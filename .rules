@@ -1,0 +1,36 @@
+# AgentOps (project rules)
+# Goal: Max automation for (1) cross-session handoff, (2) verify->commit loop, (3) test generation.
+
+## Always do this at the start
+- Read .agent/handoff.md and restate:
+  - Current goal
+  - Next actions
+  - Last verification status
+
+## Work loop (mandatory)
+- For any code change:
+  1) Implement smallest safe change
+  2) Run ".zed/scripts/verify"
+  3) If it fails: fix and repeat
+  4) If it passes: commit changes
+  5) Update handoff
+
+## Handoff is source of truth
+- .agent/handoff.md must be updated after:
+  - verify success
+  - commit
+  - session end
+- Write concise, actionable content:
+  - Decisions, Changes, Verification, Next actions
+
+## Commit message
+- ~80 chars, semantic summary (not strict conventional commits)
+- Mention scope if useful (e.g. "rust:", "py:", "swift:", "infra:")
+
+## Prefer MCP tools if available
+- If MCP tools exist:
+  - use mcp:agentops:handoff_update to update handoff
+  - use mcp:agentops:commit_if_verified to commit after verify
+  - use mcp:agentops:log_append to store session logs
+- Otherwise:
+  - update .agent/handoff.md directly

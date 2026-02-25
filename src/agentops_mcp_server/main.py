@@ -813,19 +813,6 @@ def tests_suggest_from_failures(log_path: str) -> Dict[str, Any]:
 
 
 TOOL_REGISTRY = {
-    "handoff_update": {
-        "description": "Update .agent/handoff.md",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "event": {"type": ["string", "null"]},
-                "data": {"type": ["object", "null"]},
-                "content": {"type": ["string", "null"]},
-            },
-            "required": [],
-        },
-        "handler": handoff_update,
-    },
     "handoff.read": {
         "description": "Read .agent/handoff.md and return structured sections",
         "input_schema": {"type": "object", "properties": {}, "required": []},
@@ -1069,6 +1056,9 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     resolved_name = name
     if name not in TOOL_REGISTRY and OPENAI_TOOL_COMPAT:
         resolved_name = _tool_name_from_openai(name)
+
+    if resolved_name not in TOOL_REGISTRY and name == "handoff_update":
+        resolved_name = "handoff.update"
 
     if resolved_name not in TOOL_REGISTRY:
         raise ValueError(f"Unknown tool: {name}")
