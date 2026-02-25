@@ -20,6 +20,7 @@ GITIGNORE_ENTRIES=(
   "*.py[cod]"
   ".pytest_cache/"
   ".DS_Store"
+  ".envrc"
 )
 
 mkdir -p "$ZED_SCRIPTS_DIR" "$AGENT_DIR"
