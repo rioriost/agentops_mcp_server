@@ -37,7 +37,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+
+def _resolve_repo_root() -> Path:
+    env_root = os.getenv("AGENTOPS_REPO_ROOT")
+    if env_root:
+        return Path(env_root).expanduser().resolve()
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"], cwd=str(Path.cwd())
+        )
+        return Path(out.decode("utf-8").strip()).resolve()
+    except Exception:
+        return Path.cwd().resolve()
+
+
+REPO_ROOT = _resolve_repo_root()
 HANDOFF = REPO_ROOT / ".agent" / "handoff.md"
 SESSION_LOG = REPO_ROOT / ".agent" / "session-log.jsonl"
 CHECKPOINTS_DIR = REPO_ROOT / ".agent" / "checkpoints"
