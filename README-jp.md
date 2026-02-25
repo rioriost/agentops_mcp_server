@@ -7,7 +7,14 @@
 ## クイックスタート
 
 ```bash
-./zed-agentops-init.sh project_name
+zed-agentops-init project_name
+```
+
+## インストール
+
+```
+brew tap rioriost/agentops_mcp_server
+brew install agentops_mcp_server
 ```
 
 `zed-agentops-init.sh` を使ってディレクトリをスキャフォールドします（`.rules`、`.zed/`、`.agent`、`.zed/scripts/verify` を作成）。

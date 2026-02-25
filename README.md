@@ -7,7 +7,14 @@
 ## Quick start
 
 ```bash
-./zed-agentops-init.sh project_name
+zed-agentops-init project_name
+```
+
+## Installation
+
+```
+brew tap rioriost/agentops_mcp_server
+brew install agentops_mcp_server
 ```
 
 Use `zed-agentops-init.sh` to scaffold a directory (it creates `.rules`, `.zed/`, `.agent`, and `.zed/scripts/verify`).
