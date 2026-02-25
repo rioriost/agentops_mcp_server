@@ -1068,7 +1068,15 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         name=resolved_name,
         elapsed_ms=round((time.perf_counter() - t0) * 1000, 2),
     )
-    return {"result": result}
+    content_payload = {
+        "content": [
+            {
+                "type": "text",
+                "text": json.dumps(result, ensure_ascii=False),
+            }
+        ]
+    }
+    return content_payload
 
 
 def handle_request(req: Dict[str, Any]) -> Optional[Dict[str, Any]]:
