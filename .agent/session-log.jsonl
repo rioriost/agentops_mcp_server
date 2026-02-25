@@ -2,3 +2,5 @@
 {"ts": "2026-02-25T22:11:02.400511+00:00", "kind": "handoff_update", "payload": {"path": "/Users/rifujita/ownCloud/bin/agentops_mcp_server/.agent/handoff.md", "mode": "structured"}}
 {"ts": "2026-02-25T22:16:59.806411+00:00", "kind": "commit", "payload": {"sha": "8e6d443cd073248dcf35852c8139c3e1c752f252", "message": "py/docs: switch MCP tool names to snake_case"}}
 {"ts": "2026-02-25T22:17:09.820874+00:00", "kind": "handoff_update", "payload": {"path": "/Users/rifujita/ownCloud/bin/agentops_mcp_server/.agent/handoff.md", "mode": "structured"}}
+{"ts": "2026-02-25T22:20:21.250640+00:00", "kind": "commit", "payload": {"sha": "9c8c06b6ca6b73ffbd5f369ba7c1652c6384348c", "message": "docs: update init rules MCP tool names"}}
+{"ts": "2026-02-25T22:20:29.803137+00:00", "kind": "handoff_update", "payload": {"path": "/Users/rifujita/ownCloud/bin/agentops_mcp_server/.agent/handoff.md", "mode": "structured"}}

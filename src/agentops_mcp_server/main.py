@@ -974,79 +974,12 @@ TOOL_REGISTRY = {
 }
 
 
-OPENAI_TOOL_COMPAT_RAW = os.getenv("OPENAI_TOOL_COMPAT")
-OPENAI_TOOL_COMPAT_ENV: Optional[bool] = None
-if OPENAI_TOOL_COMPAT_RAW is not None and OPENAI_TOOL_COMPAT_RAW != "":
-    OPENAI_TOOL_COMPAT_ENV = OPENAI_TOOL_COMPAT_RAW.lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-
-OPENAI_ENV_PRESENT = any(
-    os.getenv(key)
-    for key in (
-        "OPENAI_API_KEY",
-        "OPENAI_BASE_URL",
-        "OPENAI_ORG_ID",
-        "OPENAI_ORGANIZATION",
-        "OPENAI_PROJECT",
-    )
-)
-
-OPENAI_TOOL_COMPAT = (
-    OPENAI_ENV_PRESENT if OPENAI_TOOL_COMPAT_ENV is None else OPENAI_TOOL_COMPAT_ENV
-)
-
-
-def _sanitize_tool_name(name: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9_-]", "_", name)
-
-
-def _build_openai_name_map(names: List[str]) -> Tuple[Dict[str, str], Dict[str, str]]:
-    used: Dict[str, str] = {}
-    mapping: Dict[str, str] = {}
-
-    for raw_name in names:
-        if re.fullmatch(r"[a-zA-Z0-9_-]+", raw_name):
-            base = raw_name
-        else:
-            base = _sanitize_tool_name(raw_name.replace(".", "_"))
-        candidate = base
-        if candidate in used and used[candidate] != raw_name:
-            suffix = 2
-            while f"{base}_{suffix}" in used:
-                suffix += 1
-            candidate = f"{base}_{suffix}"
-
-        mapping[raw_name] = candidate
-        used[candidate] = raw_name
-
-    reverse = {alias: original for original, alias in mapping.items()}
-    return mapping, reverse
-
-
-OPENAI_NAME_MAP, OPENAI_NAME_REVERSE = _build_openai_name_map(
-    list(TOOL_REGISTRY.keys())
-)
-
-
-def _tool_name_to_openai(name: str) -> str:
-    return OPENAI_NAME_MAP.get(name, name)
-
-
-def _tool_name_from_openai(name: str) -> str:
-    return OPENAI_NAME_REVERSE.get(name, name)
-
-
 def tools_list() -> Dict[str, Any]:
     tools = []
     for name, spec in TOOL_REGISTRY.items():
-        tool_name = _tool_name_to_openai(name) if OPENAI_TOOL_COMPAT else name
         tools.append(
             {
-                "name": tool_name,
+                "name": name,
                 "description": spec["description"],
                 "inputSchema": spec["input_schema"],
             }
@@ -1056,8 +989,6 @@ def tools_list() -> Dict[str, Any]:
 
 def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     resolved_name = name
-    if name not in TOOL_REGISTRY and OPENAI_TOOL_COMPAT:
-        resolved_name = _tool_name_from_openai(name)
 
     alias_map = {
         "handoff.read": "handoff_read",
