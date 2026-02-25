@@ -41,15 +41,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 
 def _resolve_repo_root() -> Path:
-    def _match_root(candidate: Path) -> bool:
-        return (candidate / ".agent").exists() or (candidate / ".zed").exists()
-
-    cwd = Path.cwd().resolve()
-    for candidate in [cwd, *cwd.parents]:
-        if _match_root(candidate):
-            return candidate
-
-    return cwd
+    return Path.cwd().resolve()
 
 
 REPO_ROOT = _resolve_repo_root()
