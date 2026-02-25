@@ -43,32 +43,19 @@ from typing import Any, Dict, List, Optional, Tuple
 def _resolve_repo_root() -> Path:
     env_root = os.getenv("AGENTOPS_REPO_ROOT")
     if env_root:
-        return Path(env_root).expanduser().resolve()
+        candidate = Path(env_root).expanduser().resolve()
+        if (candidate / ".agent").exists() or (candidate / ".zed").exists():
+            return candidate
 
     def _match_root(candidate: Path) -> bool:
-        return (candidate / ".git").exists() or (
-            candidate / ".zed" / "scripts" / "verify"
-        ).exists()
+        return (candidate / ".agent").exists() or (candidate / ".zed").exists()
 
     cwd = Path.cwd().resolve()
     for candidate in [cwd, *cwd.parents]:
         if _match_root(candidate):
             return candidate
 
-    try:
-        out = subprocess.check_output(
-            ["git", "rev-parse", "--show-toplevel"], cwd=str(cwd)
-        )
-        return Path(out.decode("utf-8").strip()).resolve()
-    except Exception:
-        pass
-
-    module_path = Path(__file__).resolve()
-    for candidate in module_path.parents:
-        if _match_root(candidate):
-            return candidate
-
-    return cwd if cwd != Path("/") else module_path.parent
+    return cwd
 
 
 REPO_ROOT = _resolve_repo_root()
