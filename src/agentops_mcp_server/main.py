@@ -39,12 +39,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-
-def _resolve_repo_root() -> Path:
-    return Path.cwd().resolve()
-
-
-REPO_ROOT = _resolve_repo_root()
+REPO_ROOT = Path.cwd().resolve()
 HANDOFF = REPO_ROOT / ".agent" / "handoff.md"
 SESSION_LOG = REPO_ROOT / ".agent" / "session-log.jsonl"
 CHECKPOINTS_DIR = REPO_ROOT / ".agent" / "checkpoints"
