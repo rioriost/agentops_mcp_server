@@ -1,0 +1,40 @@
+[project]
+name = "agentops-mcp-server"
+authors = [
+    {name = "Rio Fujita", email = "rifujita@microsoft.com"},
+]
+version = "0.0.1"
+license = {file = "LICENSE"}
+description = "Simple MCP server for AgentOps with Zed"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/rioriost/homebrew-agentops_mcp_server"
+Issues = "https://github.com/rioriost/homebrew-agentops_mcp_server/issues"
+
+[project.scripts]
+agentops_mcp_server = "agentops_mcp_server.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentops_mcp_server"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/agentops_mcp_server/*.py",
+  "README.md",
+  "README-jp.md",
+  "LICENSE",
+  "zed-agentops-init.sh"
+]
+exclude = [
+  "agentops_mcp_server.rb",
+  "uv.lock",
+  "dist/.DS_Store",
+  ".envrc",
+]
