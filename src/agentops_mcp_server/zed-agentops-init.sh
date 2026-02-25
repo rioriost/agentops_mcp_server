@@ -72,8 +72,8 @@ cat > "$root/.rules" <<RULES
 ## Prefer MCP tools if available
 - If MCP tools exist:
   - use mcp:agentops:handoff_update to update handoff
-  - use mcp:agentops:commit_if_verified to commit after verify
-  - use mcp:agentops:log_append to store session logs
+  - use mcp:agentops:repo_commit to commit after verify
+  - use mcp:agentops:session_log_append to store session logs
 - Otherwise:
   - update ${HANDOFF_REL} directly
 RULES

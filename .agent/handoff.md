@@ -4,10 +4,12 @@
 - Ensure the Zed init script is included in the wheel and installed as an executable.
 
 ## Decisions
-- Expose only structured handoff tool and alias legacy name in calls to avoid OpenAI tool-name collisions.
+- Standardize MCP tool names on snake_case; dotted names are supported only as aliases for compatibility.
 
 ## Changes since last session
-- `src/agentops_mcp_server/main.py`: removed legacy `handoff_update` from tool registry and aliased calls to `handoff.update` to avoid `_2` tool names.
+- `src/agentops_mcp_server/main.py`: renamed tool registry keys to snake_case and mapped dotted aliases in `tools_call`.
+- `README.md`, `README-jp.md`: updated tool naming policy, permissions, and examples.
+- `plan.txt`: aligned tool examples with snake_case naming.
 
 ## Verification status
 - Last verify: `.zed/scripts/verify` (OK; no tests detected).
