@@ -4,10 +4,10 @@
 - Ensure the Zed init script is included in the wheel and installed as an executable.
 
 ## Decisions
-- Use wheel `include` to bundle `src/agentops_mcp_server/zed-agentops-init.sh`.
+- Expose only structured handoff tool and alias legacy name in calls to avoid OpenAI tool-name collisions.
 
 ## Changes since last session
-- `pyproject.toml`: added wheel `include` for `src/agentops_mcp_server/zed-agentops-init.sh` and removed shared-scripts/shared-data/force-include.
+- `src/agentops_mcp_server/main.py`: removed legacy `handoff_update` from tool registry and aliased calls to `handoff.update` to avoid `_2` tool names.
 
 ## Verification status
 - Last verify: `.zed/scripts/verify` (OK; no tests detected).

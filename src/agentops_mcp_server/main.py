@@ -10,18 +10,20 @@ Supported methods:
 - tools/list -> returns tool schemas
 - tools/call -> invokes a tool by name with arguments
 
-Tools (Level 2):
-- handoff.read() -> returns structured handoff content
-- handoff.update(summary, decisions, next_actions, risks?, links?) -> updates handoff
-- session.log_append(kind|event|text, data?) -> append to session log
-- repo.verify(timeout_sec?) -> run verify script
-- repo.commit(message?, files="auto") -> commit changes
-- tests.suggest(diff?, failures?) -> suggest tests
-
-Legacy tools:
-- handoff_update(event: str | None, data: dict | None, content: str | None)
-- commit_if_verified(message: str)
-- log_append(kind: str, payload: dict)
+Tools (snake_case):
+- handoff_read() -> returns structured handoff content
+- handoff_update(summary, decisions, next_actions, risks?, links?) -> updates handoff
+- handoff_normalize() -> normalize handoff section order
+- session_log_append(kind|event|text, data?) -> append to session log
+- session_capture_context(run_verify?, log?) -> capture repo context
+- session_checkpoint(actor, label?) -> create a diff checkpoint
+- session_diff_since_checkpoint(checkpoint_id) -> compute diff since a checkpoint
+- repo_verify(timeout_sec?) -> run verify script
+- repo_commit(message?, files="auto") -> commit changes
+- repo_status_summary() -> summarize repo status and diff
+- repo_commit_message_suggest(diff?) -> suggest commit messages
+- tests_suggest(diff?, failures?) -> suggest tests
+- tests_suggest_from_failures(log_path) -> suggest tests from failure logs
 """
 
 from __future__ import annotations
@@ -642,7 +644,7 @@ def handoff_update_structured(
     }
 
     if summary is None or decisions is None or next_actions is None:
-        raise ValueError("handoff.update requires summary, decisions, and next_actions")
+        raise ValueError("handoff_update requires summary, decisions, and next_actions")
 
     for title, value in updates.items():
         if value is not None:
@@ -813,12 +815,12 @@ def tests_suggest_from_failures(log_path: str) -> Dict[str, Any]:
 
 
 TOOL_REGISTRY = {
-    "handoff.read": {
+    "handoff_read": {
         "description": "Read .agent/handoff.md and return structured sections",
         "input_schema": {"type": "object", "properties": {}, "required": []},
         "handler": handoff_read,
     },
-    "handoff.update": {
+    "handoff_update": {
         "description": "Update .agent/handoff.md with structured sections",
         "input_schema": {
             "type": "object",
@@ -835,7 +837,7 @@ TOOL_REGISTRY = {
         },
         "handler": handoff_update_structured,
     },
-    "handoff.normalize": {
+    "handoff_normalize": {
         "description": "Normalize .agent/handoff.md section order",
         "input_schema": {"type": "object", "properties": {}, "required": []},
         "handler": handoff_normalize,
@@ -864,7 +866,7 @@ TOOL_REGISTRY = {
         },
         "handler": log_append,
     },
-    "session.log_append": {
+    "session_log_append": {
         "description": "Append a session event to .agent/session-log.jsonl",
         "input_schema": {
             "type": "object",
@@ -878,7 +880,7 @@ TOOL_REGISTRY = {
         },
         "handler": session_log_append,
     },
-    "repo.verify": {
+    "repo_verify": {
         "description": "Run .zed/scripts/verify and return results",
         "input_schema": {
             "type": "object",
@@ -887,7 +889,7 @@ TOOL_REGISTRY = {
         },
         "handler": repo_verify,
     },
-    "repo.commit": {
+    "repo_commit": {
         "description": "Commit changes with optional message and file selection",
         "input_schema": {
             "type": "object",
@@ -901,12 +903,12 @@ TOOL_REGISTRY = {
         },
         "handler": repo_commit,
     },
-    "repo.status_summary": {
+    "repo_status_summary": {
         "description": "Summarize repo status, diff stats, and last commit",
         "input_schema": {"type": "object", "properties": {}, "required": []},
         "handler": repo_status_summary,
     },
-    "repo.commit_message_suggest": {
+    "repo_commit_message_suggest": {
         "description": "Suggest commit messages from diff",
         "input_schema": {
             "type": "object",
@@ -915,7 +917,7 @@ TOOL_REGISTRY = {
         },
         "handler": repo_commit_message_suggest,
     },
-    "session.capture_context": {
+    "session_capture_context": {
         "description": "Capture repo context (branch/status/diff/last commit)",
         "input_schema": {
             "type": "object",
@@ -927,7 +929,7 @@ TOOL_REGISTRY = {
         },
         "handler": session_capture_context,
     },
-    "session.checkpoint": {
+    "session_checkpoint": {
         "description": "Create a diff checkpoint for ai/user edits",
         "input_schema": {
             "type": "object",
@@ -939,7 +941,7 @@ TOOL_REGISTRY = {
         },
         "handler": session_checkpoint,
     },
-    "session.diff_since_checkpoint": {
+    "session_diff_since_checkpoint": {
         "description": "Compute diff since a checkpoint",
         "input_schema": {
             "type": "object",
@@ -948,7 +950,7 @@ TOOL_REGISTRY = {
         },
         "handler": session_diff_since_checkpoint,
     },
-    "tests.suggest": {
+    "tests_suggest": {
         "description": "Suggest tests based on diff and failures",
         "input_schema": {
             "type": "object",
@@ -960,7 +962,7 @@ TOOL_REGISTRY = {
         },
         "handler": tests_suggest,
     },
-    "tests.suggest_from_failures": {
+    "tests_suggest_from_failures": {
         "description": "Suggest tests based on a failure log file",
         "input_schema": {
             "type": "object",
@@ -1057,8 +1059,24 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     if name not in TOOL_REGISTRY and OPENAI_TOOL_COMPAT:
         resolved_name = _tool_name_from_openai(name)
 
-    if resolved_name not in TOOL_REGISTRY and name == "handoff_update":
-        resolved_name = "handoff.update"
+    alias_map = {
+        "handoff.read": "handoff_read",
+        "handoff.update": "handoff_update",
+        "handoff.normalize": "handoff_normalize",
+        "session.log_append": "session_log_append",
+        "session.capture_context": "session_capture_context",
+        "session.checkpoint": "session_checkpoint",
+        "session.diff_since_checkpoint": "session_diff_since_checkpoint",
+        "repo.verify": "repo_verify",
+        "repo.commit": "repo_commit",
+        "repo.status_summary": "repo_status_summary",
+        "repo.commit_message_suggest": "repo_commit_message_suggest",
+        "tests.suggest": "tests_suggest",
+        "tests.suggest_from_failures": "tests_suggest_from_failures",
+    }
+
+    if resolved_name not in TOOL_REGISTRY:
+        resolved_name = alias_map.get(resolved_name, resolved_name)
 
     if resolved_name not in TOOL_REGISTRY:
         raise ValueError(f"Unknown tool: {name}")

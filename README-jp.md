@@ -66,79 +66,40 @@ Tool Settings (settings.json):
       "terminal": {
         "default": "allow"
       },
-      "mcp:agentops-server:handoff.read": {
-        "default": "allow"
-      },
       "mcp:agentops-server:handoff_read": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:handoff.update": {
         "default": "allow"
       },
       "mcp:agentops-server:handoff_update": {
         "default": "allow"
       },
-      "mcp:agentops-server:handoff.normalize": {
-        "default": "allow"
-      },
       "mcp:agentops-server:handoff_normalize": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:session.log_append": {
         "default": "allow"
       },
       "mcp:agentops-server:session_log_append": {
         "default": "allow"
       },
-      "mcp:agentops-server:session.capture_context": {
-        "default": "allow"
-      },
       "mcp:agentops-server:session_capture_context": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:session.checkpoint": {
         "default": "allow"
       },
       "mcp:agentops-server:session_checkpoint": {
         "default": "allow"
       },
-      "mcp:agentops-server:session.diff_since_checkpoint": {
-        "default": "allow"
-      },
       "mcp:agentops-server:session_diff_since_checkpoint": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:repo.verify": {
         "default": "allow"
       },
       "mcp:agentops-server:repo_verify": {
         "default": "allow"
       },
-      "mcp:agentops-server:repo.commit": {
-        "default": "allow"
-      },
       "mcp:agentops-server:repo_commit": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:repo.status_summary": {
         "default": "allow"
       },
       "mcp:agentops-server:repo_status_summary": {
         "default": "allow"
       },
-      "mcp:agentops-server:repo.commit_message_suggest": {
-        "default": "allow"
-      },
       "mcp:agentops-server:repo_commit_message_suggest": {
         "default": "allow"
       },
-      "mcp:agentops-server:tests.suggest": {
-        "default": "allow"
-      },
       "mcp:agentops-server:tests_suggest": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:tests.suggest_from_failures": {
         "default": "allow"
       },
       "mcp:agentops-server:tests_suggest_from_failures": {
@@ -159,25 +120,26 @@ Tool Settings (settings.json):
 },
 ```
 
-提供ツール（例）:
-- `handoff.read` / `handoff_read`
-- `handoff.update` / `handoff_update`
-- `handoff.normalize` / `handoff_normalize`
-- `session.log_append` / `session_log_append`
-- `session.capture_context` / `session_capture_context`
-- `session.checkpoint` / `session_checkpoint`
-- `session.diff_since_checkpoint` / `session_diff_since_checkpoint`
-- `repo.verify` / `repo_verify`
-- `repo.commit` / `repo_commit`
-- `repo.status_summary` / `repo_status_summary`
-- `repo.commit_message_suggest` / `repo_commit_message_suggest`
-- `tests.suggest` / `tests_suggest`
-- `tests.suggest_from_failures` / `tests_suggest_from_failures`
-- 互換ツール: `handoff_update`, `commit_if_verified`, `log_append`
+提供ツール（snake_case）:
+- `handoff_read`
+- `handoff_update`
+- `handoff_normalize`
+- `session_log_append`
+- `session_capture_context`
+- `session_checkpoint`
+- `session_diff_since_checkpoint`
+- `repo_verify`
+- `repo_commit`
+- `repo_status_summary`
+- `repo_commit_message_suggest`
+- `tests_suggest`
+- `tests_suggest_from_failures`
+- 互換: ドット区切り（例: `handoff.read`）は snake_case にマップされます
+- 互換ツール: `commit_if_verified`, `log_append`
 
 使用メモ:
 - `tools/list` でツール一覧を取得。例: `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
-- `tools/call` でツールを呼び出し。例: `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"handoff.read","arguments":{}}}`
+- `tools/call` でツールを呼び出し。例: `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"handoff_read","arguments":{}}}`
 - 成功時は `result`、失敗時は `error`（`code` と `message`）が返ります。
 
 あとは Zed に MCP サーバを登録し、必要な権限を付与してください。

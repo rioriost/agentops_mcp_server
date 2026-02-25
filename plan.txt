@@ -42,11 +42,11 @@ Zed は MCP サーバで 追加ツールを提供できます。  ￼
 ここで狙うのは「会話ログを手作業でまとめない」「引き継ぎを機械的に整える」「コミット規約を自動化」あたり。
 
 MCP サーバに持たせると効くツール例
-	•	handoff.read() / handoff.update(summary, decisions, next_actions)
-	•	session.log_append(text)（プロンプト・結果・コマンドログを 1 箇所に集約）
-	•	repo.verify()（言語ごとに最適な verify を呼ぶ薄いラッパ）
-	•	repo.commit(message, files="auto")（コミット規約に沿って実行）
-	•	tests.suggest()（失敗ログと変更差分を材料にテスト案を生成）
+	•	handoff_read() / handoff_update(summary, decisions, next_actions)
+	•	session_log_append(text)（プロンプト・結果・コマンドログを 1 箇所に集約）
+	•	repo_verify()（言語ごとに最適な verify を呼ぶ薄いラッパ）
+	•	repo_commit(message, files="auto")（コミット規約に沿って実行）
+	•	tests_suggest()（失敗ログと変更差分を材料にテスト案を生成）
 
 メリット
 	•	Agent 側の手順が短くなってミスが減る
