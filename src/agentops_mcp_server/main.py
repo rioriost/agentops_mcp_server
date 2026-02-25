@@ -41,12 +41,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 
 def _resolve_repo_root() -> Path:
-    env_root = os.getenv("AGENTOPS_REPO_ROOT")
-    if env_root:
-        candidate = Path(env_root).expanduser().resolve()
-        if (candidate / ".agent").exists() or (candidate / ".zed").exists():
-            return candidate
-
     def _match_root(candidate: Path) -> bool:
         return (candidate / ".agent").exists() or (candidate / ".zed").exists()
 
