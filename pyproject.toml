@@ -16,6 +16,7 @@ Issues = "https://github.com/rioriost/homebrew-agentops_mcp_server/issues"
 
 [project.scripts]
 agentops_mcp_server = "agentops_mcp_server.main:main"
+zed-agentops-init = "agentops_mcp_server.init:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -24,6 +25,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentops_mcp_server"]
 shared-scripts = { "zed-agentops-init" = "zed-agentops-init.sh" }
+shared-data = { "zed-agentops-init.sh" = "zed-agentops-init.sh" }
+force-include = { "zed-agentops-init.sh" = "agentops_mcp_server/zed-agentops-init.sh" }
 
 [tool.hatch.build.targets.sdist]
 include = [
