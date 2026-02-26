@@ -121,11 +121,11 @@ if (( ${#status_entries[@]} == 0 )); then
   exit 0
 fi
 
-bicep_files=()
-sh_files=()
 has_python=0
 has_swift=0
 has_rust=0
+sh_files=()
+bicep_files=()
 
 for entry in "${status_entries[@]}"; do
   if [[ "$entry" == *" "* ]]; then
@@ -137,8 +137,8 @@ for entry in "${status_entries[@]}"; do
     *.py|pyproject.toml|requirements.txt) has_python=1 ;;
     *.swift|Package.swift) has_swift=1 ;;
     *.rs|Cargo.toml) has_rust=1 ;;
-    *.bicep) bicep_files+=("$path") ;;
     *.sh) sh_files+=("$path") ;;
+    *.bicep) bicep_files+=("$path") ;;
   esac
 done
 
@@ -153,7 +153,7 @@ if (( has_python == 1 )); then
       echo "==> python: pytest"
       python -m pytest -q && ran=1 || exit 1
     else
-      echo "==> python: pytest not installed; skipping"
+      skip_cmd "python" "pytest"
     fi
   else
     skip_cmd "python" "python"
@@ -178,7 +178,15 @@ if (( has_rust == 1 )); then
   fi
 fi
 
-# Optional: bicep lint if az or bicep exists
+if (( ${#sh_files[@]} > 0 )); then
+  if have_cmd shellcheck; then
+    echo "==> bash: shellcheck"
+    shellcheck "${sh_files[@]}" && ran=1 || exit 1
+  else
+    skip_cmd "bash" "shellcheck"
+  fi
+fi
+
 if (( ${#bicep_files[@]} > 0 )); then
   if have_cmd az; then
     echo "==> bicep: az bicep lint"
@@ -191,21 +199,7 @@ if (( ${#bicep_files[@]} > 0 )); then
       bicep lint "$bicep_file" && ran=1 || exit 1
     done
   else
-    echo "==> bicep: az/bicep not installed; skipping"
-  fi
-else
-  echo "==> bicep: no .bicep changes; skipping"
-fi
-
-# Optional: bash lint if shellcheck exists
-if have_cmd shellcheck; then
-  if (( ${#sh_files[@]} > 0 )); then
-    echo "==> bash: shellcheck"
-    shellcheck "${sh_files[@]}" && ran=1 || exit 1
-  fi
-else
-  if (( ${#sh_files[@]} > 0 )); then
-    skip_cmd "bash" "shellcheck"
+    skip_cmd "az/bicep" "az/bicep"
   fi
 fi
 
