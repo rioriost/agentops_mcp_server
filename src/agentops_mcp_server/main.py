@@ -37,11 +37,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-REPO_ROOT = Path.cwd().resolve()
-HANDOFF = REPO_ROOT / ".agent" / "handoff.md"
-SESSION_LOG = REPO_ROOT / ".agent" / "session-log.jsonl"
-CHECKPOINTS_DIR = REPO_ROOT / ".agent" / "checkpoints"
-VERIFY = REPO_ROOT / ".zed" / "scripts" / "verify"
+
+def _set_repo_root(root: Path) -> None:
+    global REPO_ROOT, HANDOFF, SESSION_LOG, CHECKPOINTS_DIR, VERIFY
+    REPO_ROOT = root
+    HANDOFF = REPO_ROOT / ".agent" / "handoff.md"
+    SESSION_LOG = REPO_ROOT / ".agent" / "session-log.jsonl"
+    CHECKPOINTS_DIR = REPO_ROOT / ".agent" / "checkpoints"
+    VERIFY = REPO_ROOT / ".zed" / "scripts" / "verify"
+
+
+_set_repo_root(Path.cwd().resolve())
 
 SECTION_ORDER: List[Tuple[str, str]] = [
     ("Current goal", "summary"),
@@ -944,11 +950,16 @@ TOOL_REGISTRY = {
 def tools_list() -> Dict[str, Any]:
     tools = []
     for name, spec in TOOL_REGISTRY.items():
+        input_schema = dict(spec["input_schema"])
+        properties = dict(input_schema.get("properties") or {})
+        properties["workspace_root"] = {"type": ["string", "null"]}
+        input_schema["properties"] = properties
+        input_schema["required"] = list(input_schema.get("required") or [])
         tools.append(
             {
                 "name": name,
                 "description": spec["description"],
-                "inputSchema": spec["input_schema"],
+                "inputSchema": input_schema,
             }
         )
     return {"tools": tools}
@@ -979,8 +990,17 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     if resolved_name not in TOOL_REGISTRY:
         raise ValueError(f"Unknown tool: {name}")
 
+    previous_root = REPO_ROOT
+    workspace_root = arguments.get("workspace_root") if arguments else None
+    if isinstance(workspace_root, str) and workspace_root.strip():
+        _set_repo_root(Path(workspace_root).expanduser().resolve())
+        arguments = {k: v for k, v in arguments.items() if k != "workspace_root"}
+
     handler = TOOL_REGISTRY[resolved_name]["handler"]
-    result = handler(**arguments) if arguments else handler()  # type: ignore[misc]
+    try:
+        result = handler(**arguments) if arguments else handler()  # type: ignore[misc]
+    finally:
+        _set_repo_root(previous_root)
     content_payload = {
         "content": [
             {
