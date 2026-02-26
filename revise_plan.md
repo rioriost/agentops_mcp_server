@@ -1,117 +1,129 @@
-# Remote-Capable Redesign Plan (MCP Server)
+# Greenfield Remote MCP Server Design Plan
 
 ## Summary
-Current design assumes local filesystem access (`.agent/`, `.zed/`, repo root) and local process execution (`git`, `verify`). In a remote deployment, these assumptions fail because the server cannot read/write local project files or execute local commands. This plan redesigns the MCP server to operate in remote environments by making all file/system interactions explicit, client-driven, and optionally bridged through a secure agent on the client side.
+Design and implement a remote-first MCP server that provides the same functional surface as the current local server (handoff, verify, repo status, session logs, checkpoints, test suggestions) without assuming access to the client filesystem or local process execution. All file and command operations are performed by a client-side executor over explicit, authenticated protocols.
 
 ## Goals
-- Run MCP server remotely without direct access to client filesystem.
-- Preserve tool capabilities (handoff, verify, repo status) via explicit client mediation.
-- Maintain backward compatibility for local deployments.
+- Provide the same tool capabilities as the local MCP server.
+- Run entirely remote: no direct access to client files or local commands.
+- Ensure secure, auditable, and explicit execution of file and command operations.
+- Keep the design transport-agnostic (stdio, HTTP, WebSocket).
 
 ## Non-Goals
-- Building a full remote IDE sync system.
-- Implicitly accessing client files without explicit transport.
+- Transparent remote filesystem mirroring.
+- Implicit or ambient access to client resources.
 
-## Key Design Changes
+## Architecture Overview
+### Components
+1. **Remote MCP Server**
+   - Exposes tools via MCP JSON-RPC.
+   - Holds session state and validates requests.
+   - Delegates all file/command operations to a client executor.
 
-### 1. Introduce a "Workspace Provider" Abstraction
-Add a pluggable interface used by all file and repo operations:
+2. **Client Executor (Required)**
+   - Runs on the user's machine or within the target workspace.
+   - Implements filesystem and command APIs.
+   - Enforces local security policy and user consent.
 
-- `read_file(path)`
-- `write_file(path, content)`
-- `list_directory(path)`
-- `run_command(command, cwd)`
-- `stat(path)` / `exists(path)`
-- `cwd()` (optional)
+3. **Transport Layer**
+   - MCP-compatible JSON-RPC over stdio or network.
+   - Optional secure channel (mTLS, SSH, or signed tokens).
 
-Two implementations:
-1. **LocalWorkspaceProvider**: current behavior using local FS + subprocess.
-2. **RemoteWorkspaceProvider**: delegates operations to the MCP client via new tool calls or a relay protocol.
+### Trust Boundary
+- Server is untrusted with respect to local files.
+- Client executor is the sole authority for local operations.
 
-### 2. Explicit Workspace Context
-Remove implicit `REPO_ROOT = Path.cwd().resolve()` assumptions.
+## Core Abstractions
+### Workspace API (implemented by client executor)
+- `workspace.read(path)`
+- `workspace.write(path, content)`
+- `workspace.list(path)`
+- `workspace.stat(path)`
+- `workspace.run(command, cwd, timeout)`
+- `workspace.cwd()`
+- `workspace.root()` (optional explicit root)
 
-- Add a required `workspace_root` field for tools that need repo context.
-- Store the current workspace root in session state (set via `initialize` or a new tool).
-- Reject operations if `workspace_root` is missing.
+### Server Tool Surface
+- `handoff_read`
+- `handoff_update`
+- `handoff_normalize`
+- `repo_verify`
+- `repo_status_summary`
+- `repo_commit`
+- `session_log_append`
+- `session_checkpoint`
+- `session_diff_since_checkpoint`
+- `tests_suggest`
+- `tests_suggest_from_failures`
 
-### 3. Client-Mediated File Operations
-Define new MCP tool calls that the client implements (or proxy agent implements):
+## Data Model
+### Workspace Context
+- `workspace_root` (required)
+- `workspace_id` (optional)
+- `capabilities` (read/write/run)
 
-- `workspace.read`
-- `workspace.write`
-- `workspace.list`
-- `workspace.run`
-- `workspace.stat`
+### Audit Log
+Each server request records:
+- tool name
+- resolved workspace path
+- command (if any)
+- timestamp
+- result status
 
-Server-side tool handlers call these instead of local FS.  
-For local mode, these calls are implemented by LocalWorkspaceProvider.
+## Request Flow (Remote-First)
+1. Client connects and provides `workspace_root` and `capabilities`.
+2. Server validates workspace and stores session context.
+3. Server tools resolve paths relative to `workspace_root`.
+4. Server calls `workspace.*` methods via the executor.
+5. Executor performs the action and returns results.
+6. Server returns tool output.
 
-### 4. Handoff Handling
-Handoff is now stored via provider:
+## Tool Behavior Details
+### Handoff Tools
+- `handoff_read`: `workspace.read(".agent/handoff.md")`
+- `handoff_update`: `workspace.write(".agent/handoff.md", content)`
+- `handoff_normalize`: read → normalize → write
 
-- `handoff_read` → `workspace.read(".agent/handoff.md")`
-- `handoff_update` → `workspace.write(".agent/handoff.md", content)`
+### Verify and Repo Tools
+- `repo_verify`: `workspace.run(".zed/scripts/verify", cwd=workspace_root)`
+- `repo_status_summary`: execute `git` commands via `workspace.run`
 
-If remote mode and file doesn’t exist, create it via `workspace.write`.
+### Session Logs and Checkpoints
+- `.agent/session-log.jsonl`: append via `workspace.write` with read-modify-write or executor-supported append.
+- `.agent/checkpoints/*.json`: write checkpoint snapshots via executor.
 
-### 5. Verify/Repo Commands
-Replace direct `subprocess` and `git` with provider-backed `workspace.run`.
+## Security Model
+- Path normalization and traversal protection enforced by executor.
+- Command execution restricted to an allowlist (`git`, `.zed/scripts/verify`, etc).
+- Optional interactive approval on client side.
+- Request signing or token authentication for remote calls.
 
-- `repo_verify` runs `.zed/scripts/verify` via `workspace.run`.
-- `repo_status_summary` runs `git` commands via `workspace.run`.
+## Implementation Plan (Greenfield)
+### Phase 1: Protocol and Interfaces
+- Define `workspace.*` RPC schema and error contract.
+- Define server tool schema and required context.
+- Implement a reference client executor.
 
-### 6. Session Log & Checkpoints
-Session log and checkpoints are written via provider:
+### Phase 2: Remote MCP Server
+- Implement tool handlers using only `workspace.*` calls.
+- Add session context validation for `workspace_root`.
+- Add structured audit logging.
 
-- `.agent/session-log.jsonl`
-- `.agent/checkpoints/*.json`
+### Phase 3: Client Executor
+- Local filesystem operations with sandboxing to `workspace_root`.
+- Safe command runner with allowlist and timeouts.
+- Optional user consent UI for write/run.
 
-### 7. Backward Compatibility
-Default to LocalWorkspaceProvider when:
-- `REMOTE_WORKSPACE=0` or unset.
-- `workspace_root` is inferred from `cwd` (local mode only).
-
-Remote mode requires explicit `workspace_root` and provider implementation.
-
-## Data Flow
-
-1. Client connects, passes `workspace_root` and mode (local/remote).
-2. Server stores workspace context in session state.
-3. Tool calls resolve file paths relative to `workspace_root`.
-4. All file/command operations go through the provider.
-
-## Security Considerations
-- Validate and normalize paths to prevent traversal outside `workspace_root`.
-- Restrict `workspace.run` to whitelisted commands or approved scripts.
-- Require explicit client consent for writes and command execution.
-- Log all remote operations for auditability.
-
-## Migration Plan
-
-1. **Phase 1: Abstraction Layer**
-   - Add provider interface.
-   - Refactor all file and command usages to go through provider.
-   - Keep local behavior unchanged.
-
-2. **Phase 2: Remote Provider**
-   - Define new client-side MCP tools.
-   - Implement remote provider calling these tools.
-
-3. **Phase 3: Workspace Context**
-   - Require `workspace_root` for remote mode.
-   - Add explicit errors when missing.
-
-4. **Phase 4: Documentation**
-   - Update README with local vs remote usage.
-   - Document required client integrations.
+### Phase 4: Integration & Docs
+- End-to-end demo with Zed client executor.
+- Document deployment patterns (local executor, SSH tunnel, hosted server).
 
 ## Open Questions
-- Should `workspace_root` be a mandatory param for all repo tools?
-- Do we need a capability handshake to confirm remote support?
-- How to handle long-running commands (`verify`) in remote mode?
+- How to propagate user consent for write/run across repeated commands?
+- Should executor support streaming stdout/stderr?
+- What is the default allowlist for `workspace.run`?
 
 ## Success Criteria
-- Remote MCP server can read/write `handoff.md` in the client’s project.
-- `repo_verify` and `repo_status_summary` work via remote command execution.
-- No implicit dependency on server-local filesystem.
+- Full tool parity with local MCP server without server-side filesystem access.
+- Verified remote `handoff_read`, `repo_verify`, and `repo_status_summary`.
+- Clear security boundaries and auditable actions.
