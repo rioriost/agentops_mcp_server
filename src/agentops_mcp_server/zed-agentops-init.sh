@@ -144,39 +144,48 @@ done
 
 ran=0
 
+have_cmd() { command -v "$1" >/dev/null 2>&1; }
+skip_cmd() { echo "==> $1: $2 not installed; skipping"; }
+
 if (( has_python == 1 )); then
-  if command -v python >/dev/null 2>&1; then
+  if have_cmd python; then
     if python -m pytest --version >/dev/null 2>&1; then
       echo "==> python: pytest"
       python -m pytest -q && ran=1 || exit 1
     else
       echo "==> python: pytest not installed; skipping"
     fi
+  else
+    skip_cmd "python" "python"
   fi
 fi
 
 if (( has_swift == 1 )); then
-  if command -v swift >/dev/null 2>&1; then
+  if have_cmd swift; then
     echo "==> swift: swift test"
     swift test && ran=1 || exit 1
+  else
+    skip_cmd "swift" "swift"
   fi
 fi
 
 if (( has_rust == 1 )); then
-  if command -v cargo >/dev/null 2>&1; then
+  if have_cmd cargo; then
     echo "==> rust: cargo test"
     cargo test && ran=1 || exit 1
+  else
+    skip_cmd "rust" "cargo"
   fi
 fi
 
 # Optional: bicep lint if az or bicep exists
 if (( ${#bicep_files[@]} > 0 )); then
-  if command -v az >/dev/null 2>&1; then
+  if have_cmd az; then
     echo "==> bicep: az bicep lint"
     for bicep_file in "${bicep_files[@]}"; do
       az bicep lint -f "$bicep_file" && ran=1 || exit 1
     done
-  elif command -v bicep >/dev/null 2>&1; then
+  elif have_cmd bicep; then
     echo "==> bicep: bicep lint"
     for bicep_file in "${bicep_files[@]}"; do
       bicep lint "$bicep_file" && ran=1 || exit 1
@@ -189,10 +198,14 @@ else
 fi
 
 # Optional: bash lint if shellcheck exists
-if command -v shellcheck >/dev/null 2>&1; then
+if have_cmd shellcheck; then
   if (( ${#sh_files[@]} > 0 )); then
     echo "==> bash: shellcheck"
     shellcheck "${sh_files[@]}" && ran=1 || exit 1
+  fi
+else
+  if (( ${#sh_files[@]} > 0 )); then
+    skip_cmd "bash" "shellcheck"
   fi
 fi
 
