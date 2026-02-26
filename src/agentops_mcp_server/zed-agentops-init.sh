@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-root="${1:-.}"
+if [ -z "${1:-}" ]; then
+  echo "Usage: $0 <root>"
+  exit 1
+fi
+root="$1"
 mkdir -p "$root"
 if [ ! -d "$root/.git" ]; then
   ( cd "$root" && git init )
