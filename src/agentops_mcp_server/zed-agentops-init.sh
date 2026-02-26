@@ -44,7 +44,7 @@ for entry in "${GITIGNORE_ENTRIES[@]}"; do
 done
 
 # --- .rules ---
-cat > "$root/.rules" <<RULES
+cat > "$root/.rules" <<'RULES'
 # AgentOps (project rules)
 # Goal: Max automation for (1) cross-session handoff, (2) verify->commit loop, (3) test generation.
 
