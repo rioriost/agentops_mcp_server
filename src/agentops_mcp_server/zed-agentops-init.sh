@@ -115,6 +115,11 @@ cd "$(git rev-parse --show-toplevel)"
 
 echo "==> verify: start"
 
+if [[ -z "$(git status --porcelain)" ]]; then
+  echo "==> verify: no changes; skipping"
+  exit 0
+fi
+
 ran=0
 
 if [[ -f "pyproject.toml" || -f "requirements.txt" ]]; then
