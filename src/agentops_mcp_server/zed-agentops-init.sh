@@ -142,6 +142,26 @@ if [[ -f "Cargo.toml" ]]; then
   fi
 fi
 
+# Optional: bicep lint if az or bicep exists
+mapfile -d '' bicep_files < <(git ls-files -z '*.bicep' 2>/dev/null || true)
+if (( ${#bicep_files[@]} > 0 )); then
+  if command -v az >/dev/null 2>&1; then
+    echo "==> bicep: az bicep lint"
+    for bicep_file in "${bicep_files[@]}"; do
+      az bicep lint -f "$bicep_file" && ran=1 || exit 1
+    done
+  elif command -v bicep >/dev/null 2>&1; then
+    echo "==> bicep: bicep lint"
+    for bicep_file in "${bicep_files[@]}"; do
+      bicep lint "$bicep_file" && ran=1 || exit 1
+    done
+  else
+    echo "==> bicep: az/bicep not installed; skipping"
+  fi
+else
+  echo "==> bicep: no .bicep files found; skipping"
+fi
+
 # Optional: bash lint if shellcheck exists
 if command -v shellcheck >/dev/null 2>&1; then
   mapfile -d '' sh_files < <(git ls-files -z '*.sh' 2>/dev/null || true)
