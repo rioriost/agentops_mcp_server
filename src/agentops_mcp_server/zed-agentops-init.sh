@@ -115,14 +115,36 @@ cd "$(git rev-parse --show-toplevel)"
 
 echo "==> verify: start"
 
-if [[ -z "$(git status --porcelain)" ]]; then
+mapfile -d '' status_entries < <(git status --porcelain -z)
+if (( ${#status_entries[@]} == 0 )); then
   echo "==> verify: no changes; skipping"
   exit 0
 fi
 
+bicep_files=()
+sh_files=()
+has_python=0
+has_swift=0
+has_rust=0
+
+for entry in "${status_entries[@]}"; do
+  if [[ "$entry" == *" "* ]]; then
+    path="${entry#?? }"
+  else
+    path="$entry"
+  fi
+  case "$path" in
+    *.py|pyproject.toml|requirements.txt) has_python=1 ;;
+    *.swift|Package.swift) has_swift=1 ;;
+    *.rs|Cargo.toml) has_rust=1 ;;
+    *.bicep) bicep_files+=("$path") ;;
+    *.sh) sh_files+=("$path") ;;
+  esac
+done
+
 ran=0
 
-if [[ -f "pyproject.toml" || -f "requirements.txt" ]]; then
+if (( has_python == 1 )); then
   if command -v python >/dev/null 2>&1; then
     if python -m pytest --version >/dev/null 2>&1; then
       echo "==> python: pytest"
@@ -133,14 +155,14 @@ if [[ -f "pyproject.toml" || -f "requirements.txt" ]]; then
   fi
 fi
 
-if [[ -f "Package.swift" ]]; then
+if (( has_swift == 1 )); then
   if command -v swift >/dev/null 2>&1; then
     echo "==> swift: swift test"
     swift test && ran=1 || exit 1
   fi
 fi
 
-if [[ -f "Cargo.toml" ]]; then
+if (( has_rust == 1 )); then
   if command -v cargo >/dev/null 2>&1; then
     echo "==> rust: cargo test"
     cargo test && ran=1 || exit 1
@@ -148,7 +170,6 @@ if [[ -f "Cargo.toml" ]]; then
 fi
 
 # Optional: bicep lint if az or bicep exists
-mapfile -d '' bicep_files < <(git ls-files -z '*.bicep' 2>/dev/null || true)
 if (( ${#bicep_files[@]} > 0 )); then
   if command -v az >/dev/null 2>&1; then
     echo "==> bicep: az bicep lint"
@@ -164,12 +185,11 @@ if (( ${#bicep_files[@]} > 0 )); then
     echo "==> bicep: az/bicep not installed; skipping"
   fi
 else
-  echo "==> bicep: no .bicep files found; skipping"
+  echo "==> bicep: no .bicep changes; skipping"
 fi
 
 # Optional: bash lint if shellcheck exists
 if command -v shellcheck >/dev/null 2>&1; then
-  mapfile -d '' sh_files < <(git ls-files -z '*.sh' 2>/dev/null || true)
   if (( ${#sh_files[@]} > 0 )); then
     echo "==> bash: shellcheck"
     shellcheck "${sh_files[@]}" && ran=1 || exit 1
