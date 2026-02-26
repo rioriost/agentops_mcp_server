@@ -77,6 +77,10 @@ cat > "$root/.rules" <<RULES
   - use mcp:agentops:session_log_append to store session logs
 - Otherwise:
   - update ${HANDOFF_REL} directly
+
+## MCP workspace_root requirement
+- When calling MCP tools, always pass `workspace_root` (project root path).
+- If `workspace_root` is omitted, the server falls back to its current working directory.
 RULES
 
 # --- initial handoff.md ---
