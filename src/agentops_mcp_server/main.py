@@ -30,11 +30,9 @@ from __future__ import annotations
 
 import difflib
 import json
-import os
 import re
 import subprocess
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -74,26 +72,9 @@ CODE_SUFFIXES = {
     ".hpp",
 }
 
-LOG_TIMING = os.getenv("AGENTOPS_LOG_TIMING", "").lower() in {"1", "true", "yes", "on"}
-LOG_PATH = os.getenv("AGENTOPS_LOG_PATH", "").strip() or None
-
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _log_timing(event: str, **data: Any) -> None:
-    if not LOG_TIMING:
-        return
-    payload = {"ts": _now_iso(), "event": event, **data}
-    line = json.dumps(payload, ensure_ascii=False) + "\n"
-    if LOG_PATH:
-        _ensure_parent(Path(LOG_PATH))
-        with Path(LOG_PATH).open("a", encoding="utf-8") as f:
-            f.write(line)
-        return
-    sys.stderr.write(line)
-    sys.stderr.flush()
 
 
 def _write_json(obj: Dict[str, Any]) -> None:
@@ -999,14 +980,7 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError(f"Unknown tool: {name}")
 
     handler = TOOL_REGISTRY[resolved_name]["handler"]
-    t0 = time.perf_counter()
-    _log_timing("tool.start", name=resolved_name)
     result = handler(**arguments) if arguments else handler()  # type: ignore[misc]
-    _log_timing(
-        "tool.end",
-        name=resolved_name,
-        elapsed_ms=round((time.perf_counter() - t0) * 1000, 2),
-    )
     content_payload = {
         "content": [
             {
@@ -1063,16 +1037,7 @@ def main() -> None:
             if not isinstance(req, dict):
                 raise ValueError("Request must be a JSON object")
             req_id = req.get("id") if isinstance(req, dict) else None
-            method = req.get("method") if isinstance(req, dict) else None
-            t0 = time.perf_counter()
-            _log_timing("request.start", method=method, request_id=req_id)
             resp = handle_request(req)
-            _log_timing(
-                "request.end",
-                method=method,
-                request_id=req_id,
-                elapsed_ms=round((time.perf_counter() - t0) * 1000, 2),
-            )
             if resp is not None:
                 _write_json(resp)
         except Exception as exc:  # noqa: BLE001
@@ -1081,7 +1046,6 @@ def main() -> None:
                 req_id = req.get("id") if isinstance(req, dict) else None
             except Exception:  # noqa: BLE001
                 req_id = None
-            _log_timing("request.error", request_id=req_id, error=str(exc))
             if req_id is not None:
                 _write_json(
                     {
