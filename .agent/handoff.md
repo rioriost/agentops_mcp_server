@@ -1,13 +1,13 @@
 # Handoff
 
 ## Current goal
-- Skip overwriting existing .gitignore, .rules, .agent/handoff.md, and .zed scaffold assets when initializing into an existing directory.
+- Switch WIP tracking to JSON and initialize `.agent/work-in-progress.json` during init.
 
 ## Decisions
-- Treat existing paths as non-overwritable, emitting skip messages instead of clobbering files.
+- Keep `handoff.md` in Markdown while using JSON for WIP state.
 
 ## Changes since last session
-- `src/agentops_mcp_server/zed-agentops-init.sh`: guard existing .gitignore/.rules/handoff; skip .zed scaffold if present; handle non-file/non-dir paths with skip notices.
+- `src/agentops_mcp_server/zed-agentops-init.sh`: update `.rules` WIP section for JSON fields; create `work-in-progress.json` on init.
 
 ## Verification status
 - Last verify: `.zed/scripts/verify` (OK; no tests detected).

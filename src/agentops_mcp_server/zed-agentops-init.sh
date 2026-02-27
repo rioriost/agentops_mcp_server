@@ -123,7 +123,7 @@ else
   - update ${HANDOFF_REL} directly
 
 ## MCP workspace_root requirement
-- When calling MCP tools, always pass `workspace_root` (project root path).
+- When calling MCP tools, always pass `workspace_root` as the absolute project root path.
 - If `workspace_root` is omitted, the server falls back to its current working directory.
 RULES
 fi
