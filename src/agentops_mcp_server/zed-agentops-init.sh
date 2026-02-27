@@ -96,6 +96,20 @@ else
 - Write concise, actionable content:
   - Decisions, Changes, Verification, Next actions
 
+## Work-in-progress tracking
+- .agent/work-in-progress.json must be updated at:
+  - task start
+  - after edits
+  - verify start/end
+  - commit start/end
+  - session end
+- Keep it short and stateful:
+  - current_phase
+  - current_task
+  - last_action
+  - blocking_issues
+  - next_step
+
 ## Commit message
 - ~80 chars, semantic summary (not strict conventional commits)
 - Mention scope if useful (e.g. "rust:", "py:", "swift:", "infra:")
@@ -136,6 +150,21 @@ else
 ## Next actions
 1. (fill)
 MD
+fi
+
+# --- initial work-in-progress.json ---
+if [ -f "$AGENT_DIR/work-in-progress.json" ]; then
+  echo "Skipping .agent/work-in-progress.json (already exists)."
+else
+  cat > "$AGENT_DIR/work-in-progress.json" <<'JSON'
+{
+  "current_phase": "(fill)",
+  "current_task": "(fill)",
+  "last_action": "(fill)",
+  "blocking_issues": "(fill)",
+  "next_step": "(fill)"
+}
+JSON
 fi
 
 if [ -e "$ZED_DIR" ] && [ ! -d "$ZED_DIR" ]; then

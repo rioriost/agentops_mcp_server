@@ -8,3 +8,5 @@
 {"ts": "2026-02-25T22:25:32.577375+00:00", "kind": "handoff_update", "payload": {"path": "/Users/rifujita/ownCloud/bin/agentops_mcp_server/.agent/handoff.md", "mode": "structured"}}
 {"ts": "2026-02-27T01:14:52.552068+00:00", "kind": "commit", "payload": {"sha": "0f81bf2173f0c2848dac010ba9255cb67dca7af9", "message": "sh: confirm before initializing existing directories"}}
 {"ts": "2026-02-27T01:14:58.070293+00:00", "kind": "handoff_update", "payload": {"path": "/Users/rifujita/ownCloud/bin/agentops_mcp_server/.agent/handoff.md", "mode": "structured"}}
+{"ts": "2026-02-27T01:30:25.798644+00:00", "kind": "commit", "payload": {"sha": "2232578aa91e202f931944bbd5ced318503d5971", "message": "sh: avoid overwriting existing scaffold assets"}}
+{"ts": "2026-02-27T01:30:28.539741+00:00", "kind": "handoff_update", "payload": {"path": "/Users/rifujita/ownCloud/bin/agentops_mcp_server/.agent/handoff.md", "mode": "structured"}}

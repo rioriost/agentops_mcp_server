@@ -1,13 +1,13 @@
 # Handoff
 
 ## Current goal
-- Add confirmation prompt when initializing into an existing directory and normalize trailing slash input.
+- Skip overwriting existing .gitignore, .rules, .agent/handoff.md, and .zed scaffold assets when initializing into an existing directory.
 
 ## Decisions
-- Use case-insensitive yes parsing via `tr` for bash 3.2 compatibility.
+- Treat existing paths as non-overwritable, emitting skip messages instead of clobbering files.
 
 ## Changes since last session
-- `src/agentops_mcp_server/zed-agentops-init.sh`: prompt on existing directory before scaffolding; normalize root input and handle non-directory paths.
+- `src/agentops_mcp_server/zed-agentops-init.sh`: guard existing .gitignore/.rules/handoff; skip .zed scaffold if present; handle non-file/non-dir paths with skip notices.
 
 ## Verification status
 - Last verify: `.zed/scripts/verify` (OK; no tests detected).
