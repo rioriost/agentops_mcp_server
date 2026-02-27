@@ -26,7 +26,7 @@ if [ -d "$root" ]; then
 fi
 
 mkdir -p "$root"
-if [ ! -d "$root/.git" ]; then
+if [ ! -e "$root/.git" ]; then
   ( cd "$root" && git init )
 fi
 
@@ -46,24 +46,31 @@ GITIGNORE_ENTRIES=(
   ".envrc"
 )
 
-mkdir -p "$ZED_SCRIPTS_DIR" "$AGENT_DIR"
+mkdir -p "$AGENT_DIR"
 
 # --- .gitignore ---
-if [ ! -f "$GITIGNORE_FILE" ]; then
+if [ -e "$GITIGNORE_FILE" ] && [ ! -f "$GITIGNORE_FILE" ]; then
+  echo "Skipping .gitignore (path exists and is not a file)."
+elif [ -f "$GITIGNORE_FILE" ]; then
+  echo "Skipping .gitignore (already exists)."
+else
   touch "$GITIGNORE_FILE"
+  append_gitignore_entry() {
+    local entry="$1"
+    if ! grep -qxF "$entry" "$GITIGNORE_FILE"; then
+      echo "$entry" >> "$GITIGNORE_FILE"
+    fi
+  }
+  for entry in "${GITIGNORE_ENTRIES[@]}"; do
+    append_gitignore_entry "$entry"
+  done
 fi
-append_gitignore_entry() {
-  local entry="$1"
-  if ! grep -qxF "$entry" "$GITIGNORE_FILE"; then
-    echo "$entry" >> "$GITIGNORE_FILE"
-  fi
-}
-for entry in "${GITIGNORE_ENTRIES[@]}"; do
-  append_gitignore_entry "$entry"
-done
 
 # --- .rules ---
-cat > "$root/.rules" <<'RULES'
+if [ -f "$root/.rules" ]; then
+  echo "Skipping .rules (already exists)."
+else
+  cat > "$root/.rules" <<'RULES'
 # AgentOps (project rules)
 # Goal: Max automation for (1) cross-session handoff, (2) verify->commit loop, (3) test generation.
 
@@ -105,9 +112,13 @@ cat > "$root/.rules" <<'RULES'
 - When calling MCP tools, always pass `workspace_root` (project root path).
 - If `workspace_root` is omitted, the server falls back to its current working directory.
 RULES
+fi
 
 # --- initial handoff.md ---
-cat > "$AGENT_DIR/handoff.md" <<'MD'
+if [ -f "$AGENT_DIR/handoff.md" ]; then
+  echo "Skipping .agent/handoff.md (already exists)."
+else
+  cat > "$AGENT_DIR/handoff.md" <<'MD'
 # Handoff
 
 ## Current goal
@@ -125,9 +136,17 @@ cat > "$AGENT_DIR/handoff.md" <<'MD'
 ## Next actions
 1. (fill)
 MD
+fi
 
-# --- .zed/scripts/verify (polyglot-ish) ---
-cat > "$ZED_SCRIPTS_DIR/verify" <<'SH'
+if [ -e "$ZED_DIR" ] && [ ! -d "$ZED_DIR" ]; then
+  echo "Skipping .zed scaffold (path exists and is not a directory)."
+elif [ -e "$ZED_DIR" ]; then
+  echo "Skipping .zed scaffold (already exists)."
+else
+  mkdir -p "$ZED_SCRIPTS_DIR"
+
+  # --- .zed/scripts/verify (polyglot-ish) ---
+  cat > "$ZED_SCRIPTS_DIR/verify" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -228,10 +247,10 @@ fi
 
 echo "==> verify: OK"
 SH
-chmod +x "$ZED_SCRIPTS_DIR/verify"
+  chmod +x "$ZED_SCRIPTS_DIR/verify"
 
-# --- .zed/tasks.json ---
-cat > "$root/.zed/tasks.json" <<JSON
+  # --- .zed/tasks.json ---
+  cat > "$root/.zed/tasks.json" <<JSON
 [
   {
     "label": "verify",
@@ -247,6 +266,7 @@ cat > "$root/.zed/tasks.json" <<JSON
   }
 ]
 JSON
+fi
 
 echo "Initialized AgentOps scaffold in: $root"
 echo "Next:"

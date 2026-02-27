@@ -1,18 +1,17 @@
 # Handoff
 
 ## Current goal
-- Ensure the Zed init script is included in the wheel and installed as an executable.
+- Add confirmation prompt when initializing into an existing directory and normalize trailing slash input.
 
 ## Decisions
-- Unify command availability checks in `.zed/scripts/verify` to avoid repeated logic.
+- Use case-insensitive yes parsing via `tr` for bash 3.2 compatibility.
 
 ## Changes since last session
-- `src/agentops_mcp_server/zed-agentops-init.sh`: `.zed/scripts/verify` now uses shared command-check helpers and only reports missing tools when relevant.
+- `src/agentops_mcp_server/zed-agentops-init.sh`: prompt on existing directory before scaffolding; normalize root input and handle non-directory paths.
 
 ## Verification status
 - Last verify: `.zed/scripts/verify` (OK; no tests detected).
 
 ## Next actions
-1. Pass `workspace_root` in MCP tool calls and confirm `.agent`/`.zed` paths resolve correctly.
-2. Review the greenfield remote plan in `revise_plan.md` and confirm scope/capabilities.
-3. Build a wheel and confirm it contains `agentops_mcp_server/zed-agentops-init.sh`.
+1. Review the greenfield remote plan in `revise_plan.md` and confirm scope/capabilities.
+2. Build a wheel and confirm it contains `agentops_mcp_server/zed-agentops-init.sh`.
