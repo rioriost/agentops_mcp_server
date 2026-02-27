@@ -5,7 +5,26 @@ if [ -z "${1:-}" ]; then
   echo "Usage: $0 <root>"
   exit 1
 fi
-root="$1"
+root="${1%/}"
+if [ -z "$root" ]; then
+  root="$1"
+fi
+
+if [ -e "$root" ] && [ ! -d "$root" ]; then
+  echo "Error: $root exists and is not a directory."
+  exit 1
+fi
+
+if [ -d "$root" ]; then
+  echo "Directory $root already exists. Continue? [y/N]"
+  read -r reply
+  reply_lc=$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]')
+  case "$reply_lc" in
+    y|yes) ;;
+    *) echo "Aborted."; exit 1 ;;
+  esac
+fi
+
 mkdir -p "$root"
 if [ ! -d "$root/.git" ]; then
   ( cd "$root" && git init )
