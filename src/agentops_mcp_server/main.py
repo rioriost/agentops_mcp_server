@@ -707,6 +707,70 @@ def _commit_message_from_status(status_lines: List[str]) -> str:
     return f"chore: update {count} file(s)"
 
 
+def _auto_snapshot_checkpoint_after_commit() -> Dict[str, Any]:
+    if not JOURNAL.exists():
+        return {"ok": False, "reason": "journal not found", "path": str(JOURNAL)}
+
+    snapshot = _read_json_file(SNAPSHOT)
+    snapshot_state = snapshot.get("state") if isinstance(snapshot, dict) else None
+    snapshot_session_id: Optional[str] = None
+    snapshot_last_seq: Optional[int] = None
+
+    if isinstance(snapshot, dict):
+        snapshot_session_id = snapshot.get("session_id")
+        if not isinstance(snapshot_session_id, str):
+            snapshot_session_id = None
+        snapshot_last_seq = snapshot.get("last_applied_seq")
+        if not isinstance(snapshot_last_seq, int):
+            snapshot_last_seq = None
+
+    if not snapshot_session_id and isinstance(snapshot_state, dict):
+        state_session_id = snapshot_state.get("session_id")
+        if isinstance(state_session_id, str):
+            snapshot_session_id = state_session_id
+
+    start_seq = snapshot_last_seq or 0
+    journal_result = _read_journal_events(start_seq=start_seq)
+    events = journal_result.get("events") or []
+    invalid_lines = (
+        journal_result.get("invalid_lines")
+        if isinstance(journal_result.get("invalid_lines"), int)
+        else 0
+    )
+    last_seq = journal_result.get("last_seq")
+    if not isinstance(last_seq, int):
+        last_seq = start_seq
+
+    if not events and snapshot is None and last_seq == 0:
+        return {"ok": False, "reason": "no journal events", "last_seq": last_seq}
+
+    state = replay_events_to_state(
+        snapshot_state=snapshot_state,
+        events=events,
+        preferred_session_id=snapshot_session_id,
+        invalid_lines=invalid_lines,
+    )
+    session_id = snapshot_session_id
+    if not session_id and isinstance(state, dict):
+        state_session_id = state.get("session_id")
+        if isinstance(state_session_id, str):
+            session_id = state_session_id
+
+    snapshot_result = snapshot_save(
+        state=state, session_id=session_id, last_applied_seq=last_seq
+    )
+    checkpoint_result = checkpoint_update(
+        last_applied_seq=last_seq, snapshot_path=SNAPSHOT.name
+    )
+    return {
+        "ok": True,
+        "snapshot": snapshot_result,
+        "checkpoint": checkpoint_result,
+        "last_applied_seq": last_seq,
+        "events_applied": len(events),
+    }
+
+
 def commit_if_verified(
     message: str, timeout_sec: Optional[int] = None
 ) -> Dict[str, str]:
@@ -730,6 +794,21 @@ def commit_if_verified(
         _journal_safe("commit.end", {"ok": False, "summary": str(exc)})
         raise
     _journal_safe("commit.end", {"ok": True, "sha": sha, "summary": summary})
+    try:
+        auto_result = _auto_snapshot_checkpoint_after_commit()
+        if not auto_result.get("ok"):
+            _journal_safe(
+                "error",
+                {
+                    "message": "auto snapshot/checkpoint skipped",
+                    "context": auto_result,
+                },
+            )
+    except Exception as exc:  # noqa: BLE001
+        _journal_safe(
+            "error",
+            {"message": "auto snapshot/checkpoint failed", "context": str(exc)},
+        )
     return {"sha": sha, "message": msg}
 
 
@@ -789,6 +868,21 @@ def repo_commit(
         _journal_safe("commit.end", {"ok": False, "summary": str(exc)})
         raise
     _journal_safe("commit.end", {"ok": True, "sha": sha, "summary": summary})
+    try:
+        auto_result = _auto_snapshot_checkpoint_after_commit()
+        if not auto_result.get("ok"):
+            _journal_safe(
+                "error",
+                {
+                    "message": "auto snapshot/checkpoint skipped",
+                    "context": auto_result,
+                },
+            )
+    except Exception as exc:  # noqa: BLE001
+        _journal_safe(
+            "error",
+            {"message": "auto snapshot/checkpoint failed", "context": str(exc)},
+        )
     return {"ok": True, "sha": sha, "message": msg, "summary": summary}
 
 
