@@ -10,7 +10,10 @@ Note: This project currently supports macOS only.
 
 ```bash
 zed-agentops-init project_name
+zed-agentops-init --update existing_project
 ```
+
+Use `--update` to migrate an existing AgentOps-managed directory (removes legacy files, creates `.agent` state files, and refreshes `.rules`).
 
 ## Installation
 
@@ -33,11 +36,11 @@ Open the directory in Zed and use the Agent Panel.
 - `.agent/journal.jsonl` : append-only event log
 - `.agent/snapshot.json` : state snapshot
 - `.agent/checkpoint.json` : roll-forward starting point
-- `src/agentops_mcp_server/` : optional MCP server scaffold (Python)
+- `/opt/homebrew/bin/agentops_mcp_server` : MCP server binary installed by Homebrew (macOS)
 
 ## MCP Server (Zed)
 
-The MCP server lives in `src/agentops_mcp_server/main.py` and exposes a minimal JSON-RPC 2.0 stdio protocol compatible with Zed. It reads one JSON object per line from stdin and writes JSON-RPC responses to stdout. Supported methods include `initialize`, `initialized`, `tools/list`, `tools/call`, `shutdown`, and `exit`.
+The MCP server is provided as a Homebrew-installed binary (e.g. `/opt/homebrew/bin/agentops_mcp_server`) and exposes a minimal JSON-RPC 2.0 stdio protocol compatible with Zed. It reads one JSON object per line from stdin and writes JSON-RPC responses to stdout. Supported methods include `initialize`, `initialized`, `tools/list`, `tools/call`, `shutdown`, and `exit`.
 
 
 
