@@ -55,7 +55,8 @@
       "scope": "test",
       "title": "Verify update flow on existing managed directory",
       "description": "Run a manual verification checklist covering legacy file removal, new file creation, and .rules update.",
-      "status": "todo",
+      "status": "done",
+      "outputs": ["ticket_T-006_update_flow_verification.md"],
       "dependencies": ["T-003", "T-004", "T-005"]
     },
     {
