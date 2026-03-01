@@ -1,0 +1,62 @@
+{
+  "project": "agentops_mcp_server",
+  "version": "v0.1.1",
+  "generated_from": "zed-agentops-init.sh --update migration plan",
+  "tickets": [
+    {
+      "id": "T-001",
+      "phase": "Phase 0",
+      "scope": "infra",
+      "title": "Define --update migration behavior and safety checks",
+      "description": "Specify how --update detects existing AgentOps-managed directories, confirms intent, and handles missing/partial legacy files.",
+      "status": "todo",
+      "outputs": ["ticket_T-001_update_spec.md"],
+      "dependencies": []
+    },
+    {
+      "id": "T-002",
+      "phase": "Phase 1",
+      "scope": "infra",
+      "title": "Add --update flag parsing to zed-agentops-init.sh",
+      "description": "Extend CLI parsing to accept --update, preserve existing behavior when flag is absent, and route to migration flow.",
+      "status": "todo",
+      "dependencies": ["T-001"]
+    },
+    {
+      "id": "T-003",
+      "phase": "Phase 1",
+      "scope": "infra",
+      "title": "Implement legacy cleanup for update flow",
+      "description": "Delete .agent/handoff.md, .agent/snapshot-log.jsonl, and .agent/work-in-progress.md during --update when present.",
+      "status": "todo",
+      "dependencies": ["T-002"]
+    },
+    {
+      "id": "T-004",
+      "phase": "Phase 1",
+      "scope": "infra",
+      "title": "Create journal/snapshot/checkpoint files in update flow",
+      "description": "Ensure .agent/journal.jsonl, .agent/snapshot.json, and .agent/checkpoint.json are created with the current schema.",
+      "status": "todo",
+      "dependencies": ["T-002", "T-003"]
+    },
+    {
+      "id": "T-005",
+      "phase": "Phase 2",
+      "scope": "docs",
+      "title": "Update .rules template for v0.1.1 migration",
+      "description": "Revise .rules content to reflect current persistence files and update guidance applied in --update.",
+      "status": "todo",
+      "dependencies": ["T-004"]
+    },
+    {
+      "id": "T-006",
+      "phase": "Phase 2",
+      "scope": "test",
+      "title": "Verify update flow on existing managed directory",
+      "description": "Run a manual verification checklist covering legacy file removal, new file creation, and .rules update.",
+      "status": "todo",
+      "dependencies": ["T-003", "T-004", "T-005"]
+    }
+  ]
+}
