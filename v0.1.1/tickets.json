@@ -65,6 +65,7 @@
       "title": "Add post-commit snapshot/checkpoint hook",
       "description": "On successful commit, persist snapshot.json and checkpoint.json with the latest state/last_applied_seq; handle failures gracefully and no-op when state is unavailable.",
       "status": "todo",
+      "outputs": ["ticket_T-007_auto_snapshot_hook.md"],
       "dependencies": []
     }
   ]
