@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+echo "==> verify: start"
+
+ran=0
+
+if [[ -f "pyproject.toml" || -f "requirements.txt" ]]; then
+  if command -v python >/dev/null 2>&1; then
+    if python -m pytest --version >/dev/null 2>&1; then
+      echo "==> python: pytest"
+      if python - <<'PY' >/dev/null 2>&1
+import importlib.util
+raise SystemExit(0 if importlib.util.find_spec("pytest_cov") else 1)
+PY
+      then
+        python -m pytest -q --cov=agentops_mcp_server --cov-report=term-missing && ran=1 || exit 1
+      else
+        python -m pytest -q && ran=1 || exit 1
+      fi
+    else
+      echo "==> python: pytest not installed; skipping"
+    fi
+  fi
+fi
+
+if [[ "$ran" -eq 0 ]]; then
+  echo "WARN: No known test/build targets detected. Add checks to .zed/scripts/verify."
+fi
+
+echo "==> verify: OK"

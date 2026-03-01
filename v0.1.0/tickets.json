@@ -1,0 +1,139 @@
+{
+  "project": "agentops_mcp_server",
+  "version": "v0.1.0",
+  "generated_from": "revise_plan.md",
+  "tickets": [
+    {
+      "id": "T-001",
+      "phase": "Phase 0",
+      "scope": "infra",
+      "title": "Inventory legacy handoff/WIP/session_log usage",
+      "description": "Identify all code paths and scripts that read/write handoff, WIP, and session_log to prepare for removal.",
+      "status": "done",
+      "outputs": ["ticket_T-001_inventory.md"],
+      "dependencies": []
+    },
+    {
+      "id": "T-002",
+      "phase": "Phase 0",
+      "scope": "py",
+      "title": "List legacy tracking removal candidates in main.py",
+      "description": "Document and mark sections in main.py that update legacy tracking files for later removal.",
+      "status": "done",
+      "inputs": ["ticket_T-001_inventory.md"],
+      "outputs": ["ticket_T-002_removal_candidates.md"],
+      "dependencies": ["T-001"]
+    },
+    {
+      "id": "T-003",
+      "phase": "Phase 1",
+      "scope": "py",
+      "title": "Add journal.jsonl append API",
+      "description": "Implement append-only event logging with monotonic sequence numbers.",
+      "status": "done",
+      "dependencies": ["T-001"]
+    },
+    {
+      "id": "T-004",
+      "phase": "Phase 1",
+      "scope": "py",
+      "title": "Add snapshot.json save/load API",
+      "description": "Implement state snapshot persistence and restore routines.",
+      "status": "done",
+      "dependencies": ["T-003"]
+    },
+    {
+      "id": "T-005",
+      "phase": "Phase 1",
+      "scope": "py",
+      "title": "Add checkpoint.json update/read API",
+      "description": "Track last applied sequence and snapshot path for roll-forward start.",
+      "status": "done",
+      "dependencies": ["T-003", "T-004"]
+    },
+    {
+      "id": "T-006",
+      "phase": "Phase 1",
+      "scope": "infra",
+      "title": "Define per-project storage paths and locking",
+      "description": "Specify directory layout and locking strategy for journal/snapshot/checkpoint per project.",
+      "status": "done",
+      "outputs": ["ticket_T-006_storage_paths.md"],
+      "dependencies": ["T-001"]
+    },
+    {
+      "id": "T-007",
+      "phase": "Phase 2",
+      "scope": "py",
+      "title": "Implement event kinds and payload schema",
+      "description": "Define event types and common fields for journal entries.",
+      "status": "done",
+      "outputs": ["ticket_T-007_event_schema.md"],
+      "dependencies": ["T-003", "T-006"]
+    },
+    {
+      "id": "T-008",
+      "phase": "Phase 2",
+      "scope": "py",
+      "title": "Add event emission hooks in main.py",
+      "description": "Emit events for session/task/tool/file/verify/commit/error actions.",
+      "status": "done",
+      "dependencies": ["T-007"]
+    },
+    {
+      "id": "T-009",
+      "phase": "Phase 2",
+      "scope": "py",
+      "title": "Remove legacy tracking updates",
+      "description": "Eliminate handoff/WIP/session_log write paths after event system is in place.",
+      "status": "done",
+      "inputs": ["ticket_T-002_removal_candidates.md"],
+      "dependencies": ["T-002", "T-008"]
+    },
+    {
+      "id": "T-010",
+      "phase": "Phase 3",
+      "scope": "py",
+      "title": "Implement roll-forward replay",
+      "description": "Rebuild state by replaying journal from checkpoint and snapshot.",
+      "status": "todo",
+      "dependencies": ["T-004", "T-005", "T-007"]
+    },
+    {
+      "id": "T-011",
+      "phase": "Phase 3",
+      "scope": "py",
+      "title": "Add continue-ready state reconstruction API",
+      "description": "Expose API to rebuild agent state for 'continue' sessions.",
+      "status": "done",
+      "dependencies": ["T-010"]
+    },
+    {
+      "id": "T-012",
+      "phase": "Phase 4",
+      "scope": "infra",
+      "title": "Update zed-agentops-init.sh for new files",
+      "description": "Initialize journal/snapshot/checkpoint instead of legacy files.",
+      "status": "done",
+      "dependencies": ["T-006", "T-009"]
+    },
+    {
+      "id": "T-013",
+      "phase": "Phase 4",
+      "scope": "docs",
+      "title": "Update documentation for v0.1.0 behavior",
+      "description": "Document new persistence files and resume flow.",
+      "status": "done",
+      "dependencies": ["T-011", "T-012"]
+    },
+    {
+      "id": "T-014",
+      "phase": "Phase 4",
+      "scope": "test",
+      "title": "Add tests for append/snapshot/replay",
+      "description": "Cover journal append, snapshot save/load, and roll-forward replay.",
+      "status": "done",
+      "dependencies": ["T-010"]
+    }
+  ]
+}
