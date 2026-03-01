@@ -9,7 +9,7 @@
       "scope": "infra",
       "title": "Define --update migration behavior and safety checks",
       "description": "Specify how --update detects existing AgentOps-managed directories, confirms intent, and handles missing/partial legacy files.",
-      "status": "todo",
+      "status": "in-progress",
       "outputs": ["ticket_T-001_update_spec.md"],
       "dependencies": []
     },
