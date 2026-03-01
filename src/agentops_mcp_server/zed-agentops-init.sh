@@ -1,13 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ -z "${1:-}" ]; then
-  echo "Usage: $0 <root>"
-  exit 1
-fi
-root="${1%/}"
+update_mode=0
+root=""
+
+usage() {
+  echo "Usage: $0 <root> [--update]"
+  echo "       $0 --update <root>"
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    --update)
+      update_mode=1
+      ;;
+    *)
+      if [ -z "$root" ]; then
+        root="${arg%/}"
+        if [ -z "$root" ]; then
+          root="$arg"
+        fi
+      else
+        echo "Error: unexpected argument: $arg"
+        usage
+        exit 1
+      fi
+      ;;
+  esac
+done
+
 if [ -z "$root" ]; then
-  root="$1"
+  usage
+  exit 1
 fi
 
 if [ -e "$root" ] && [ ! -d "$root" ]; then
@@ -15,19 +39,45 @@ if [ -e "$root" ] && [ ! -d "$root" ]; then
   exit 1
 fi
 
-if [ -d "$root" ]; then
-  echo "Directory $root already exists. Continue? [y/N]"
+if (( update_mode == 1 )); then
+  if [ ! -d "$root" ]; then
+    echo "Error: $root does not exist or is not a directory."
+    exit 1
+  fi
+
+  managed_hint=0
+  if [ -d "$root/.agent" ] || [ -d "$root/.zed" ] || [ -f "$root/.rules" ]; then
+    managed_hint=1
+  fi
+
+  if (( managed_hint == 0 )); then
+    echo "Warning: $root does not look like an AgentOps-managed directory."
+  fi
+
+  echo "Update existing directory $root? [y/N]"
   read -r reply
   reply_lc=$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]')
   case "$reply_lc" in
     y|yes) ;;
     *) echo "Aborted."; exit 1 ;;
   esac
+else
+  if [ -d "$root" ]; then
+    echo "Directory $root already exists. Continue? [y/N]"
+    read -r reply
+    reply_lc=$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]')
+    case "$reply_lc" in
+      y|yes) ;;
+      *) echo "Aborted."; exit 1 ;;
+    esac
+  fi
 fi
 
-mkdir -p "$root"
-if [ ! -e "$root/.git" ]; then
-  ( cd "$root" && git init )
+if (( update_mode == 0 )); then
+  mkdir -p "$root"
+  if [ ! -e "$root/.git" ]; then
+    ( cd "$root" && git init )
+  fi
 fi
 
 ZED_DIR="$root/.zed"
@@ -52,6 +102,20 @@ GITIGNORE_ENTRIES=(
 
 mkdir -p "$AGENT_DIR"
 
+if (( update_mode == 1 )); then
+  legacy_paths=(
+    "$AGENT_DIR/handoff.md"
+    "$AGENT_DIR/snapshot-log.jsonl"
+    "$AGENT_DIR/work-in-progress.md"
+  )
+  for legacy_path in "${legacy_paths[@]}"; do
+    if [ -e "$legacy_path" ]; then
+      rm -f "$legacy_path"
+      echo "Removed legacy: ${legacy_path#$root/}"
+    fi
+  done
+fi
+
 # --- .gitignore ---
 if [ -e "$GITIGNORE_FILE" ] && [ ! -f "$GITIGNORE_FILE" ]; then
   echo "Skipping .gitignore (path exists and is not a file)."
@@ -69,9 +133,14 @@ else
 fi
 
 # --- .rules ---
-if [ -f "$root/.rules" ]; then
+if [ -e "$root/.rules" ] && [ ! -f "$root/.rules" ]; then
+  echo "Skipping .rules (path exists and is not a file)."
+elif [ -f "$root/.rules" ] && (( update_mode == 0 )); then
   echo "Skipping .rules (already exists)."
 else
+  if [ -f "$root/.rules" ] && (( update_mode == 1 )); then
+    cp "$root/.rules" "$root/.rules.bak"
+  fi
   cat > "$root/.rules" <<'RULES'
 # AgentOps (project rules)
 # Goal: Max automation for (1) journal/snapshot/checkpoint persistence, (2) verify->commit loop, (3) test generation.
@@ -153,7 +222,9 @@ else
 JSON
 fi
 
-if [ -e "$ZED_DIR" ] && [ ! -d "$ZED_DIR" ]; then
+if (( update_mode == 1 )); then
+  echo "Skipping .zed scaffold (update mode)."
+elif [ -e "$ZED_DIR" ] && [ ! -d "$ZED_DIR" ]; then
   echo "Skipping .zed scaffold (path exists and is not a directory)."
 elif [ -e "$ZED_DIR" ]; then
   echo "Skipping .zed scaffold (already exists)."
@@ -283,6 +354,10 @@ SH
 JSON
 fi
 
-echo "Initialized AgentOps scaffold in: $root"
-echo "Next:"
-echo "  - Open $root in Zed"
+if (( update_mode == 1 )); then
+  echo "Updated AgentOps scaffold in: $root"
+else
+  echo "Initialized AgentOps scaffold in: $root"
+  echo "Next:"
+  echo "  - Open $root in Zed"
+fi
