@@ -57,6 +57,15 @@
       "description": "Run a manual verification checklist covering legacy file removal, new file creation, and .rules update.",
       "status": "todo",
       "dependencies": ["T-003", "T-004", "T-005"]
+    },
+    {
+      "id": "T-007",
+      "phase": "Phase 2",
+      "scope": "py",
+      "title": "Add post-commit snapshot/checkpoint hook",
+      "description": "On successful commit, persist snapshot.json and checkpoint.json with the latest state/last_applied_seq; handle failures gracefully and no-op when state is unavailable.",
+      "status": "todo",
+      "dependencies": []
     }
   ]
 }
