@@ -10,7 +10,10 @@
 
 ```bash
 zed-agentops-init project_name
+zed-agentops-init --update existing_project
 ```
+
+`--update` を使うと既存の AgentOps 管理ディレクトリを移行できます（legacy ファイル削除、`.agent` 状態ファイル作成、`.rules` 更新）。
 
 ## インストール
 
@@ -33,11 +36,11 @@ brew install agentops_mcp_server
 - `.agent/journal.jsonl` : 追記専用のイベントログ
 - `.agent/snapshot.json` : 状態スナップショット
 - `.agent/checkpoint.json` : ロールフォワード開始位置
-- `src/agentops_mcp_server/` : 任意の MCP サーバスキャフォールド（Python）
+- `/opt/homebrew/bin/agentops_mcp_server` : Homebrew でインストールされる MCP サーババイナリ（macOS）
 
 ## MCP Server (Zed)
 
-MCP サーバは `src/agentops_mcp_server/main.py` にあり、Zed と互換の最小 JSON-RPC 2.0 stdio プロトコルを提供します。stdin から 1 行 1 JSON を読み、stdout に JSON-RPC 応答を返します。対応メソッドは `initialize`、`initialized`、`tools/list`、`tools/call`、`shutdown`、`exit` です。
+MCP サーバは Homebrew でインストールされるバイナリ（例: `/opt/homebrew/bin/agentops_mcp_server`）として提供され、Zed と互換の最小 JSON-RPC 2.0 stdio プロトコルを提供します。stdin から 1 行 1 JSON を読み、stdout に JSON-RPC 応答を返します。対応メソッドは `initialize`、`initialized`、`tools/list`、`tools/call`、`shutdown`、`exit` です。
 
 
 
