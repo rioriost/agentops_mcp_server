@@ -19,7 +19,7 @@
       "scope": "infra",
       "title": "Add --update flag parsing to zed-agentops-init.sh",
       "description": "Extend CLI parsing to accept --update, preserve existing behavior when flag is absent, and route to migration flow.",
-      "status": "todo",
+      "status": "done",
       "dependencies": ["T-001"]
     },
     {
@@ -28,7 +28,7 @@
       "scope": "infra",
       "title": "Implement legacy cleanup for update flow",
       "description": "Delete .agent/handoff.md, .agent/snapshot-log.jsonl, and .agent/work-in-progress.md during --update when present.",
-      "status": "todo",
+      "status": "done",
       "dependencies": ["T-002"]
     },
     {
@@ -37,7 +37,7 @@
       "scope": "infra",
       "title": "Create journal/snapshot/checkpoint files in update flow",
       "description": "Ensure .agent/journal.jsonl, .agent/snapshot.json, and .agent/checkpoint.json are created with the current schema.",
-      "status": "todo",
+      "status": "done",
       "dependencies": ["T-002", "T-003"]
     },
     {
@@ -46,7 +46,7 @@
       "scope": "docs",
       "title": "Update .rules template for v0.1.1 migration",
       "description": "Revise .rules content to reflect current persistence files and update guidance applied in --update.",
-      "status": "todo",
+      "status": "done",
       "dependencies": ["T-004"]
     },
     {
