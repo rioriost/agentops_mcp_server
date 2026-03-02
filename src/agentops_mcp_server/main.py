@@ -35,9 +35,9 @@ import re
 import subprocess
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def _set_repo_root(root: Path) -> None:
@@ -186,6 +186,122 @@ def _read_json_file(path: Path) -> Optional[Dict[str, Any]]:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return None
+
+
+def _parse_iso_ts(value: str) -> Optional[datetime]:
+    try:
+        if value.endswith("Z"):
+            value = value[:-1] + "+00:00"
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _week_start_utc(dt: datetime) -> datetime:
+    dt = dt.astimezone(timezone.utc)
+    start = dt - timedelta(days=dt.weekday())
+    return start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _read_first_event_with_ts(
+    path: Path,
+) -> Optional[Tuple[Dict[str, Any], datetime]]:
+    if not path.exists():
+        return None
+    with path.open("r", encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(rec, dict):
+                continue
+            ts_value = rec.get("ts")
+            if not isinstance(ts_value, str):
+                continue
+            parsed = _parse_iso_ts(ts_value)
+            if parsed is None:
+                continue
+            return rec, parsed
+    return None
+
+
+def _rotate_journal_if_prev_week() -> Dict[str, Any]:
+    if not JOURNAL.exists():
+        return {"ok": False, "reason": "journal not found", "path": str(JOURNAL)}
+    first = _read_first_event_with_ts(JOURNAL)
+    if not first:
+        return {"ok": False, "reason": "no valid journal timestamps"}
+    _, first_dt = first
+    current_week = _week_start_utc(datetime.now(timezone.utc))
+    first_week = _week_start_utc(first_dt)
+    if first_week == current_week:
+        return {"ok": True, "rotated": False, "reason": "current week only"}
+
+    last_week_start = current_week - timedelta(days=7)
+    last_week_end = current_week - timedelta(seconds=1)
+
+    old_lines: List[str] = []
+    keep_lines: List[str] = []
+    invalid_json_lines = 0
+    invalid_ts = 0
+
+    with JOURNAL.open("r", encoding="utf-8") as f:
+        for raw_line in f:
+            if not raw_line.strip():
+                continue
+            try:
+                rec = json.loads(raw_line)
+            except json.JSONDecodeError:
+                invalid_json_lines += 1
+                keep_lines.append(raw_line)
+                continue
+            if not isinstance(rec, dict):
+                invalid_json_lines += 1
+                keep_lines.append(raw_line)
+                continue
+            ts_value = rec.get("ts")
+            if not isinstance(ts_value, str):
+                invalid_ts += 1
+                keep_lines.append(raw_line)
+                continue
+            parsed = _parse_iso_ts(ts_value)
+            if parsed is None:
+                invalid_ts += 1
+                keep_lines.append(raw_line)
+                continue
+            serialized = json.dumps(rec, ensure_ascii=False) + "\n"
+            if last_week_start <= parsed <= last_week_end:
+                old_lines.append(serialized)
+            else:
+                keep_lines.append(serialized)
+
+    if not old_lines:
+        return {
+            "ok": True,
+            "rotated": False,
+            "reason": "no last-week events",
+            "invalid_json_lines": invalid_json_lines,
+            "invalid_ts": invalid_ts,
+        }
+
+    archive = JOURNAL.with_name(
+        f"journal.{last_week_start:%Y%m%d}-{last_week_end:%Y%m%d}.jsonl"
+    )
+    _write_text(archive, "".join(old_lines))
+    _write_text(JOURNAL, "".join(keep_lines))
+    return {
+        "ok": True,
+        "rotated": True,
+        "archive": str(archive),
+        "archived": len(old_lines),
+        "kept": len(keep_lines),
+        "invalid_json_lines": invalid_json_lines,
+        "invalid_ts": invalid_ts,
+    }
 
 
 def snapshot_save(
@@ -762,10 +878,14 @@ def _auto_snapshot_checkpoint_after_commit() -> Dict[str, Any]:
     checkpoint_result = checkpoint_update(
         last_applied_seq=last_seq, snapshot_path=SNAPSHOT.name
     )
+    rotation_result = _rotate_journal_if_prev_week()
+    if rotation_result.get("rotated"):
+        _journal_safe("journal.rotate", rotation_result)
     return {
         "ok": True,
         "snapshot": snapshot_result,
         "checkpoint": checkpoint_result,
+        "journal_rotation": rotation_result,
         "last_applied_seq": last_seq,
         "events_applied": len(events),
     }
