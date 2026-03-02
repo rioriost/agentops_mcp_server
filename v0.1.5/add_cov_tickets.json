@@ -112,8 +112,17 @@
       "scope": "test",
       "title": "Increase coverage toward 90% with integration paths",
       "description": "Add release-marked tests for remaining high-value branches (tool flows, error paths, and IO helpers) to continue raising coverage toward 90%.",
-      "status": "planned",
+      "status": "done",
       "dependencies": ["C-011"]
+    },
+    {
+      "id": "C-013",
+      "phase": "Phase 10",
+      "scope": "test",
+      "title": "Expand coverage on remaining branches",
+      "description": "Add release-marked tests targeting remaining uncovered branches to move coverage toward 90%.",
+      "status": "planned",
+      "dependencies": ["C-012"]
     }
   ]
 }

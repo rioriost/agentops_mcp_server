@@ -607,3 +607,88 @@ def test_normalize_test_candidate_suffix_rules():
 
 def test_test_candidates_for_non_code_returns_empty():
     assert m._test_candidates_for_path("README.md") == []
+
+
+def test_truncate_text_behaviors():
+    assert m._truncate_text(None) is None
+    assert m._truncate_text("short", limit=10) == "short"
+    result = m._truncate_text("hello world", limit=5)
+    assert result.startswith("hello")
+    assert result.endswith("...(truncated)")
+
+
+def test_commit_message_from_status_counts():
+    assert m._commit_message_from_status([]) == "chore: no-op"
+    assert m._commit_message_from_status([" M a", " M b"]) == "chore: update 2 file(s)"
+
+
+def test_git_status_porcelain_parses_lines(monkeypatch):
+    monkeypatch.setattr(m, "git", lambda *args: " M a\n\n?? b\n")
+    assert m._git_status_porcelain() == ["M a", "?? b"]
+
+
+def test_tests_suggest_uses_git_diff_when_none(monkeypatch):
+    def fake_git(*args):
+        if args == ("diff", "--name-only"):
+            return "src/agentops_mcp_server/main.py"
+        if args == ("diff", "--name-only", "--cached"):
+            return "tests/test_main.py"
+        return ""
+
+    monkeypatch.setattr(m, "git", fake_git)
+    result = m.tests_suggest()
+    paths = {item["path"] for item in result["suggestions"]}
+    assert "tests/agentops_mcp_server/main_test.py" in paths
+    assert "tests/test_main.py" in paths
+
+
+def test_tests_suggest_adds_investigate_for_failures():
+    result = m.tests_suggest(diff="", failures="boom")
+    assert result["suggestions"] == [
+        {"path": "(investigate)", "reason": "verify failures present"}
+    ]
+
+
+def test_tests_suggest_from_failures_requires_path():
+    with pytest.raises(ValueError):
+        m.tests_suggest_from_failures("")
+
+
+def test_tests_suggest_from_failures_missing_file(temp_repo):
+    with pytest.raises(FileNotFoundError):
+        m.tests_suggest_from_failures("missing.log")
+
+
+def test_tests_suggest_from_failures_relative_path(temp_repo, monkeypatch):
+    log_path = temp_repo / "logs" / "fail.txt"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text("boom", encoding="utf-8")
+    monkeypatch.setattr(m, "git", lambda *args: "")
+    result = m.tests_suggest_from_failures("logs/fail.txt")
+    assert result["suggestions"][0]["path"] == "(investigate)"
+
+
+def test_session_capture_context_verify_unavailable(monkeypatch):
+    monkeypatch.setattr(m, "git", lambda *args: "main")
+    monkeypatch.setattr(m, "run_verify", "nope")
+    context = m.session_capture_context(run_verify=True)
+    assert context["verify"]["ok"] is False
+    assert context["verify"]["error"] == "verify unavailable"
+
+
+def test_session_capture_context_runs_verify(monkeypatch):
+    monkeypatch.setattr(m, "git", lambda *args: "main")
+    monkeypatch.setattr(m, "run_verify", lambda: {"ok": True})
+    context = m.session_capture_context(run_verify=True)
+    assert context["verify"]["ok"] is True
+
+
+def test_read_journal_events_missing_file(temp_repo):
+    result = m._read_journal_events(start_seq=0)
+    assert result["events"] == []
+    assert result["last_seq"] == 0
+
+
+def test_journal_append_requires_kind(temp_repo):
+    with pytest.raises(ValueError, match="kind is required"):
+        m.journal_append(kind="", payload={})
