@@ -9,7 +9,7 @@
       "scope": "test",
       "title": "Add roll_forward_replay error cases",
       "description": "Add tests in tests/test_persistence.py (e.g., test_roll_forward_replay_missing_checkpoint, test_roll_forward_replay_missing_snapshot) to assert ok=false with reason 'checkpoint not found'/'snapshot not found' and validate the returned path.",
-      "status": "planned",
+      "status": "done",
       "dependencies": []
     },
     {

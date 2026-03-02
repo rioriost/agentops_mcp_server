@@ -66,6 +66,20 @@ def test_snapshot_save_and_load(temp_repo):
     assert snapshot["last_applied_seq"] == 3
 
 
+def test_roll_forward_replay_missing_checkpoint(temp_repo):
+    replay = m.roll_forward_replay()
+    assert replay["ok"] is False
+    assert replay["reason"] == "checkpoint not found"
+
+
+def test_roll_forward_replay_missing_snapshot(temp_repo):
+    m.checkpoint_update(last_applied_seq=0, snapshot_path="missing.json")
+    replay = m.roll_forward_replay()
+    assert replay["ok"] is False
+    assert replay["reason"] == "snapshot not found"
+    assert replay["path"].endswith("/missing.json")
+
+
 def test_roll_forward_replay_and_continue_state_rebuild(temp_repo):
     snapshot_state = {"current_phase": "session", "last_action": "boot"}
     m.snapshot_save(state=snapshot_state, session_id="s1", last_applied_seq=1)
