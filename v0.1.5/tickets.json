@@ -27,7 +27,7 @@
       "scope": "test",
       "title": "Add tools/call arguments type validation test",
       "description": "Add a tests/test_main.py case that sends tools/call with arguments as a non-object (e.g., list/string) and asserts handle_request raises ValueError.",
-      "status": "planned",
+      "status": "done",
       "dependencies": []
     },
     {

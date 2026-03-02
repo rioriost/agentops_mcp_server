@@ -61,6 +61,17 @@ def test_handle_request_tools_call_invalid_name_type():
         m.handle_request(req)
 
 
+def test_handle_request_tools_call_invalid_arguments_type():
+    req = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {"name": "snapshot_load", "arguments": []},
+    }
+    with pytest.raises(ValueError):
+        m.handle_request(req)
+
+
 def test_main_emits_response(monkeypatch):
     input_req = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}) + "\n"
     stdin = io.StringIO(input_req)

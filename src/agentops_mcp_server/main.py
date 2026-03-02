@@ -1515,7 +1515,8 @@ def handle_request(req: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         result = tools_list()
     elif method == "tools/call":
         name = params.get("name")
-        arguments = params.get("arguments") or {}
+        raw_arguments = params.get("arguments")
+        arguments = raw_arguments if raw_arguments is not None else {}
         if not isinstance(name, str):
             raise ValueError("tools/call requires 'name' (string)")
         if not isinstance(arguments, dict):
