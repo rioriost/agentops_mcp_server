@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -243,3 +244,62 @@ def test_tools_call_alias_maps_to_handler(temp_repo):
     assert result["diff"] == ""
     assert result["files"] == []
     assert result["suggestions"]
+
+
+def test_parse_iso_ts_handles_z_and_invalid():
+    parsed = m._parse_iso_ts("2026-03-02T12:00:00Z")
+    assert parsed == datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)
+    assert m._parse_iso_ts("not-a-ts") is None
+
+
+def test_rotate_journal_if_prev_week_archives_last_week(temp_repo, monkeypatch):
+    agent_dir = temp_repo / ".agent"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    journal = agent_dir / "journal.jsonl"
+
+    last_week_event = {"ts": "2026-03-04T10:00:00+00:00", "seq": 1}
+    current_week_event = {"ts": "2026-03-09T01:00:00+00:00", "seq": 2}
+    invalid_json = "{bad json\n"
+    invalid_ts = json.dumps({"ts": "not-a-ts", "seq": 3}) + "\n"
+
+    journal.write_text(
+        "".join(
+            [
+                json.dumps(last_week_event) + "\n",
+                json.dumps(current_week_event) + "\n",
+                invalid_json,
+                invalid_ts,
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    fixed_now = datetime(2026, 3, 9, 12, 0, 0, tzinfo=timezone.utc)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz is None:
+                return fixed_now.replace(tzinfo=None)
+            return fixed_now.astimezone(tz)
+
+    monkeypatch.setattr(m, "datetime", FixedDateTime)
+
+    result = m._rotate_journal_if_prev_week()
+
+    assert result["ok"] is True
+    assert result["rotated"] is True
+    assert result["archived"] == 1
+    assert result["kept"] == 3
+
+    archive = agent_dir / "journal.20260302-20260308.jsonl"
+    assert archive.exists()
+
+    archive_lines = archive.read_text(encoding="utf-8").splitlines()
+    journal_lines = journal.read_text(encoding="utf-8").splitlines()
+
+    assert archive_lines == [json.dumps(last_week_event)]
+    assert json.dumps(current_week_event) in journal_lines
+    assert "{bad json" in journal_lines
+    assert json.dumps({"ts": "not-a-ts", "seq": 3}) in journal_lines
+    assert json.dumps(last_week_event) not in journal_lines

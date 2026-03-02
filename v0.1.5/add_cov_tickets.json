@@ -58,8 +58,17 @@
       "scope": "test",
       "title": "Cover journal rotation helpers",
       "description": "Add release-marked tests that exercise _parse_iso_ts and _rotate_journal_if_prev_week with controlled timestamps via temporary journal files.",
-      "status": "planned",
+      "status": "done",
       "dependencies": []
+    },
+    {
+      "id": "C-007",
+      "phase": "Phase 4",
+      "scope": "test",
+      "title": "Raise release coverage toward 90%",
+      "description": "Add release-marked tests for init.py entrypoints and remaining main.py tool/verify flows to lift overall coverage.",
+      "status": "planned",
+      "dependencies": ["C-006"]
     }
   ]
 }
