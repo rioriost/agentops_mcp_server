@@ -451,7 +451,15 @@ def roll_forward_replay(
         if isinstance(snapshot_ref, str) and snapshot_ref.strip():
             resolved_snapshot_path = snapshot_ref
 
-    resolved_snapshot_file = _resolve_path(resolved_snapshot_path, SNAPSHOT)
+    resolved_snapshot_file = None
+    if resolved_snapshot_path:
+        candidate = Path(resolved_snapshot_path)
+        if not candidate.is_absolute():
+            agent_candidate = SNAPSHOT.parent / candidate
+            if agent_candidate.exists():
+                resolved_snapshot_file = agent_candidate
+    if resolved_snapshot_file is None:
+        resolved_snapshot_file = _resolve_path(resolved_snapshot_path, SNAPSHOT)
     snapshot = _read_json_file(resolved_snapshot_file)
     if snapshot is None:
         return {
