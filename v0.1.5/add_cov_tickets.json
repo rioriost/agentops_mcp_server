@@ -67,8 +67,17 @@
       "scope": "test",
       "title": "Raise release coverage toward 90%",
       "description": "Add release-marked tests for init.py entrypoints and remaining main.py tool/verify flows to lift overall coverage.",
-      "status": "planned",
+      "status": "done",
       "dependencies": ["C-006"]
+    },
+    {
+      "id": "C-008",
+      "phase": "Phase 5",
+      "scope": "test",
+      "title": "Cover remaining main.py execution paths",
+      "description": "Add release-marked tests for untested main.py branches (tool/verify/commit flows and error handling) to continue raising overall coverage.",
+      "status": "planned",
+      "dependencies": ["C-007"]
     }
   ]
 }
