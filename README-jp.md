@@ -23,6 +23,7 @@ brew install agentops_mcp_server
 
 `zed-agentops-init.sh` を使ってディレクトリをスキャフォールドします（`.rules`、`.zed/`、`.agent`、`.zed/scripts/verify` に加え、`.agent/journal.jsonl`、`.agent/snapshot.json`、`.agent/checkpoint.json` を作成）。
 ディレクトリを Zed で開き、Agent パネルを使ってください。
+リリース向けのカバレッジ計測は `.zed/scripts/verify-release`（`pytest-cov` が必要）を使ってください。
 `.gitignore` にはエントリが自動追記されます。
 
 ## 主要ファイルの配置
@@ -30,6 +31,7 @@ brew install agentops_mcp_server
 - `.rules` : Zed Agent のコンテキストに自動注入されるプロジェクトルール
 - `.zed/tasks.json` : 再利用可能なタスク（verify、git ヘルパー）
 - `.zed/scripts/verify` : build/test/lint の単一エントリーポイント（必要に応じて拡張）
+- `.zed/scripts/verify-release` : リリース向けのカバレッジ計測（pytest-cov）
 
 - `.agent/journal.jsonl` : 追記専用のイベントログ
 - `.agent/snapshot.json` : 状態スナップショット

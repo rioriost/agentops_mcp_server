@@ -24,12 +24,14 @@ brew install agentops_mcp_server
 Use `zed-agentops-init.sh` to scaffold a directory (it creates `.rules`, `.zed/`, `.agent`, and `.zed/scripts/verify`, plus `.agent/journal.jsonl`, `.agent/snapshot.json`, `.agent/checkpoint.json`).
 It also auto-appends common entries to `.gitignore`.
 Open the directory in Zed and use the Agent Panel.
+For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-cov`).
 
 ## Where things live
 
 - `.rules` : project rules auto-injected into Zed Agent context
 - `.zed/tasks.json` : reusable Tasks (verify, git helpers)
 - `.zed/scripts/verify` : the single entry point for build/test/lint (extend as needed)
+- `.zed/scripts/verify-release` : release-only coverage run (pytest-cov)
 - `.agent/journal.jsonl` : append-only event log
 - `.agent/snapshot.json` : state snapshot
 - `.agent/checkpoint.json` : roll-forward start
