@@ -179,6 +179,11 @@ else
   - use mcp:agentops:continue_state_rebuild for continue-ready state
   - use mcp:agentops:repo_commit to commit after verify
 
+## MCP tool usage requirements
+- Always call `tools/list` first and read each tool's `inputSchema`.
+- When calling `tools/call`, always include all fields listed in `inputSchema.required`.
+- If required fields are unclear or missing, re-fetch `tools/list` before calling.
+
 ## MCP workspace_root requirement
 - When calling MCP tools, always pass `workspace_root` as the absolute project root path.
 - If `workspace_root` is omitted, the server falls back to its current working directory.
