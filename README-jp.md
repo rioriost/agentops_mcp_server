@@ -1,7 +1,6 @@
 # Zed AgentOps
 
-- クロスセッションの引き継ぎ（.agent/handoff.md）
-- CI/CD 的ループ：編集 -> verify -> commit -> handoff 更新
+- CI/CD 的ループ：編集 -> verify -> commit
 - テスト生成をループに含める（エージェントがテスト追加し、verify）
 
 ※ 現時点では動作環境は macOS のみです。
@@ -31,8 +30,7 @@ brew install agentops_mcp_server
 - `.rules` : Zed Agent のコンテキストに自動注入されるプロジェクトルール
 - `.zed/tasks.json` : 再利用可能なタスク（verify、git ヘルパー）
 - `.zed/scripts/verify` : build/test/lint の単一エントリーポイント（必要に応じて拡張）
-- `.agent/handoff.md` : クロスセッション引き継ぎ（ソース・オブ・トゥルース）
-- `.agent/work-in-progress.json` : 軽量なタスク状態（フェーズ、タスク、直近のアクション、次のステップ）
+
 - `.agent/journal.jsonl` : 追記専用のイベントログ
 - `.agent/snapshot.json` : 状態スナップショット
 - `.agent/checkpoint.json` : ロールフォワード開始位置

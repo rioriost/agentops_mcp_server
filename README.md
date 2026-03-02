@@ -1,7 +1,6 @@
 # Zed AgentOps
 
-- Cross-session handoff (.agent/handoff.md)
-- CI/CD-like loop: edit -> verify -> commit -> update handoff
+- CI/CD-like loop: edit -> verify -> commit
 - Test generation as part of the loop (agent adds tests, then verify)
 
 Note: This project currently supports macOS only.
@@ -31,11 +30,9 @@ Open the directory in Zed and use the Agent Panel.
 - `.rules` : project rules auto-injected into Zed Agent context
 - `.zed/tasks.json` : reusable Tasks (verify, git helpers)
 - `.zed/scripts/verify` : the single entry point for build/test/lint (extend as needed)
-- `.agent/handoff.md` : cross-session handoff (source of truth)
-- `.agent/work-in-progress.json` : lightweight task state (phase, task, last action, next step)
 - `.agent/journal.jsonl` : append-only event log
 - `.agent/snapshot.json` : state snapshot
-- `.agent/checkpoint.json` : roll-forward starting point
+- `.agent/checkpoint.json` : roll-forward start
 - `/opt/homebrew/bin/agentops_mcp_server` : MCP server binary installed by Homebrew (macOS)
 
 ## MCP Server (Zed)
