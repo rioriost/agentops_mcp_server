@@ -8,7 +8,7 @@
       "phase": "Phase 1",
       "scope": "test",
       "title": "Add roll_forward_replay error cases",
-      "description": "Cover missing checkpoint and missing snapshot paths returning ok=false with appropriate reasons.",
+      "description": "Add tests in tests/test_persistence.py (e.g., test_roll_forward_replay_missing_checkpoint, test_roll_forward_replay_missing_snapshot) to assert ok=false with reason 'checkpoint not found'/'snapshot not found' and validate the returned path.",
       "status": "planned",
       "dependencies": []
     },
@@ -17,7 +17,7 @@
       "phase": "Phase 1",
       "scope": "test",
       "title": "Add continue_state_rebuild default session selection",
-      "description": "Verify latest session selection when session_id is omitted and multiple sessions exist.",
+      "description": "Add a tests/test_persistence.py case where events contain multiple session.start entries; call continue_state_rebuild without session_id and assert the state reflects the latest session.start (session_id + last_action/next_step).",
       "status": "planned",
       "dependencies": []
     },
@@ -26,7 +26,7 @@
       "phase": "Phase 1",
       "scope": "test",
       "title": "Add tools/call arguments type validation test",
-      "description": "Ensure tools/call rejects non-object arguments with a ValueError in handle_request.",
+      "description": "Add a tests/test_main.py case that sends tools/call with arguments as a non-object (e.g., list/string) and asserts handle_request raises ValueError.",
       "status": "planned",
       "dependencies": []
     },
@@ -35,7 +35,7 @@
       "phase": "Phase 1",
       "scope": "test",
       "title": "Add repo_commit_message_suggest empty diff case",
-      "description": "Confirm commit message suggestions return deterministically when diff is empty.",
+      "description": "Add a tests/test_main.py case for repo_commit_message_suggest(diff=\"\") asserting a suggestions list is returned and files is an empty list (and diff echoes \"\").",
       "status": "planned",
       "dependencies": []
     }
