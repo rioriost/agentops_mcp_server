@@ -1328,10 +1328,9 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
 
     previous_root = REPO_ROOT
     workspace_root = arguments.get("workspace_root") if arguments else None
-    if arguments and "workspace_root" in arguments:
-        arguments = {k: v for k, v in arguments.items() if k != "workspace_root"}
     if isinstance(workspace_root, str) and workspace_root.strip():
         _set_repo_root(Path(workspace_root).expanduser().resolve())
+        arguments = {k: v for k, v in arguments.items() if k != "workspace_root"}
 
     handler = TOOL_REGISTRY[resolved_name]["handler"]
     call_id = str(uuid.uuid4())
