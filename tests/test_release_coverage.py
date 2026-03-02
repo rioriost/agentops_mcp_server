@@ -136,3 +136,26 @@ def test_apply_event_to_state_commit_and_error_branches():
     m._apply_event_to_state(state, {"kind": "error", "payload": {"message": "bad"}})
     assert state["last_error"] == "bad"
     assert state["last_action"] == "error recorded"
+
+
+def test_tests_suggest_for_src_path():
+    diff = "src/agentops_mcp_server/main.py\n"
+    result = m.tests_suggest(diff=diff)
+    paths = {item["path"] for item in result["suggestions"]}
+    assert "tests/agentops_mcp_server/main_test.py" in paths
+
+
+def test_tests_suggest_for_test_path():
+    diff = "tests/test_main.py\n"
+    result = m.tests_suggest(diff=diff)
+    assert result["suggestions"] == [
+        {"path": "tests/test_main.py", "reason": "existing test changed"}
+    ]
+
+
+def test_tests_suggest_for_non_code():
+    diff = "README.md\n"
+    result = m.tests_suggest(diff=diff)
+    assert result["suggestions"] == [
+        {"path": "(none)", "reason": "no obvious test targets"}
+    ]

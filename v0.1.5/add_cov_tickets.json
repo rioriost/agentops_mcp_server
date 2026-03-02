@@ -31,7 +31,7 @@
       "scope": "test",
       "title": "Cover tests_suggest path logic",
       "description": "Add release-marked tests for _test_candidates_for_path and tests_suggest outputs for src/ paths, tests paths, and non-code files.",
-      "status": "planned",
+      "status": "done",
       "dependencies": []
     },
     {
