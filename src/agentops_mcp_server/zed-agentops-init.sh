@@ -93,6 +93,7 @@ GITIGNORE_ENTRIES=(
   ".zed/"
   ".venv/"
   ".agent/"
+  ".rules"
   "__pycache__/"
   "*.py[cod]"
   ".pytest_cache/"
