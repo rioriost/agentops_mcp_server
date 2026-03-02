@@ -1237,7 +1237,7 @@ def tests_suggest_from_failures(log_path: str) -> Dict[str, Any]:
 
 TOOL_REGISTRY = {
     "commit_if_verified": {
-        "description": "Run verify, commit changes, and return commit info",
+        "description": "Verify then commit",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1249,7 +1249,7 @@ TOOL_REGISTRY = {
         "handler": commit_if_verified,
     },
     "journal_append": {
-        "description": "Append an event to .agent/journal.jsonl",
+        "description": "Append journal event",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1264,7 +1264,7 @@ TOOL_REGISTRY = {
         "handler": journal_append,
     },
     "snapshot_save": {
-        "description": "Save snapshot state to .agent/snapshot.json",
+        "description": "Save snapshot",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1278,12 +1278,12 @@ TOOL_REGISTRY = {
         "handler": snapshot_save,
     },
     "snapshot_load": {
-        "description": "Load snapshot state from .agent/snapshot.json",
+        "description": "Load snapshot",
         "input_schema": {"type": "object", "properties": {}, "required": []},
         "handler": snapshot_load,
     },
     "checkpoint_update": {
-        "description": "Update checkpoint.json with last applied sequence",
+        "description": "Update checkpoint",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1296,12 +1296,12 @@ TOOL_REGISTRY = {
         "handler": checkpoint_update,
     },
     "checkpoint_read": {
-        "description": "Read checkpoint.json",
+        "description": "Read checkpoint",
         "input_schema": {"type": "object", "properties": {}, "required": []},
         "handler": checkpoint_read,
     },
     "roll_forward_replay": {
-        "description": "Replay journal events from checkpoint/snapshot",
+        "description": "Replay journal",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1315,7 +1315,7 @@ TOOL_REGISTRY = {
         "handler": roll_forward_replay,
     },
     "continue_state_rebuild": {
-        "description": "Rebuild continue-ready state from replayed events",
+        "description": "Rebuild state",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1330,7 +1330,7 @@ TOOL_REGISTRY = {
         "handler": continue_state_rebuild,
     },
     "repo_verify": {
-        "description": "Run .zed/scripts/verify and return results",
+        "description": "Run verify",
         "input_schema": {
             "type": "object",
             "properties": {"timeout_sec": {"type": ["integer", "null"]}},
@@ -1339,7 +1339,7 @@ TOOL_REGISTRY = {
         "handler": repo_verify,
     },
     "repo_commit": {
-        "description": "Commit changes with optional message and file selection",
+        "description": "Commit changes",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1353,12 +1353,12 @@ TOOL_REGISTRY = {
         "handler": repo_commit,
     },
     "repo_status_summary": {
-        "description": "Summarize repo status, diff stats, and last commit",
+        "description": "Repo status summary",
         "input_schema": {"type": "object", "properties": {}, "required": []},
         "handler": repo_status_summary,
     },
     "repo_commit_message_suggest": {
-        "description": "Suggest commit messages from diff",
+        "description": "Suggest commit messages",
         "input_schema": {
             "type": "object",
             "properties": {"diff": {"type": ["string", "null"]}},
@@ -1367,7 +1367,7 @@ TOOL_REGISTRY = {
         "handler": repo_commit_message_suggest,
     },
     "session_capture_context": {
-        "description": "Capture repo context (branch/status/diff/last commit)",
+        "description": "Capture repo context",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1379,7 +1379,7 @@ TOOL_REGISTRY = {
         "handler": session_capture_context,
     },
     "tests_suggest": {
-        "description": "Suggest tests based on diff and failures",
+        "description": "Suggest tests",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1391,7 +1391,7 @@ TOOL_REGISTRY = {
         "handler": tests_suggest,
     },
     "tests_suggest_from_failures": {
-        "description": "Suggest tests based on a failure log file",
+        "description": "Suggest tests from failures",
         "input_schema": {
             "type": "object",
             "properties": {"log_path": {"type": "string"}},

@@ -181,7 +181,7 @@ else
   - use mcp:agentops:repo_commit to commit after verify
 
 ## MCP tool usage requirements
-- Always call `tools/list` first and read each tool's `inputSchema`.
+- Call `tools/list` only once at session start; re-fetch only when tool errors indicate a schema mismatch or when tools are unavailable.
 - When calling `tools/call`, always include all fields listed in `inputSchema.required`.
 - If required fields are unclear or missing, re-fetch `tools/list` before calling.
 
