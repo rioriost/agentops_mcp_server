@@ -22,7 +22,7 @@
       "scope": "test",
       "title": "Cover apply_event_to_state branches",
       "description": "Add release-marked tests covering task.start/update/end, commit.start/end, error, tool.result(ok false) branches.",
-      "status": "planned",
+      "status": "done",
       "dependencies": ["C-001"]
     },
     {

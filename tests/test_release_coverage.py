@@ -87,3 +87,52 @@ def test_select_target_session_id_prefers_explicit():
         {"seq": 2, "session_id": "s2", "kind": "session.start"},
     ]
     assert m._select_target_session_id(events, "s2") == "s2"
+
+
+def test_apply_event_to_state_task_branches():
+    state = {}
+    m._apply_event_to_state(
+        state, {"kind": "task.start", "payload": {"title": "Do work"}}
+    )
+    assert state["current_task"] == "Do work"
+    assert state["current_phase"] == "task"
+    assert state["last_action"] == "task started"
+
+    m._apply_event_to_state(
+        state,
+        {"kind": "task.update", "payload": {"status": "review", "note": "progress"}},
+    )
+    assert state["current_phase"] == "review"
+    assert state["last_action"] == "progress"
+
+    m._apply_event_to_state(
+        state,
+        {"kind": "task.end", "payload": {"summary": "done", "next_action": "next"}},
+    )
+    assert state["current_task"] == ""
+    assert state["last_action"] == "done"
+    assert state["next_step"] == "next"
+
+
+def test_apply_event_to_state_commit_and_error_branches():
+    state = {}
+    m._apply_event_to_state(
+        state, {"kind": "commit.start", "payload": {"message": "msg"}}
+    )
+    assert state["last_commit"] == "msg"
+    assert state["last_action"] == "commit started"
+
+    m._apply_event_to_state(
+        state, {"kind": "commit.end", "payload": {"sha": "abc", "summary": "sum"}}
+    )
+    assert state["last_commit"] == "abc"
+    assert state["last_action"] == "commit finished"
+
+    m._apply_event_to_state(
+        state, {"kind": "tool.result", "payload": {"ok": False, "error": "boom"}}
+    )
+    assert state["last_error"] == "boom"
+
+    m._apply_event_to_state(state, {"kind": "error", "payload": {"message": "bad"}})
+    assert state["last_error"] == "bad"
+    assert state["last_action"] == "error recorded"
