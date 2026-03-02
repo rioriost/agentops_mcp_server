@@ -18,7 +18,7 @@
       "scope": "test",
       "title": "Add continue_state_rebuild default session selection",
       "description": "Add a tests/test_persistence.py case where events contain multiple session.start entries; call continue_state_rebuild without session_id and assert the state reflects the latest session.start (session_id + last_action/next_step).",
-      "status": "planned",
+      "status": "done",
       "dependencies": []
     },
     {

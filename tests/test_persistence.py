@@ -80,6 +80,38 @@ def test_roll_forward_replay_missing_snapshot(temp_repo):
     assert replay["path"].endswith("/missing.json")
 
 
+def test_continue_state_rebuild_selects_latest_session(temp_repo):
+    m.snapshot_save(
+        state={"current_phase": "session"}, session_id="s1", last_applied_seq=0
+    )
+    m.journal_append(
+        kind="session.start",
+        payload={"note": "first"},
+        session_id="s1",
+        event_id="evt-1",
+    )
+    m.journal_append(
+        kind="session.start",
+        payload={"note": "second"},
+        session_id="s2",
+        event_id="evt-2",
+    )
+    m.journal_append(
+        kind="task.end",
+        payload={"summary": "done", "next_action": "next up"},
+        session_id="s2",
+        event_id="evt-3",
+    )
+    m.checkpoint_update(last_applied_seq=0, snapshot_path=m.SNAPSHOT.name)
+
+    rebuilt = m.continue_state_rebuild()
+    assert rebuilt["ok"] is True
+    state = rebuilt["state"]
+    assert state["session_id"] == "s2"
+    assert state["last_action"] == "done"
+    assert state["next_step"] == "next up"
+
+
 def test_roll_forward_replay_and_continue_state_rebuild(temp_repo):
     snapshot_state = {"current_phase": "session", "last_action": "boot"}
     m.snapshot_save(state=snapshot_state, session_id="s1", last_applied_seq=1)
