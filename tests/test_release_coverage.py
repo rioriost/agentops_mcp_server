@@ -56,3 +56,34 @@ def test_replay_events_to_state_updates_verify_status():
     assert state["session_id"] == "s1"
     assert state["verification_status"] == "passed"
     assert state["last_action"] == "verify finished"
+
+
+def test_init_replay_state_defaults():
+    state = m._init_replay_state(None)
+    assert state["session_id"] == ""
+    assert state["replay_warnings"]["invalid_lines"] == 0
+    assert state["replay_warnings"]["dropped_events"] == 0
+    assert state["applied_event_ids"] == []
+
+
+def test_append_applied_event_id_trims_oldest():
+    state = {"applied_event_ids": ["evt-1", "evt-2"]}
+    m._append_applied_event_id(state, "evt-3", max_size=2)
+    assert state["applied_event_ids"] == ["evt-2", "evt-3"]
+
+
+def test_select_target_session_id_prefers_latest_session_start():
+    events = [
+        {"seq": 1, "session_id": "s1", "kind": "task.start"},
+        {"seq": 2, "session_id": "s2", "kind": "session.start"},
+        {"seq": 3, "session_id": "s1", "kind": "session.start"},
+    ]
+    assert m._select_target_session_id(events, None) == "s1"
+
+
+def test_select_target_session_id_prefers_explicit():
+    events = [
+        {"seq": 1, "session_id": "s1", "kind": "session.start"},
+        {"seq": 2, "session_id": "s2", "kind": "session.start"},
+    ]
+    assert m._select_target_session_id(events, "s2") == "s2"

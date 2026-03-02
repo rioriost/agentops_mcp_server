@@ -1,0 +1,65 @@
+{
+  "project": "agentops_mcp_server",
+  "version": "v0.1.5",
+  "goal": "Raise main.py coverage toward 90% with release-only tests",
+  "notes": [
+    "All new coverage tests should be marked @pytest.mark.release",
+    "verify excludes release tests; verify-release runs all tests"
+  ],
+  "tickets": [
+    {
+      "id": "C-001",
+      "phase": "Phase 1",
+      "scope": "test",
+      "title": "Cover replay state helpers",
+      "description": "Add release-marked tests for _init_replay_state defaults, _append_applied_event_id trimming, and _select_target_session_id preference behavior.",
+      "status": "done",
+      "dependencies": []
+    },
+    {
+      "id": "C-002",
+      "phase": "Phase 1",
+      "scope": "test",
+      "title": "Cover apply_event_to_state branches",
+      "description": "Add release-marked tests covering task.start/update/end, commit.start/end, error, tool.result(ok false) branches.",
+      "status": "planned",
+      "dependencies": ["C-001"]
+    },
+    {
+      "id": "C-003",
+      "phase": "Phase 1",
+      "scope": "test",
+      "title": "Cover tests_suggest path logic",
+      "description": "Add release-marked tests for _test_candidates_for_path and tests_suggest outputs for src/ paths, tests paths, and non-code files.",
+      "status": "planned",
+      "dependencies": []
+    },
+    {
+      "id": "C-004",
+      "phase": "Phase 2",
+      "scope": "test",
+      "title": "Cover roll_forward_replay sequencing edges",
+      "description": "Add release-marked tests for start_seq inference from checkpoint/snapshot and end_seq filtering behavior.",
+      "status": "planned",
+      "dependencies": []
+    },
+    {
+      "id": "C-005",
+      "phase": "Phase 2",
+      "scope": "test",
+      "title": "Cover tools_call error paths",
+      "description": "Add release-marked tests for unknown tool names and alias mapping resolution with minimal stub arguments.",
+      "status": "planned",
+      "dependencies": []
+    },
+    {
+      "id": "C-006",
+      "phase": "Phase 3",
+      "scope": "test",
+      "title": "Cover journal rotation helpers",
+      "description": "Add release-marked tests that exercise _parse_iso_ts and _rotate_journal_if_prev_week with controlled timestamps via temporary journal files.",
+      "status": "planned",
+      "dependencies": []
+    }
+  ]
+}
