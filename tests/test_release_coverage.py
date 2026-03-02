@@ -1,8 +1,20 @@
+import json
+
 import pytest
 
 from agentops_mcp_server import main as m
 
 pytestmark = pytest.mark.release
+
+
+@pytest.fixture
+def temp_repo(tmp_path):
+    original_root = m.REPO_ROOT
+    m._set_repo_root(tmp_path)
+    try:
+        yield tmp_path
+    finally:
+        m._set_repo_root(original_root)
 
 
 def test_parse_changed_files_from_diff_blocks():
@@ -159,3 +171,61 @@ def test_tests_suggest_for_non_code():
     assert result["suggestions"] == [
         {"path": "(none)", "reason": "no obvious test targets"}
     ]
+
+
+def test_roll_forward_replay_uses_checkpoint_seq(temp_repo):
+    m.snapshot_save(state={}, session_id="s1", last_applied_seq=5)
+    m.journal_append(
+        kind="session.start", payload={}, session_id="s1", event_id="evt-1"
+    )
+    m.journal_append(kind="task.start", payload={}, session_id="s1", event_id="evt-2")
+    m.journal_append(kind="task.end", payload={}, session_id="s1", event_id="evt-3")
+    m.checkpoint_update(last_applied_seq=2, snapshot_path=m.SNAPSHOT.name)
+
+    replay = m.roll_forward_replay()
+    assert replay["start_seq"] == 2
+    assert [event["seq"] for event in replay["events"]] == [3]
+
+
+def test_roll_forward_replay_uses_snapshot_seq_when_checkpoint_missing_seq(temp_repo):
+    m.snapshot_save(state={}, session_id="s1", last_applied_seq=2)
+    m.journal_append(
+        kind="session.start", payload={}, session_id="s1", event_id="evt-1"
+    )
+    m.journal_append(kind="task.start", payload={}, session_id="s1", event_id="evt-2")
+    m.journal_append(kind="task.end", payload={}, session_id="s1", event_id="evt-3")
+
+    checkpoint_path = temp_repo / ".agent" / "checkpoint-custom.json"
+    checkpoint_path.write_text(
+        json.dumps(
+            {
+                "checkpoint_id": "c1",
+                "ts": m._now_iso(),
+                "project_root": str(m.REPO_ROOT),
+                "snapshot_path": m.SNAPSHOT.name,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    replay = m.roll_forward_replay(checkpoint_path=str(checkpoint_path))
+    assert replay["start_seq"] == 2
+    assert [event["seq"] for event in replay["events"]] == [3]
+
+
+def test_roll_forward_replay_end_seq_filters(temp_repo):
+    m.snapshot_save(state={}, session_id="s1", last_applied_seq=0)
+    m.journal_append(
+        kind="session.start", payload={}, session_id="s1", event_id="evt-1"
+    )
+    m.journal_append(kind="task.start", payload={}, session_id="s1", event_id="evt-2")
+    m.journal_append(kind="task.end", payload={}, session_id="s1", event_id="evt-3")
+    m.journal_append(kind="task.end", payload={}, session_id="s1", event_id="evt-4")
+    m.checkpoint_update(last_applied_seq=0, snapshot_path=m.SNAPSHOT.name)
+
+    replay = m.roll_forward_replay(start_seq=0, end_seq=2)
+    assert [event["seq"] for event in replay["events"]] == [1, 2]
+    assert replay["last_seq"] == 2

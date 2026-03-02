@@ -40,7 +40,7 @@
       "scope": "test",
       "title": "Cover roll_forward_replay sequencing edges",
       "description": "Add release-marked tests for start_seq inference from checkpoint/snapshot and end_seq filtering behavior.",
-      "status": "planned",
+      "status": "done",
       "dependencies": []
     },
     {
