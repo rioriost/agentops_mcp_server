@@ -94,8 +94,17 @@
       "scope": "test",
       "title": "Cover journal and snapshot utilities",
       "description": "Add release-marked tests for journal/snapshot/checkpoint helpers and remaining edge cases to continue raising overall coverage toward 90%.",
-      "status": "planned",
+      "status": "done",
       "dependencies": ["C-009"]
+    },
+    {
+      "id": "C-011",
+      "phase": "Phase 8",
+      "scope": "test",
+      "title": "Cover remaining helper edge cases",
+      "description": "Add release-marked tests for remaining helpers and error paths to push coverage closer to 90%.",
+      "status": "planned",
+      "dependencies": ["C-010"]
     }
   ]
 }

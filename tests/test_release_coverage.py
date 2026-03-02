@@ -482,3 +482,81 @@ def test_git_missing_binary_raises(monkeypatch):
     monkeypatch.setattr(m.subprocess, "check_output", boom)
     with pytest.raises(RuntimeError, match="git is not installed"):
         m.git("status")
+
+
+def test_read_last_json_line_returns_none_on_invalid_json(temp_repo):
+    journal = temp_repo / ".agent" / "journal.jsonl"
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    journal.write_text("not-json\n", encoding="utf-8")
+    assert m._read_last_json_line(journal) is None
+
+
+def test_next_journal_seq_defaults_to_one(temp_repo):
+    assert m._next_journal_seq() == 1
+
+
+def test_journal_append_writes_event(temp_repo):
+    result = m.journal_append(
+        kind="session.start",
+        payload={"note": "hi"},
+        session_id="s1",
+        agent_id="a1",
+    )
+    assert result["ok"] is True
+    assert result["seq"] == 1
+
+    journal = temp_repo / ".agent" / "journal.jsonl"
+    record = json.loads(journal.read_text(encoding="utf-8").strip())
+    assert record["kind"] == "session.start"
+    assert record["payload"]["note"] == "hi"
+    assert record["session_id"] == "s1"
+    assert record["agent_id"] == "a1"
+
+
+def test_snapshot_load_missing_returns_reason(temp_repo):
+    result = m.snapshot_load()
+    assert result["ok"] is False
+    assert result["reason"] == "snapshot not found"
+
+
+def test_checkpoint_read_missing_returns_reason(temp_repo):
+    result = m.checkpoint_read()
+    assert result["ok"] is False
+    assert result["reason"] == "checkpoint not found"
+
+
+def test_checkpoint_update_requires_last_applied_seq(temp_repo):
+    with pytest.raises(ValueError, match="last_applied_seq is required"):
+        m.checkpoint_update(last_applied_seq=None)
+
+
+def test_checkpoint_read_invalid_json_returns_not_found(temp_repo):
+    checkpoint = temp_repo / ".agent" / "checkpoint.json"
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint.write_text("{bad", encoding="utf-8")
+    result = m.checkpoint_read()
+    assert result["ok"] is False
+    assert result["reason"] == "checkpoint not found"
+
+
+def test_read_journal_events_filters_and_counts_invalid(temp_repo):
+    journal = temp_repo / ".agent" / "journal.jsonl"
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    journal.write_text(
+        "\n".join(
+            [
+                "{bad json}",
+                json.dumps({"seq": "nope"}),
+                json.dumps({"seq": 1, "kind": "skip"}),
+                json.dumps({"seq": 2, "kind": "keep"}),
+                json.dumps({"seq": 4, "kind": "too-high"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = m._read_journal_events(start_seq=1, end_seq=3)
+    assert [event["seq"] for event in result["events"]] == [2]
+    assert result["invalid_lines"] == 2
+    assert result["last_seq"] == 2
