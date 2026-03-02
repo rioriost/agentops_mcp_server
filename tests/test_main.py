@@ -72,6 +72,13 @@ def test_handle_request_tools_call_invalid_arguments_type():
         m.handle_request(req)
 
 
+def test_repo_commit_message_suggest_empty_diff():
+    result = m.repo_commit_message_suggest(diff="")
+    assert result["diff"] == ""
+    assert result["files"] == []
+    assert result["suggestions"]
+
+
 def test_main_emits_response(monkeypatch):
     input_req = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}) + "\n"
     stdin = io.StringIO(input_req)

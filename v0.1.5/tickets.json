@@ -36,7 +36,7 @@
       "scope": "test",
       "title": "Add repo_commit_message_suggest empty diff case",
       "description": "Add a tests/test_main.py case for repo_commit_message_suggest(diff=\"\") asserting a suggestions list is returned and files is an empty list (and diff echoes \"\").",
-      "status": "planned",
+      "status": "done",
       "dependencies": []
     }
   ]
