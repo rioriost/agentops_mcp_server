@@ -76,8 +76,17 @@
       "scope": "test",
       "title": "Cover remaining main.py execution paths",
       "description": "Add release-marked tests for untested main.py branches (tool/verify/commit flows and error handling) to continue raising overall coverage.",
-      "status": "planned",
+      "status": "done",
       "dependencies": ["C-007"]
+    },
+    {
+      "id": "C-009",
+      "phase": "Phase 6",
+      "scope": "test",
+      "title": "Expand main.py tool handler coverage",
+      "description": "Add release-marked tests for handle_request initialize/tools/call responses, tools_list schema details, and git/verify failure branches to continue raising coverage toward 90%.",
+      "status": "planned",
+      "dependencies": ["C-008"]
     }
   ]
 }

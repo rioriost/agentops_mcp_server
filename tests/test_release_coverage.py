@@ -1,5 +1,7 @@
 import json
+import subprocess
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import pytest
 
@@ -353,3 +355,79 @@ def test_init_main_execv(monkeypatch, tmp_path):
 
     assert called["path"] == "/usr/bin/env"
     assert called["args"] == ["env", "bash", str(script), "--flag"]
+
+
+def test_run_verify_timeout_returns_error(temp_repo, monkeypatch):
+    verify_path = temp_repo / ".zed" / "scripts" / "verify"
+    verify_path.parent.mkdir(parents=True, exist_ok=True)
+    verify_path.write_text("#!/bin/sh\n", encoding="utf-8")
+
+    def boom(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=[str(verify_path)], timeout=3, output="out")
+
+    monkeypatch.setattr(m.subprocess, "run", boom)
+    result = m.run_verify(timeout_sec=3)
+    assert result["ok"] is False
+    assert result["stdout"] == "out"
+    assert "timed out after 3s" in result["stderr"]
+
+
+def test_run_verify_success(temp_repo, monkeypatch):
+    verify_path = temp_repo / ".zed" / "scripts" / "verify"
+    verify_path.parent.mkdir(parents=True, exist_ok=True)
+    verify_path.write_text("#!/bin/sh\n", encoding="utf-8")
+
+    fake = SimpleNamespace(returncode=0, stdout="ok", stderr="")
+    monkeypatch.setattr(m.subprocess, "run", lambda *args, **kwargs: fake)
+    result = m.run_verify(timeout_sec=5)
+    assert result["ok"] is True
+    assert result["stdout"] == "ok"
+
+
+def test_git_error_message_includes_output(monkeypatch):
+    def boom(*args, **kwargs):
+        raise subprocess.CalledProcessError(1, ["git", "status"], output=b"nope")
+
+    monkeypatch.setattr(m.subprocess, "check_output", boom)
+    with pytest.raises(RuntimeError, match="nope"):
+        m.git("status")
+
+
+def test_repo_commit_no_changes(temp_repo, monkeypatch):
+    monkeypatch.setattr(m, "_git_status_porcelain", lambda: [])
+    monkeypatch.setattr(m, "_journal_safe", lambda *args, **kwargs: None)
+    result = m.repo_commit(message="msg", files="auto", run_verify=False)
+    assert result["ok"] is False
+    assert result["reason"] == "no changes to commit"
+
+
+def test_repo_commit_no_files_specified(temp_repo, monkeypatch):
+    monkeypatch.setattr(m, "_git_status_porcelain", lambda: [" M foo.py"])
+    monkeypatch.setattr(m, "_journal_safe", lambda *args, **kwargs: None)
+    result = m.repo_commit(message="msg", files=" , ", run_verify=False)
+    assert result["ok"] is False
+    assert result["reason"] == "no files specified"
+
+
+def test_commit_if_verified_raises_on_failed_verify(monkeypatch):
+    monkeypatch.setattr(
+        m,
+        "run_verify",
+        lambda **kwargs: {"ok": False, "returncode": 2, "stderr": "nope"},
+    )
+    with pytest.raises(RuntimeError, match="verify failed"):
+        m.commit_if_verified("msg")
+
+
+@pytest.mark.parametrize(
+    ("diff", "prefix"),
+    [
+        ("README.md\n", "docs"),
+        ("tests/data.json\n", "test"),
+        ("pyproject.toml\n", "chore"),
+        ("src/agentops_mcp_server/main.py\n", "feat"),
+    ],
+)
+def test_repo_commit_message_suggest_prefixes(diff, prefix):
+    result = m.repo_commit_message_suggest(diff=diff)
+    assert result["suggestions"][0].startswith(f"{prefix}:")
