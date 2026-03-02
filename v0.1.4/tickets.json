@@ -1,0 +1,43 @@
+{
+  "project": "agentops_mcp_server",
+  "version": "v0.1.4",
+  "generated_from": "minimal tests expansion plan",
+  "tickets": [
+    {
+      "id": "T-001",
+      "phase": "Phase 1",
+      "scope": "test",
+      "title": "Add roll_forward_replay error cases",
+      "description": "Cover missing checkpoint and missing snapshot paths returning ok=false with appropriate reasons.",
+      "status": "planned",
+      "dependencies": []
+    },
+    {
+      "id": "T-002",
+      "phase": "Phase 1",
+      "scope": "test",
+      "title": "Add continue_state_rebuild default session selection",
+      "description": "Verify latest session selection when session_id is omitted and multiple sessions exist.",
+      "status": "planned",
+      "dependencies": []
+    },
+    {
+      "id": "T-003",
+      "phase": "Phase 1",
+      "scope": "test",
+      "title": "Add tools/call arguments type validation test",
+      "description": "Ensure tools/call rejects non-object arguments with a ValueError in handle_request.",
+      "status": "planned",
+      "dependencies": []
+    },
+    {
+      "id": "T-004",
+      "phase": "Phase 1",
+      "scope": "test",
+      "title": "Add repo_commit_message_suggest empty diff case",
+      "description": "Confirm commit message suggestions return deterministically when diff is empty.",
+      "status": "planned",
+      "dependencies": []
+    }
+  ]
+}
