@@ -431,3 +431,54 @@ def test_commit_if_verified_raises_on_failed_verify(monkeypatch):
 def test_repo_commit_message_suggest_prefixes(diff, prefix):
     result = m.repo_commit_message_suggest(diff=diff)
     assert result["suggestions"][0].startswith(f"{prefix}:")
+
+
+def test_tools_list_includes_workspace_root_for_all_tools():
+    result = m.tools_list()
+    for tool in result["tools"]:
+        properties = tool["inputSchema"]["properties"]
+        assert "workspace_root" in properties
+
+
+def test_handle_request_initialize_response():
+    resp = m.handle_request({"jsonrpc": "2.0", "id": 1, "method": "initialize"})
+    assert resp["result"]["protocolVersion"] == "2024-11-05"
+
+
+def test_handle_request_initialized_with_id_returns_none():
+    resp = m.handle_request({"jsonrpc": "2.0", "id": 1, "method": "initialized"})
+    assert resp["result"] is None
+
+
+def test_handle_request_shutdown_with_id_returns_none():
+    resp = m.handle_request({"jsonrpc": "2.0", "id": 1, "method": "shutdown"})
+    assert resp["result"] is None
+
+
+def test_handle_request_exit_raises():
+    with pytest.raises(SystemExit):
+        m.handle_request({"jsonrpc": "2.0", "id": 1, "method": "exit"})
+
+
+def test_handle_request_unknown_method_raises():
+    with pytest.raises(ValueError):
+        m.handle_request({"jsonrpc": "2.0", "id": 1, "method": "nope"})
+
+
+def test_tools_call_propagates_handler_error():
+    with pytest.raises(ValueError):
+        m.tools_call("snapshot_save", {"state": None})
+
+
+def test_run_verify_missing_script_raises(temp_repo):
+    with pytest.raises(FileNotFoundError):
+        m.run_verify()
+
+
+def test_git_missing_binary_raises(monkeypatch):
+    def boom(*args, **kwargs):
+        raise FileNotFoundError("no git")
+
+    monkeypatch.setattr(m.subprocess, "check_output", boom)
+    with pytest.raises(RuntimeError, match="git is not installed"):
+        m.git("status")
