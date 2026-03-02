@@ -560,3 +560,50 @@ def test_read_journal_events_filters_and_counts_invalid(temp_repo):
     assert [event["seq"] for event in result["events"]] == [2]
     assert result["invalid_lines"] == 2
     assert result["last_seq"] == 2
+
+
+def test_resolve_path_handles_default_and_relative(temp_repo, tmp_path):
+    default = temp_repo / "default.txt"
+    assert m._resolve_path(None, default) == default
+    assert m._resolve_path("logs/out.txt", default) == temp_repo / "logs" / "out.txt"
+
+    absolute = tmp_path / "abs.txt"
+    assert m._resolve_path(str(absolute), default) == absolute
+
+
+def test_write_text_creates_parent_dirs(temp_repo):
+    target = temp_repo / "nested" / "file.txt"
+    m._write_text(target, "hello")
+    assert target.read_text(encoding="utf-8") == "hello"
+
+
+def test_read_json_file_invalid_returns_none(temp_repo):
+    path = temp_repo / "bad.json"
+    path.write_text("{bad", encoding="utf-8")
+    assert m._read_json_file(path) is None
+
+
+def test_sanitize_args_truncates_strings():
+    long_text = "x" * 2100
+    result = m._sanitize_args({"a": long_text, "b": 1})
+    assert result["a"].endswith("...(truncated)")
+    assert result["b"] == 1
+
+
+def test_summarize_result_truncates_large_payload():
+    result = m._summarize_result({"text": "x" * 2100}, limit=50)
+    assert result["truncated"] is True
+    assert "summary" in result
+
+
+def test_unique_preserve_order_keeps_first_occurrence():
+    assert m._unique_preserve_order(["a", "b", "a", "c"]) == ["a", "b", "c"]
+
+
+def test_normalize_test_candidate_suffix_rules():
+    assert m._normalize_test_candidate("tests/foo.py", ".py") == "tests/foo_test.py"
+    assert m._normalize_test_candidate("src/foo.py", "") == "src/foo.py"
+
+
+def test_test_candidates_for_non_code_returns_empty():
+    assert m._test_candidates_for_path("README.md") == []

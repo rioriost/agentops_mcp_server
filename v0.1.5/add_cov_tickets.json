@@ -103,8 +103,17 @@
       "scope": "test",
       "title": "Cover remaining helper edge cases",
       "description": "Add release-marked tests for remaining helpers and error paths to push coverage closer to 90%.",
-      "status": "planned",
+      "status": "done",
       "dependencies": ["C-010"]
+    },
+    {
+      "id": "C-012",
+      "phase": "Phase 9",
+      "scope": "test",
+      "title": "Increase coverage toward 90% with integration paths",
+      "description": "Add release-marked tests for remaining high-value branches (tool flows, error paths, and IO helpers) to continue raising coverage toward 90%.",
+      "status": "planned",
+      "dependencies": ["C-011"]
     }
   ]
 }
