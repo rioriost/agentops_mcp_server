@@ -49,7 +49,7 @@
       "scope": "test",
       "title": "Cover tools_call error paths",
       "description": "Add release-marked tests for unknown tool names and alias mapping resolution with minimal stub arguments.",
-      "status": "planned",
+      "status": "done",
       "dependencies": []
     },
     {

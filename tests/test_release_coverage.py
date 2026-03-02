@@ -229,3 +229,17 @@ def test_roll_forward_replay_end_seq_filters(temp_repo):
     replay = m.roll_forward_replay(start_seq=0, end_seq=2)
     assert [event["seq"] for event in replay["events"]] == [1, 2]
     assert replay["last_seq"] == 2
+
+
+def test_tools_call_unknown_tool_raises(temp_repo):
+    with pytest.raises(ValueError):
+        m.tools_call("unknown.tool", {})
+
+
+def test_tools_call_alias_maps_to_handler(temp_repo):
+    payload = m.tools_call("repo.commit_message_suggest", {"diff": ""})
+    content = payload["content"][0]["text"]
+    result = json.loads(content)
+    assert result["diff"] == ""
+    assert result["files"] == []
+    assert result["suggestions"]
