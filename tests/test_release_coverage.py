@@ -692,3 +692,58 @@ def test_read_journal_events_missing_file(temp_repo):
 def test_journal_append_requires_kind(temp_repo):
     with pytest.raises(ValueError, match="kind is required"):
         m.journal_append(kind="", payload={})
+
+
+def test_read_last_json_line_missing_file(temp_repo):
+    missing = temp_repo / ".agent" / "missing.jsonl"
+    assert m._read_last_json_line(missing) is None
+
+
+def test_read_journal_events_invalid_bounds():
+    with pytest.raises(ValueError, match="start_seq must be >= 0"):
+        m._read_journal_events(start_seq=-1)
+
+    with pytest.raises(ValueError, match="end_seq must be >= start_seq"):
+        m._read_journal_events(start_seq=2, end_seq=1)
+
+
+def test_repo_status_summary_uses_git(monkeypatch):
+    outputs = {
+        ("rev-parse", "--abbrev-ref", "HEAD"): "main",
+        ("status", "--short"): " M file.txt",
+        ("diff", "--stat"): "file.txt | 1 +",
+        ("diff", "--stat", "--cached"): "",
+        ("log", "-1", "--oneline"): "abc123 test commit",
+        ("diff", "--name-only"): "file.txt",
+        ("diff", "--name-only", "--cached"): "",
+    }
+
+    def fake_git(*args):
+        return outputs.get(args, "")
+
+    monkeypatch.setattr(m, "git", fake_git)
+    summary = m.repo_status_summary()
+    assert summary["branch"] == "main"
+    assert summary["status"] == " M file.txt"
+    assert summary["diff"] == "file.txt | 1 +"
+    assert summary["staged_diff"] == ""
+    assert summary["last_commit"] == "abc123 test commit"
+    assert summary["files"]["unstaged"] == "file.txt"
+    assert summary["files"]["staged"] == ""
+
+
+def test_repo_commit_message_suggest_diff_none_uses_git(monkeypatch):
+    outputs = {
+        ("diff", "--stat", "--cached"): "docs/readme.md | 1 +",
+        ("diff", "--stat"): "",
+        ("diff", "--name-only", "--cached"): "docs/readme.md",
+        ("diff", "--name-only"): "",
+    }
+
+    def fake_git(*args):
+        return outputs.get(args, "")
+
+    monkeypatch.setattr(m, "git", fake_git)
+    result = m.repo_commit_message_suggest(diff=None)
+    assert result["files"] == ["docs/readme.md"]
+    assert result["suggestions"][0].startswith("docs:")
