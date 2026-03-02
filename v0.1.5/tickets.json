@@ -38,6 +38,15 @@
       "description": "Add a tests/test_main.py case for repo_commit_message_suggest(diff=\"\") asserting a suggestions list is returned and files is an empty list (and diff echoes \"\").",
       "status": "done",
       "dependencies": []
+    },
+    {
+      "id": "T-005",
+      "phase": "Phase 2",
+      "scope": "test",
+      "title": "Add release coverage test script and task",
+      "description": "Create a release-only coverage runner (e.g., .zed/scripts/verify-release) using pytest-cov and add a .zed task entry; document the command in README as release-only.",
+      "status": "planned",
+      "dependencies": []
     }
   ]
 }
