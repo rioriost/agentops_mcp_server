@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +30,11 @@ zed-agentops-init = "agentops_mcp_server.init:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+markers = [
+  "release: coverage-only tests (excluded from verify)",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentops_mcp_server"]

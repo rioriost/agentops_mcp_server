@@ -15,9 +15,9 @@ import importlib.util
 raise SystemExit(0 if importlib.util.find_spec("pytest_cov") else 1)
 PY
       then
-        python -m pytest -q --cov=agentops_mcp_server --cov-report=term-missing && ran=1 || exit 1
+        python -m pytest -q -m "not release" --cov=agentops_mcp_server --cov-report=term-missing && ran=1 || exit 1
       else
-        python -m pytest -q && ran=1 || exit 1
+        python -m pytest -q -m "not release" && ran=1 || exit 1
       fi
     else
       echo "==> python: pytest not installed; skipping"
