@@ -1,5 +1,6 @@
 import io
 import json
+import runpy
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -354,6 +355,35 @@ def test_init_main_execv(monkeypatch, tmp_path):
     monkeypatch.setattr(init_mod.sys, "argv", ["init.py", "--flag"])
 
     init_mod.main()
+
+    assert called["path"] == "/usr/bin/env"
+    assert called["args"] == ["env", "bash", str(script), "--flag"]
+
+
+def test_init_module_main_entrypoint(monkeypatch, tmp_path):
+    script = tmp_path / "zed-agentops-init.sh"
+    script.write_text("#!/bin/bash\necho ok\n", encoding="utf-8")
+
+    class DummyFiles:
+        def __init__(self, base):
+            self._base = base
+
+        def joinpath(self, name):
+            return self._base / name
+
+    monkeypatch.setattr(init_mod.resources, "files", lambda _: DummyFiles(tmp_path))
+    monkeypatch.setattr(init_mod.os.path, "exists", lambda _: True)
+
+    called = {}
+
+    def fake_execv(path, args):
+        called["path"] = path
+        called["args"] = args
+
+    monkeypatch.setattr(init_mod.os, "execv", fake_execv)
+    monkeypatch.setattr(init_mod.sys, "argv", ["init.py", "--flag"])
+
+    runpy.run_module("agentops_mcp_server.init", run_name="__main__")
 
     assert called["path"] == "/usr/bin/env"
     assert called["args"] == ["env", "bash", str(script), "--flag"]
