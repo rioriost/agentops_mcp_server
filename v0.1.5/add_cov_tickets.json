@@ -130,7 +130,7 @@
       "scope": "test",
       "title": "Push coverage toward 90% with remaining paths",
       "description": "Add release-marked tests for remaining uncovered branches to continue raising coverage toward 90%.",
-      "status": "planned",
+      "status": "done",
       "dependencies": ["C-013"]
     }
   ]

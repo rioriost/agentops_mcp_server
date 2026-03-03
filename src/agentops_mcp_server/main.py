@@ -947,7 +947,10 @@ def repo_commit(
     timeout_sec: Optional[int] = None,
 ) -> Dict[str, Any]:
     if run_verify:
-        verify_result = run_verify(timeout_sec=timeout_sec)
+        verify_fn = globals().get("run_verify")
+        if not callable(verify_fn):
+            raise RuntimeError("verify unavailable")
+        verify_result = verify_fn(timeout_sec=timeout_sec)
         if not verify_result["ok"]:
             stderr = (verify_result.get("stderr") or "").strip()
             stdout = (verify_result.get("stdout") or "").strip()

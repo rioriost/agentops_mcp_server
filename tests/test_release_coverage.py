@@ -1,5 +1,7 @@
+import io
 import json
 import subprocess
+import sys
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -694,6 +696,61 @@ def test_journal_append_requires_kind(temp_repo):
         m.journal_append(kind="", payload={})
 
 
+def test_commit_if_verified_success(monkeypatch):
+    monkeypatch.setattr(
+        m, "run_verify", lambda **kwargs: {"ok": True, "returncode": 0, "stderr": ""}
+    )
+    monkeypatch.setattr(m, "_journal_safe", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "_git_diff_stat_cached", lambda: "diff")
+
+    calls = {"git": []}
+
+    def fake_git(*args):
+        calls["git"].append(args)
+        if args == ("rev-parse", "HEAD"):
+            return "abc"
+        return ""
+
+    monkeypatch.setattr(m, "git", fake_git)
+    monkeypatch.setattr(m.subprocess, "run", lambda *args, **kwargs: None)
+
+    result = m.commit_if_verified("msg")
+    assert result["sha"] == "abc"
+    assert result["message"] == "msg"
+
+
+def test_repo_commit_with_files_list(monkeypatch):
+    monkeypatch.setattr(m, "_git_status_porcelain", lambda: [" M a", " M b"])
+    monkeypatch.setattr(m, "_journal_safe", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "_git_diff_stat_cached", lambda: "diff")
+
+    calls = {"git": []}
+
+    def fake_git(*args):
+        calls["git"].append(args)
+        if args == ("rev-parse", "HEAD"):
+            return "abc"
+        return ""
+
+    monkeypatch.setattr(m, "git", fake_git)
+    monkeypatch.setattr(m.subprocess, "run", lambda *args, **kwargs: None)
+
+    result = m.repo_commit(message="", files="a.txt, b.txt", run_verify=False)
+    assert result["ok"] is True
+    assert ("add", "a.txt", "b.txt") in calls["git"]
+    assert result["message"].startswith("chore:")
+
+
+def test_repo_commit_raises_on_verify_failure(monkeypatch):
+    monkeypatch.setattr(
+        m,
+        "run_verify",
+        lambda **kwargs: {"ok": False, "returncode": 1, "stderr": "nope", "stdout": ""},
+    )
+    with pytest.raises(RuntimeError, match="verify failed"):
+        m.repo_commit(message="msg", run_verify=True)
+
+
 def test_read_last_json_line_missing_file(temp_repo):
     missing = temp_repo / ".agent" / "missing.jsonl"
     assert m._read_last_json_line(missing) is None
@@ -747,3 +804,35 @@ def test_repo_commit_message_suggest_diff_none_uses_git(monkeypatch):
     result = m.repo_commit_message_suggest(diff=None)
     assert result["files"] == ["docs/readme.md"]
     assert result["suggestions"][0].startswith("docs:")
+
+
+def test_main_writes_error_response(monkeypatch):
+    input_req = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "nope"}) + "\n"
+    stdin = io.StringIO(input_req)
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdin", stdin)
+    monkeypatch.setattr(sys, "stdout", stdout)
+    monkeypatch.setattr(m, "_journal_safe", lambda *args, **kwargs: None)
+
+    m.main()
+
+    output = stdout.getvalue().strip()
+    resp = json.loads(output)
+    assert resp["id"] == 1
+    assert resp["error"]["code"] == -32000
+    assert "Unknown method" in resp["error"]["message"]
+
+
+def test_auto_snapshot_checkpoint_missing_journal(temp_repo):
+    result = m._auto_snapshot_checkpoint_after_commit()
+    assert result["ok"] is False
+    assert result["reason"] == "journal not found"
+
+
+def test_auto_snapshot_checkpoint_no_events(temp_repo):
+    m.JOURNAL.parent.mkdir(parents=True, exist_ok=True)
+    m.JOURNAL.write_text("", encoding="utf-8")
+    result = m._auto_snapshot_checkpoint_after_commit()
+    assert result["ok"] is False
+    assert result["reason"] == "no journal events"
+    assert result["last_seq"] == 0
