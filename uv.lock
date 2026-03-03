@@ -4,10 +4,11 @@ requires-python = ">=3.14"
 
 [[package]]
 name = "agentops-mcp-server"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "." }
 dependencies = [
     { name = "pytest" },
+    { name = "pytest-cov" },
 ]
 
 [package.optional-dependencies]
@@ -20,6 +21,7 @@ test = [
 requires-dist = [
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=7" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4" },
 ]
 provides-extras = ["test"]
