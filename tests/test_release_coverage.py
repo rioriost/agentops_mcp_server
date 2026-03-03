@@ -836,3 +836,410 @@ def test_auto_snapshot_checkpoint_no_events(temp_repo):
     assert result["ok"] is False
     assert result["reason"] == "no journal events"
     assert result["last_seq"] == 0
+
+
+def test_sanitize_args_handles_none_and_passthrough():
+    assert m._sanitize_args(None) == {}
+    data = {"a": 1, "b": ["x"]}
+    assert m._sanitize_args(data) == data
+
+
+def test_summarize_result_uses_repr_for_non_json():
+    class NoJson:
+        def __repr__(self):
+            return "x" * 100
+
+    result = m._summarize_result(NoJson(), limit=10)
+    assert result["truncated"] is True
+    assert "summary" in result
+
+
+def test_journal_safe_ignores_errors(monkeypatch):
+    monkeypatch.setattr(
+        m,
+        "journal_append",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    m._journal_safe("task.start", {"note": "ignore"})
+
+
+def test_read_first_event_with_ts_skips_invalid(tmp_path):
+    path = tmp_path / "journal.jsonl"
+    path.write_text(
+        "\n".join(
+            [
+                "",
+                "not-json",
+                "[]",
+                json.dumps({"seq": 1}),
+                json.dumps({"ts": 123}),
+                json.dumps({"ts": "not-a-ts"}),
+                json.dumps({"ts": "2026-03-02T12:00:00+00:00", "seq": 9}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    rec, parsed = m._read_first_event_with_ts(path)
+    assert rec["seq"] == 9
+    assert parsed == datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def test_rotate_journal_no_valid_timestamps(temp_repo):
+    m.JOURNAL.parent.mkdir(parents=True, exist_ok=True)
+    m.JOURNAL.write_text(
+        "not-json\n" + json.dumps({"ts": "bad"}) + "\n", encoding="utf-8"
+    )
+    result = m._rotate_journal_if_prev_week()
+    assert result["ok"] is False
+    assert result["reason"] == "no valid journal timestamps"
+
+
+def test_rotate_journal_current_week_only(temp_repo, monkeypatch):
+    m.JOURNAL.parent.mkdir(parents=True, exist_ok=True)
+    fixed_now = datetime(2026, 3, 9, 12, 0, 0, tzinfo=timezone.utc)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz is None:
+                return fixed_now.replace(tzinfo=None)
+            return fixed_now.astimezone(tz)
+
+    m.JOURNAL.write_text(
+        json.dumps({"ts": "2026-03-09T01:00:00+00:00", "seq": 1}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(m, "datetime", FixedDateTime)
+    result = m._rotate_journal_if_prev_week()
+    assert result["ok"] is True
+    assert result["rotated"] is False
+    assert result["reason"] == "current week only"
+
+
+def test_apply_event_to_state_session_end_and_file_edit():
+    state = {}
+    m._apply_event_to_state(state, {"kind": "session.end", "payload": {}})
+    assert state["last_action"] == "session ended"
+
+    m._apply_event_to_state(
+        state, {"kind": "file.edit", "payload": {"action": "edit", "path": "foo.py"}}
+    )
+    assert state["last_action"] == "file edit: foo.py"
+
+
+def test_apply_event_to_state_verify_end_failed():
+    state = {}
+    m._apply_event_to_state(state, {"kind": "verify.end", "payload": {"ok": False}})
+    assert state["verification_status"] == "failed"
+    assert state["last_action"] == "verify finished"
+
+
+def test_replay_events_to_state_no_target_session():
+    events = [{"seq": "bad", "kind": "session.start"}, {"seq": 1, "kind": "task.start"}]
+    state = m.replay_events_to_state(snapshot_state=None, events=events)
+    assert state["session_id"] == ""
+
+
+def test_repo_commit_verify_unavailable(monkeypatch):
+    monkeypatch.setattr(m, "run_verify", None)
+    with pytest.raises(RuntimeError, match="verify unavailable"):
+        m.repo_commit(message="msg", run_verify=True)
+
+
+def test_git_success_returns_output(monkeypatch):
+    monkeypatch.setattr(m.subprocess, "check_output", lambda *args, **kwargs: b"ok")
+    assert m.git("status") == "ok"
+
+
+def test_handle_request_without_id_returns_none():
+    resp = m.handle_request({"jsonrpc": "2.0", "method": "tools/list"})
+    assert resp is None
+
+
+def test_main_invalid_request_no_id_writes_nothing(monkeypatch):
+    stdin = io.StringIO("[]\n")
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdin", stdin)
+    monkeypatch.setattr(sys, "stdout", stdout)
+    monkeypatch.setattr(m, "_journal_safe", lambda *args, **kwargs: None)
+
+    m.main()
+
+    assert stdout.getvalue() == ""
+
+
+def test_read_last_json_line_only_empty_lines(temp_repo):
+    path = temp_repo / ".agent" / "empty.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n  \n\t\n", encoding="utf-8")
+    assert m._read_last_json_line(path) is None
+
+
+def test_read_first_event_with_ts_missing_file(tmp_path):
+    assert m._read_first_event_with_ts(tmp_path / "missing.jsonl") is None
+
+
+def test_rotate_journal_no_last_week_events(temp_repo, monkeypatch):
+    m.JOURNAL.parent.mkdir(parents=True, exist_ok=True)
+    fixed_now = datetime(2026, 3, 16, 12, 0, 0, tzinfo=timezone.utc)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz is None:
+                return fixed_now.replace(tzinfo=None)
+            return fixed_now.astimezone(tz)
+
+    m.JOURNAL.write_text(
+        json.dumps({"ts": "2026-02-20T10:00:00+00:00", "seq": 1}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(m, "datetime", FixedDateTime)
+    result = m._rotate_journal_if_prev_week()
+    assert result["ok"] is True
+    assert result["rotated"] is False
+    assert result["reason"] == "no last-week events"
+
+
+def test_read_journal_events_skips_blank_lines(temp_repo):
+    journal = temp_repo / ".agent" / "journal.jsonl"
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    journal.write_text(
+        "\n".join(
+            [
+                "",
+                json.dumps([]),
+                json.dumps({"seq": "nope"}),
+                json.dumps({"seq": 1, "kind": "keep"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = m._read_journal_events(start_seq=0)
+    assert [event["seq"] for event in result["events"]] == [1]
+    assert result["invalid_lines"] == 2
+
+
+def test_apply_event_to_state_task_update_sets_unknown():
+    state = {}
+    m._apply_event_to_state(state, {"kind": "task.update", "payload": {}})
+    assert state["current_task"] == "unknown"
+    assert state["last_action"] == "task updated"
+
+
+def test_apply_event_to_state_commit_end_uses_summary():
+    state = {}
+    m._apply_event_to_state(
+        state, {"kind": "commit.end", "payload": {"sha": "", "summary": "sum"}}
+    )
+    assert state["last_commit"] == "sum"
+    assert state["last_action"] == "commit finished"
+
+
+def test_replay_events_to_state_drops_duplicate_event():
+    snapshot_state = {"applied_event_ids": ["evt-1"]}
+    events = [
+        {
+            "seq": 1,
+            "event_id": "evt-1",
+            "kind": "session.start",
+            "session_id": "s1",
+            "payload": {},
+        }
+    ]
+    state = m.replay_events_to_state(snapshot_state=snapshot_state, events=events)
+    assert state["replay_warnings"]["dropped_events"] == 1
+    assert state["session_id"] == "s1"
+
+
+def test_replay_events_to_state_sets_session_id_when_missing():
+    events = [{"seq": 1, "kind": "task.start", "session_id": "s1", "payload": {}}]
+    state = m.replay_events_to_state(snapshot_state=None, events=events)
+    assert state["session_id"] == "s1"
+
+
+def test_roll_forward_replay_uses_agent_snapshot_path(temp_repo):
+    agent_dir = temp_repo / ".agent"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_path = agent_dir / "snap.json"
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                "snapshot_id": "snap-1",
+                "ts": m._now_iso(),
+                "project_root": str(m.REPO_ROOT),
+                "state": {},
+                "last_applied_seq": 0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    checkpoint_path = agent_dir / "checkpoint.json"
+    checkpoint_path.write_text(
+        json.dumps(
+            {
+                "checkpoint_id": "c1",
+                "ts": m._now_iso(),
+                "project_root": str(m.REPO_ROOT),
+                "last_applied_seq": 0,
+                "snapshot_path": "snap.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    replay = m.roll_forward_replay(checkpoint_path=str(checkpoint_path))
+    assert replay["ok"] is True
+    assert replay["snapshot_path"].endswith("/.agent/snap.json")
+
+
+def test_commit_if_verified_truncates_long_message(monkeypatch):
+    monkeypatch.setattr(
+        m, "run_verify", lambda **kwargs: {"ok": True, "returncode": 0, "stderr": ""}
+    )
+    monkeypatch.setattr(m, "_journal_safe", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "_git_diff_stat_cached", lambda: "")
+
+    def fake_git(*args):
+        if args == ("rev-parse", "HEAD"):
+            return "abc"
+        return ""
+
+    monkeypatch.setattr(m, "git", fake_git)
+    monkeypatch.setattr(m.subprocess, "run", lambda *args, **kwargs: None)
+
+    result = m.commit_if_verified("x" * 200)
+    assert result["message"].endswith("...")
+    assert len(result["message"]) <= 80
+
+
+def test_repo_commit_with_list_files(monkeypatch):
+    monkeypatch.setattr(m, "_git_status_porcelain", lambda: [" M a"])
+    monkeypatch.setattr(m, "_journal_safe", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "_git_diff_stat_cached", lambda: "")
+
+    calls = {"git": []}
+
+    def fake_git(*args):
+        calls["git"].append(args)
+        if args == ("rev-parse", "HEAD"):
+            return "abc"
+        return ""
+
+    monkeypatch.setattr(m, "git", fake_git)
+    monkeypatch.setattr(m.subprocess, "run", lambda *args, **kwargs: None)
+
+    result = m.repo_commit(message="msg", files=["a.txt"], run_verify=False)
+    assert result["ok"] is True
+    assert ("add", "a.txt") in calls["git"]
+
+
+def test_test_candidates_for_lib_marker():
+    candidates = m._test_candidates_for_path("src/lib/foo.py")
+    assert "src/tests/foo_test.py" in candidates
+
+
+def test_main_skips_blank_line(monkeypatch):
+    stdin = io.StringIO("\n")
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdin", stdin)
+    monkeypatch.setattr(sys, "stdout", stdout)
+    monkeypatch.setattr(m, "_journal_safe", lambda *args, **kwargs: None)
+
+    m.main()
+
+    assert stdout.getvalue() == ""
+
+
+def test_read_last_json_line_returns_last_valid(temp_repo):
+    path = temp_repo / ".agent" / "last.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('{"seq": 1}\n{"seq": 2}\n', encoding="utf-8")
+    assert m._read_last_json_line(path)["seq"] == 2
+
+
+def test_test_candidates_for_existing_test_path():
+    assert m._test_candidates_for_path("tests/foo.py") == ["tests/foo.py"]
+
+
+def test_repo_commit_auto_adds_all(monkeypatch):
+    monkeypatch.setattr(m, "_git_status_porcelain", lambda: [" M a"])
+    monkeypatch.setattr(m, "_journal_safe", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "_git_diff_stat_cached", lambda: "")
+    monkeypatch.setattr(
+        m, "_auto_snapshot_checkpoint_after_commit", lambda: {"ok": True}
+    )
+
+    calls = {"git": []}
+
+    def fake_git(*args):
+        calls["git"].append(args)
+        if args == ("rev-parse", "HEAD"):
+            return "abc"
+        return ""
+
+    monkeypatch.setattr(m, "git", fake_git)
+    monkeypatch.setattr(m.subprocess, "run", lambda *args, **kwargs: None)
+
+    result = m.repo_commit(message="msg", files="auto", run_verify=False)
+    assert result["ok"] is True
+    assert ("add", "-A") in calls["git"]
+
+
+def test_commit_if_verified_raises_on_commit_failure(monkeypatch):
+    monkeypatch.setattr(
+        m, "run_verify", lambda **kwargs: {"ok": True, "returncode": 0, "stderr": ""}
+    )
+    monkeypatch.setattr(m, "_journal_safe", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "_git_diff_stat_cached", lambda: "")
+
+    def fake_git(*args):
+        if args == ("rev-parse", "HEAD"):
+            return "abc"
+        return ""
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("commit failed")
+
+    monkeypatch.setattr(m, "git", fake_git)
+    monkeypatch.setattr(m.subprocess, "run", boom)
+
+    with pytest.raises(RuntimeError, match="commit failed"):
+        m.commit_if_verified("msg")
+
+
+def test_auto_snapshot_checkpoint_logs_rotation(temp_repo, monkeypatch):
+    m.JOURNAL.parent.mkdir(parents=True, exist_ok=True)
+    m.JOURNAL.write_text(
+        json.dumps({"seq": 1, "kind": "session.start", "ts": m._now_iso()}) + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        m,
+        "_read_journal_events",
+        lambda *args, **kwargs: {
+            "events": [],
+            "invalid_lines": 0,
+            "last_seq": 1,
+            "path": str(m.JOURNAL),
+        },
+    )
+    monkeypatch.setattr(m, "snapshot_save", lambda **kwargs: {"ok": True})
+    monkeypatch.setattr(m, "checkpoint_update", lambda **kwargs: {"ok": True})
+    monkeypatch.setattr(
+        m, "_rotate_journal_if_prev_week", lambda: {"ok": True, "rotated": True}
+    )
+
+    calls = []
+
+    monkeypatch.setattr(m, "_journal_safe", lambda *args, **kwargs: calls.append(args))
+
+    result = m._auto_snapshot_checkpoint_after_commit()
+    assert result["ok"] is True
+    assert any(call[0] == "journal.rotate" for call in calls)

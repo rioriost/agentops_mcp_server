@@ -132,6 +132,15 @@
       "description": "Add release-marked tests for remaining uncovered branches to continue raising coverage toward 90%.",
       "status": "done",
       "dependencies": ["C-013"]
+    },
+    {
+      "id": "C-015",
+      "phase": "Phase 12",
+      "scope": "test",
+      "title": "Push coverage toward 95% with remaining paths",
+      "description": "Add release-marked tests targeting the remaining uncovered branches to move coverage toward 95%.",
+      "status": "done",
+      "dependencies": ["C-014"]
     }
   ]
 }
