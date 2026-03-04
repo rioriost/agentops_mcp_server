@@ -201,7 +201,10 @@ else
       '' \
       '## MCP workspace_root requirement' \
       '- When calling MCP tools, always pass `workspace_root` as the absolute project root path.' \
-      '- If `workspace_root` is omitted, the server falls back to its current working directory.'
+      '- If `workspace_root` is omitted, the server falls back to its current working directory.' \
+      '' \
+      '## For GPT-5.3-Codex' \
+      '- If instruction begins with "EXECUTE:", skip analysis and start implementation immediately.'
   } > "$root/.rules"
 fi
 
