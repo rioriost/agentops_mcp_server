@@ -150,58 +150,59 @@ else
   if [ -f "$root/.rules" ] && (( update_mode == 1 )); then
     cp "$root/.rules" "$root/.rules.bak"
   fi
-  cat > "$root/.rules" <<'RULES'
-# AgentOps (project rules)
-# Goal: Max automation for (1) journal/snapshot/checkpoint persistence, (2) verify->commit loop, (3) test generation.
-
-## Always do this at the start
-- Review `.agent/snapshot.json` and `.agent/checkpoint.json` for current state and last applied seq.
-- Inspect `.agent/journal.jsonl` for recent events if needed.
-
-## Work loop (mandatory)
-- For any code change:
-  1) Implement smallest safe change
-  2) Run "${VERIFY_REL}"
-  3) If it fails: fix and repeat
-  4) If it passes: commit changes
-  5) Update snapshot/checkpoint as needed
-
-## State persistence (v0.1.0)
-- Use `.agent/journal.jsonl` for append-only events.
-- Use `.agent/snapshot.json` for state snapshots.
-- Use `.agent/checkpoint.json` for roll-forward start.
-
-## Roll-forward recovery
-- Rebuild state by replaying journal from checkpoint/snapshot when resuming.
-- Use continue-ready state reconstruction if provided.
-
-## Commit message
-- ~80 chars, semantic summary (not strict conventional commits)
-- Mention scope if useful (e.g. "rust:", "py:", "swift:", "infra:")
-
-## Prefer MCP tools if available
-- If MCP tools exist:
-  - use mcp:agentops:journal_append for events
-  - use mcp:agentops:snapshot_save to persist state
-  - use mcp:agentops:checkpoint_update to advance replay
-  - use mcp:agentops:roll_forward_replay for recovery
-  - use mcp:agentops:continue_state_rebuild for continue-ready state
-  - use mcp:agentops:repo_commit to commit after verify
-
-## MCP tool usage requirements
-- Call `tools/list` only once at session start; re-fetch only when tool errors indicate a schema mismatch or when tools are unavailable.
-- When calling `tools/call`, always include all fields listed in `inputSchema.required`.
-- If required fields are unclear or missing, re-fetch `tools/list` before calling.
-
-## Commit suggestion guardrails
-- After `repo_verify`, call `repo_status_summary` and confirm there are changes.
-- If `diff` and `files` are empty, do not call `repo_commit_message_suggest` or `repo_commit`.
-- Do not retry `repo_commit_message_suggest` on parsing errors; treat as a hard error and stop.
-
-## MCP workspace_root requirement
-- When calling MCP tools, always pass `workspace_root` as the absolute project root path.
-- If `workspace_root` is omitted, the server falls back to its current working directory.
-RULES
+  {
+    printf '%s\n' \
+      '# AgentOps (project rules)' \
+      '# Goal: Max automation for (1) journal/snapshot/checkpoint persistence, (2) verify->commit loop, (3) test generation.' \
+      '' \
+      '## Always do this at the start' \
+      '- Review `.agent/snapshot.json` and `.agent/checkpoint.json` for current state and last applied seq.' \
+      '- Inspect `.agent/journal.jsonl` for recent events if needed.' \
+      '' \
+      '## Work loop (mandatory)' \
+      '- For any code change:' \
+      '  1) Implement smallest safe change' \
+      '  2) Run "${VERIFY_REL}"' \
+      '  3) If it fails: fix and repeat' \
+      '  4) If it passes: commit changes' \
+      '  5) Update snapshot/checkpoint as needed' \
+      '' \
+      '## State persistence (v0.1.0)' \
+      '- Use `.agent/journal.jsonl` for append-only events.' \
+      '- Use `.agent/snapshot.json` for state snapshots.' \
+      '- Use `.agent/checkpoint.json` for roll-forward start.' \
+      '' \
+      '## Roll-forward recovery' \
+      '- Rebuild state by replaying journal from checkpoint/snapshot when resuming.' \
+      '- Use continue-ready state reconstruction if provided.' \
+      '' \
+      '## Commit message' \
+      '- ~80 chars, semantic summary (not strict conventional commits)' \
+      '- Mention scope if useful (e.g. "rust:", "py:", "swift:", "infra:")' \
+      '' \
+      '## Prefer MCP tools if available' \
+      '- If MCP tools exist:' \
+      '  - use mcp:agentops:journal_append for events' \
+      '  - use mcp:agentops:snapshot_save to persist state' \
+      '  - use mcp:agentops:checkpoint_update to advance replay' \
+      '  - use mcp:agentops:roll_forward_replay for recovery' \
+      '  - use mcp:agentops:continue_state_rebuild for continue-ready state' \
+      '  - use mcp:agentops:repo_commit to commit after verify' \
+      '' \
+      '## MCP tool usage requirements' \
+      '- Call `tools/list` only once at session start; re-fetch only when tool errors indicate a schema mismatch or when tools are unavailable.' \
+      '- When calling `tools/call`, always include all fields listed in `inputSchema.required`.' \
+      '- If required fields are unclear or missing, re-fetch `tools/list` before calling.' \
+      '' \
+      '## Commit suggestion guardrails' \
+      '- After `repo_verify`, call `repo_status_summary` and confirm there are changes.' \
+      '- If `diff` and `files` are empty, do not call `repo_commit_message_suggest` or `repo_commit`.' \
+      '- Do not retry `repo_commit_message_suggest` on parsing errors; treat as a hard error and stop.' \
+      '' \
+      '## MCP workspace_root requirement' \
+      '- When calling MCP tools, always pass `workspace_root` as the absolute project root path.' \
+      '- If `workspace_root` is omitted, the server falls back to its current working directory.'
+  } > "$root/.rules"
 fi
 
 
