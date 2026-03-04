@@ -217,10 +217,11 @@ fi
 if [ -f "$AGENT_DIR/snapshot.json" ]; then
   echo "Skipping .agent/snapshot.json (already exists)."
 else
+  snapshot_ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   printf '%s\n' \
     '{' \
     '  "snapshot_id": "init",' \
-    "  \"ts\": \"$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")\"," \
+    "  \"ts\": \"$snapshot_ts\"," \
     "  \"project_root\": \"$root\"," \
     '  "last_applied_seq": 0,' \
     '  "state": {}' \
@@ -230,10 +231,11 @@ fi
 if [ -f "$AGENT_DIR/checkpoint.json" ]; then
   echo "Skipping .agent/checkpoint.json (already exists)."
 else
+  checkpoint_ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   printf '%s\n' \
     '{' \
     '  "checkpoint_id": "init",' \
-    "  \"ts\": \"$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")\"," \
+    "  \"ts\": \"$checkpoint_ts\"," \
     "  \"project_root\": \"$root\"," \
     '  "last_applied_seq": 0,' \
     '  "snapshot_path": "snapshot.json"' \
