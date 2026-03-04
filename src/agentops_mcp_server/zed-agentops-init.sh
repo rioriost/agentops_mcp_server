@@ -55,7 +55,11 @@ if (( update_mode == 1 )); then
   fi
 
   echo "Update existing directory $root? [y/N]"
-  read -r reply
+  if [ -r /dev/tty ]; then
+    read -r reply < /dev/tty
+  else
+    read -r reply
+  fi
   reply_lc=$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]')
   case "$reply_lc" in
     y|yes) ;;
@@ -64,7 +68,11 @@ if (( update_mode == 1 )); then
 else
   if [ -d "$root" ]; then
     echo "Directory $root already exists. Continue? [y/N]"
-    read -r reply
+    if [ -r /dev/tty ]; then
+      read -r reply < /dev/tty
+    else
+      read -r reply
+    fi
     reply_lc=$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]')
     case "$reply_lc" in
       y|yes) ;;
