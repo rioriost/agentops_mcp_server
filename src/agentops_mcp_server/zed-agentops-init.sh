@@ -217,29 +217,27 @@ fi
 if [ -f "$AGENT_DIR/snapshot.json" ]; then
   echo "Skipping .agent/snapshot.json (already exists)."
 else
-  cat > "$AGENT_DIR/snapshot.json" <<JSON
-{
-  "snapshot_id": "init",
-  "ts": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "project_root": "$root",
-  "last_applied_seq": 0,
-  "state": {}
-}
-JSON
+  printf '%s\n' \
+    '{' \
+    '  "snapshot_id": "init",' \
+    "  \"ts\": \"$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")\"," \
+    "  \"project_root\": \"$root\"," \
+    '  "last_applied_seq": 0,' \
+    '  "state": {}' \
+    '}' > "$AGENT_DIR/snapshot.json"
 fi
 
 if [ -f "$AGENT_DIR/checkpoint.json" ]; then
   echo "Skipping .agent/checkpoint.json (already exists)."
 else
-  cat > "$AGENT_DIR/checkpoint.json" <<JSON
-{
-  "checkpoint_id": "init",
-  "ts": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "project_root": "$root",
-  "last_applied_seq": 0,
-  "snapshot_path": "snapshot.json"
-}
-JSON
+  printf '%s\n' \
+    '{' \
+    '  "checkpoint_id": "init",' \
+    "  \"ts\": \"$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")\"," \
+    "  \"project_root\": \"$root\"," \
+    '  "last_applied_seq": 0,' \
+    '  "snapshot_path": "snapshot.json"' \
+    '}' > "$AGENT_DIR/checkpoint.json"
 fi
 
 if (( update_mode == 1 )); then
@@ -252,126 +250,126 @@ else
   mkdir -p "$ZED_SCRIPTS_DIR"
 
   # --- .zed/scripts/verify (polyglot-ish) ---
-  cat > "$ZED_SCRIPTS_DIR/verify" <<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
-cd "$(git rev-parse --show-toplevel)"
-
-echo "==> verify: start"
-
-mapfile -d '' status_entries < <(git status --porcelain -z)
-if (( ${#status_entries[@]} == 0 )); then
-  echo "==> verify: no changes; skipping"
-  exit 0
-fi
-
-has_python=0
-has_swift=0
-has_rust=0
-sh_files=()
-bicep_files=()
-
-for entry in "${status_entries[@]}"; do
-  if [[ "$entry" == *" "* ]]; then
-    path="${entry#?? }"
-  else
-    path="$entry"
-  fi
-  case "$path" in
-    *.py|pyproject.toml|requirements.txt) has_python=1 ;;
-    *.swift|Package.swift) has_swift=1 ;;
-    *.rs|Cargo.toml) has_rust=1 ;;
-    *.sh) sh_files+=("$path") ;;
-    *.bicep) bicep_files+=("$path") ;;
-  esac
-done
-
-ran=0
-
-have_cmd() { command -v "$1" >/dev/null 2>&1; }
-skip_cmd() { echo "==> $1: $2 not installed; skipping"; }
-
-if (( has_python == 1 )); then
-  if have_cmd python; then
-    if python -m pytest --version >/dev/null 2>&1; then
-      echo "==> python: pytest"
-      python -m pytest -q && ran=1 || exit 1
-    else
-      skip_cmd "python" "pytest"
-    fi
-  else
-    skip_cmd "python" "python"
-  fi
-fi
-
-if (( has_swift == 1 )); then
-  if have_cmd swift; then
-    echo "==> swift: swift test"
-    swift test && ran=1 || exit 1
-  else
-    skip_cmd "swift" "swift"
-  fi
-fi
-
-if (( has_rust == 1 )); then
-  if have_cmd cargo; then
-    echo "==> rust: cargo test"
-    cargo test && ran=1 || exit 1
-  else
-    skip_cmd "rust" "cargo"
-  fi
-fi
-
-if (( ${#sh_files[@]} > 0 )); then
-  if have_cmd shellcheck; then
-    echo "==> bash: shellcheck"
-    shellcheck "${sh_files[@]}" && ran=1 || exit 1
-  else
-    skip_cmd "bash" "shellcheck"
-  fi
-fi
-
-if (( ${#bicep_files[@]} > 0 )); then
-  if have_cmd az; then
-    echo "==> bicep: az bicep lint"
-    for bicep_file in "${bicep_files[@]}"; do
-      az bicep lint -f "$bicep_file" && ran=1 || exit 1
-    done
-  elif have_cmd bicep; then
-    echo "==> bicep: bicep lint"
-    for bicep_file in "${bicep_files[@]}"; do
-      bicep lint "$bicep_file" && ran=1 || exit 1
-    done
-  else
-    skip_cmd "az/bicep" "az/bicep"
-  fi
-fi
-
-if [[ "$ran" -eq 0 ]]; then
-  echo "WARN: No known test/build targets detected. Add checks to .zed/scripts/verify."
-fi
-
-echo "==> verify: OK"
-SH
+  {
+    printf '%s\n' \
+      '#!/usr/bin/env bash' \
+      'set -euo pipefail' \
+      'cd "$(git rev-parse --show-toplevel)"' \
+      '' \
+      'echo "==> verify: start"' \
+      '' \
+      "mapfile -d '' status_entries < <(git status --porcelain -z)" \
+      'if (( ${#status_entries[@]} == 0 )); then' \
+      '  echo "==> verify: no changes; skipping"' \
+      '  exit 0' \
+      'fi' \
+      '' \
+      'has_python=0' \
+      'has_swift=0' \
+      'has_rust=0' \
+      'sh_files=()' \
+      'bicep_files=()' \
+      '' \
+      'for entry in "${status_entries[@]}"; do' \
+      '  if [[ "$entry" == *" "* ]]; then' \
+      '    path="${entry#?? }"' \
+      '  else' \
+      '    path="$entry"' \
+      '  fi' \
+      '  case "$path" in' \
+      '    *.py|pyproject.toml|requirements.txt) has_python=1 ;;' \
+      '    *.swift|Package.swift) has_swift=1 ;;' \
+      '    *.rs|Cargo.toml) has_rust=1 ;;' \
+      '    *.sh) sh_files+=("$path") ;;' \
+      '    *.bicep) bicep_files+=("$path") ;;' \
+      '  esac' \
+      'done' \
+      '' \
+      'ran=0' \
+      '' \
+      'have_cmd() { command -v "$1" >/dev/null 2>&1; }' \
+      'skip_cmd() { echo "==> $1: $2 not installed; skipping"; }' \
+      '' \
+      'if (( has_python == 1 )); then' \
+      '  if have_cmd python; then' \
+      '    if python -m pytest --version >/dev/null 2>&1; then' \
+      '      echo "==> python: pytest"' \
+      '      python -m pytest -q && ran=1 || exit 1' \
+      '    else' \
+      '      skip_cmd "python" "pytest"' \
+      '    fi' \
+      '  else' \
+      '    skip_cmd "python" "python"' \
+      '  fi' \
+      'fi' \
+      '' \
+      'if (( has_swift == 1 )); then' \
+      '  if have_cmd swift; then' \
+      '    echo "==> swift: swift test"' \
+      '    swift test && ran=1 || exit 1' \
+      '  else' \
+      '    skip_cmd "swift" "swift"' \
+      '  fi' \
+      'fi' \
+      '' \
+      'if (( has_rust == 1 )); then' \
+      '  if have_cmd cargo; then' \
+      '    echo "==> rust: cargo test"' \
+      '    cargo test && ran=1 || exit 1' \
+      '  else' \
+      '    skip_cmd "rust" "cargo"' \
+      '  fi' \
+      'fi' \
+      '' \
+      'if (( ${#sh_files[@]} > 0 )); then' \
+      '  if have_cmd shellcheck; then' \
+      '    echo "==> bash: shellcheck"' \
+      '    shellcheck "${sh_files[@]}" && ran=1 || exit 1' \
+      '  else' \
+      '    skip_cmd "bash" "shellcheck"' \
+      '  fi' \
+      'fi' \
+      '' \
+      'if (( ${#bicep_files[@]} > 0 )); then' \
+      '  if have_cmd az; then' \
+      '    echo "==> bicep: az bicep lint"' \
+      '    for bicep_file in "${bicep_files[@]}"; do' \
+      '      az bicep lint -f "$bicep_file" && ran=1 || exit 1' \
+      '    done' \
+      '  elif have_cmd bicep; then' \
+      '    echo "==> bicep: bicep lint"' \
+      '    for bicep_file in "${bicep_files[@]}"; do' \
+      '      bicep lint "$bicep_file" && ran=1 || exit 1' \
+      '    done' \
+      '  else' \
+      '    skip_cmd "az/bicep" "az/bicep"' \
+      '  fi' \
+      'fi' \
+      '' \
+      'if [[ "$ran" -eq 0 ]]; then' \
+      '  echo "WARN: No known test/build targets detected. Add checks to .zed/scripts/verify."' \
+      'fi' \
+      '' \
+      'echo "==> verify: OK"'
+  } > "$ZED_SCRIPTS_DIR/verify"
   chmod +x "$ZED_SCRIPTS_DIR/verify"
 
   # --- .zed/tasks.json ---
-  cat > "$root/.zed/tasks.json" <<JSON
-[
-  {
-    "label": "verify",
-    "command": "./${VERIFY_REL}"
-  },
-  {
-    "label": "git status",
-    "command": "git status -sb"
-  },
-  {
-    "label": "git diff",
-    "command": "git diff"
-  }
-]
-JSON
+  printf '%s\n' \
+    '[' \
+    '  {' \
+    '    "label": "verify",' \
+    "    \"command\": \"./${VERIFY_REL}\"" \
+    '  },' \
+    '  {' \
+    '    "label": "git status",' \
+    '    "command": "git status -sb"' \
+    '  },' \
+    '  {' \
+    '    "label": "git diff",' \
+    '    "command": "git diff"' \
+    '  }' \
+    ']' > "$root/.zed/tasks.json"
 fi
 
 if (( update_mode == 1 )); then
