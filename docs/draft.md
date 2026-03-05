@@ -1,12 +1,10 @@
-# Draft for 0.2.3: Refactor main.py
+# Draft for 0.3.0: Refactor main.py continued
 
 ## Background
-現在のmain.pyには、処理が重複した部分がある可能性が高い。
+現在のmain.pyは、サイズが肥大化しており、メンテ性が悪化している。
 
 ## Goal
-- main.pyをリファクタリングして、重複を減らす。
-- 新たなmain.pyにあわせて、テストコードも修正する。
+- main.pyをクラスを導入して分割する
 
 ## Acceptance criteria
-- コード量が減ること
-- カバレッジ90%以上
+- 前バージョン0.2.3と外面的な動作が変わらないこと＝tool呼び出しと結果は同じ
