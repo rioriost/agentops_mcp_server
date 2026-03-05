@@ -2,7 +2,7 @@
   "id": "p1-t02",
   "title": "Refactor main.py to reduce duplication",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Refactor main.py by extracting shared helpers and reducing repeated logic while preserving external behavior.",
   "inputs": ["docs/draft.md", "docs/plan.md"],
   "outputs": [
