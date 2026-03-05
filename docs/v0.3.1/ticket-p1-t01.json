@@ -2,7 +2,7 @@
   "id": "p1-t01",
   "title": "Design class boundaries for full main.py split",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Define class-based structure and file boundaries to fully split main.py while preserving external behavior.",
   "inputs": ["docs/draft.md"],
   "outputs": [
