@@ -2142,183 +2142,226 @@ TOOL_REGISTRY = {
 }
 
 
-def tools_list() -> Dict[str, Any]:
-    tools = []
-    for name, spec in TOOL_REGISTRY.items():
-        input_schema = dict(spec["input_schema"])
-        properties = dict(input_schema.get("properties") or {})
-        properties["workspace_root"] = {"type": ["string", "null"]}
-        properties["truncate_limit"] = {"type": ["integer", "null"]}
-        input_schema["properties"] = properties
-        input_schema["required"] = list(input_schema.get("required") or [])
-        tools.append(
+class RepoContext:
+    def resolve_workspace_root(self, value: str) -> Path:
+        candidate = Path(value).expanduser()
+        if candidate.is_absolute():
+            return candidate.resolve()
+        cwd = Path.cwd().resolve()
+        if candidate in {Path("."), Path(cwd.name)}:
+            return cwd
+        return (cwd / candidate).resolve()
+
+    def set_repo_root(self, root: Path) -> None:
+        _set_repo_root(root)
+
+    def get_repo_root(self) -> Path:
+        return REPO_ROOT
+
+
+class ToolRouter:
+    def __init__(
+        self, tool_registry: Dict[str, Any], repo_context: RepoContext
+    ) -> None:
+        self.tool_registry = tool_registry
+        self.repo_context = repo_context
+        self.alias_map = {
+            "journal.append": "journal_append",
+            "snapshot.save": "snapshot_save",
+            "snapshot.load": "snapshot_load",
+            "checkpoint.update": "checkpoint_update",
+            "checkpoint.read": "checkpoint_read",
+            "roll_forward.replay": "roll_forward_replay",
+            "continue.state_rebuild": "continue_state_rebuild",
+            "session.capture_context": "session_capture_context",
+            "repo.verify": "repo_verify",
+            "repo.commit": "repo_commit",
+            "repo.status_summary": "repo_status_summary",
+            "repo.commit_message_suggest": "repo_commit_message_suggest",
+            "tests.suggest": "tests_suggest",
+            "tests.suggest_from_failures": "tests_suggest_from_failures",
+            "ops.compact_context": "ops_compact_context",
+            "ops.handoff_export": "ops_handoff_export",
+            "ops.resume_brief": "ops_resume_brief",
+            "ops.start_task": "ops_start_task",
+            "ops.update_task": "ops_update_task",
+            "ops.end_task": "ops_end_task",
+            "ops.capture_state": "ops_capture_state",
+            "ops.task_summary": "ops_task_summary",
+            "ops.observability_summary": "ops_observability_summary",
+        }
+
+    def tools_list(self) -> Dict[str, Any]:
+        tools = []
+        for name, spec in self.tool_registry.items():
+            input_schema = dict(spec["input_schema"])
+            properties = dict(input_schema.get("properties") or {})
+            properties["workspace_root"] = {"type": ["string", "null"]}
+            properties["truncate_limit"] = {"type": ["integer", "null"]}
+            input_schema["properties"] = properties
+            input_schema["required"] = list(input_schema.get("required") or [])
+            tools.append(
+                {
+                    "name": name,
+                    "description": spec["description"],
+                    "inputSchema": input_schema,
+                }
+            )
+        return {"tools": tools}
+
+    def tools_call(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        resolved_name = name
+        if resolved_name not in self.tool_registry:
+            resolved_name = self.alias_map.get(resolved_name, resolved_name)
+
+        if resolved_name not in self.tool_registry:
+            raise ValueError(f"Unknown tool: {name}")
+
+        previous_root = self.repo_context.get_repo_root()
+        workspace_root = arguments.get("workspace_root") if arguments else None
+        if isinstance(workspace_root, str) and workspace_root.strip():
+            resolved_root = self.repo_context.resolve_workspace_root(
+                workspace_root.strip()
+            )
+            self.repo_context.set_repo_root(resolved_root)
+            arguments = {k: v for k, v in arguments.items() if k != "workspace_root"}
+
+        truncate_limit = None
+        if arguments and "truncate_limit" in arguments:
+            raw_limit = arguments.get("truncate_limit")
+            if isinstance(raw_limit, int) and raw_limit > 0:
+                truncate_limit = raw_limit
+            arguments = {k: v for k, v in arguments.items() if k != "truncate_limit"}
+
+        handler = self.tool_registry[resolved_name]["handler"]
+        call_id = str(uuid.uuid4())
+        _journal_safe(
+            "tool.call",
             {
-                "name": name,
-                "description": spec["description"],
-                "inputSchema": input_schema,
-            }
+                "call_id": call_id,
+                "tool": resolved_name,
+                "args": _sanitize_args(arguments),
+            },
         )
-    return {"tools": tools}
+        try:
+            result = handler(**arguments) if arguments else handler()  # type: ignore[misc]
+        except Exception as exc:  # noqa: BLE001
+            _journal_safe(
+                "tool.result", {"call_id": call_id, "ok": False, "error": str(exc)}
+            )
+            raise
+        finally:
+            self.repo_context.set_repo_root(previous_root)
+
+        summary_limit = truncate_limit if truncate_limit is not None else 2000
+        result_payload = _summarize_result(result, limit=summary_limit)
+        _journal_safe(
+            "tool.result",
+            {"call_id": call_id, "ok": True, "result": result_payload},
+        )
+        content_payload = {
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps(result_payload, ensure_ascii=False),
+                }
+            ]
+        }
+        return content_payload
+
+
+class JsonRpcServer:
+    def __init__(self, tool_router: ToolRouter) -> None:
+        self.tool_router = tool_router
+
+    def handle_request(self, req: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        method = req.get("method")
+        params = req.get("params") or {}
+        req_id = req.get("id")
+
+        if method == "initialize":
+            result = {
+                "protocolVersion": "2024-11-05",
+                "serverInfo": {"name": "agentops-server", "version": "0.2.0"},
+                "capabilities": {"tools": {}},
+            }
+        elif method == "initialized":
+            result = None
+        elif method == "shutdown":
+            result = None
+        elif method == "exit":
+            sys.exit(0)
+        elif method == "tools/list":
+            result = self.tool_router.tools_list()
+        elif method == "tools/call":
+            name = params.get("name")
+            raw_arguments = params.get("arguments")
+            arguments = raw_arguments if raw_arguments is not None else {}
+            if not isinstance(name, str):
+                raise ValueError("tools/call requires 'name' (string)")
+            if not isinstance(arguments, dict):
+                raise ValueError("tools/call requires 'arguments' (object)")
+            result = self.tool_router.tools_call(name, arguments)
+        else:
+            raise ValueError(f"Unknown method: {method}")
+
+        if req_id is None:
+            return None
+        return {"jsonrpc": "2.0", "id": req_id, "result": result}
+
+    def run(self) -> None:
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                req = json.loads(line)
+                if not isinstance(req, dict):
+                    raise ValueError("Request must be a JSON object")
+                req_id = req.get("id") if isinstance(req, dict) else None
+                resp = self.handle_request(req)
+                if resp is not None:
+                    _write_json(resp)
+            except Exception as exc:  # noqa: BLE001
+                req_id = None
+                try:
+                    req_id = req.get("id") if isinstance(req, dict) else None
+                except Exception:  # noqa: BLE001
+                    req_id = None
+                _journal_safe("error", {"message": str(exc), "kind": "request"})
+                if req_id is not None:
+                    _write_json(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": req_id,
+                            "error": {"code": -32000, "message": str(exc)},
+                        }
+                    )
+
+
+_REPO_CONTEXT = RepoContext()
+_TOOL_ROUTER = ToolRouter(TOOL_REGISTRY, _REPO_CONTEXT)
+_RPC_SERVER = JsonRpcServer(_TOOL_ROUTER)
+
+
+def tools_list() -> Dict[str, Any]:
+    return _TOOL_ROUTER.tools_list()
 
 
 def _resolve_workspace_root(value: str) -> Path:
-    candidate = Path(value).expanduser()
-    if candidate.is_absolute():
-        return candidate.resolve()
-    cwd = Path.cwd().resolve()
-    if candidate in {Path("."), Path(cwd.name)}:
-        return cwd
-    return (cwd / candidate).resolve()
+    return _REPO_CONTEXT.resolve_workspace_root(value)
 
 
 def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    resolved_name = name
-
-    alias_map = {
-        "journal.append": "journal_append",
-        "snapshot.save": "snapshot_save",
-        "snapshot.load": "snapshot_load",
-        "checkpoint.update": "checkpoint_update",
-        "checkpoint.read": "checkpoint_read",
-        "roll_forward.replay": "roll_forward_replay",
-        "continue.state_rebuild": "continue_state_rebuild",
-        "session.capture_context": "session_capture_context",
-        "repo.verify": "repo_verify",
-        "repo.commit": "repo_commit",
-        "repo.status_summary": "repo_status_summary",
-        "repo.commit_message_suggest": "repo_commit_message_suggest",
-        "tests.suggest": "tests_suggest",
-        "tests.suggest_from_failures": "tests_suggest_from_failures",
-        "ops.compact_context": "ops_compact_context",
-        "ops.handoff_export": "ops_handoff_export",
-        "ops.resume_brief": "ops_resume_brief",
-        "ops.start_task": "ops_start_task",
-        "ops.update_task": "ops_update_task",
-        "ops.end_task": "ops_end_task",
-        "ops.capture_state": "ops_capture_state",
-        "ops.task_summary": "ops_task_summary",
-        "ops.observability_summary": "ops_observability_summary",
-    }
-
-    if resolved_name not in TOOL_REGISTRY:
-        resolved_name = alias_map.get(resolved_name, resolved_name)
-
-    if resolved_name not in TOOL_REGISTRY:
-        raise ValueError(f"Unknown tool: {name}")
-
-    previous_root = REPO_ROOT
-    workspace_root = arguments.get("workspace_root") if arguments else None
-    if isinstance(workspace_root, str) and workspace_root.strip():
-        _set_repo_root(_resolve_workspace_root(workspace_root.strip()))
-        arguments = {k: v for k, v in arguments.items() if k != "workspace_root"}
-
-    truncate_limit = None
-    if arguments and "truncate_limit" in arguments:
-        raw_limit = arguments.get("truncate_limit")
-        if isinstance(raw_limit, int) and raw_limit > 0:
-            truncate_limit = raw_limit
-        arguments = {k: v for k, v in arguments.items() if k != "truncate_limit"}
-
-    handler = TOOL_REGISTRY[resolved_name]["handler"]
-    call_id = str(uuid.uuid4())
-    _journal_safe(
-        "tool.call",
-        {
-            "call_id": call_id,
-            "tool": resolved_name,
-            "args": _sanitize_args(arguments),
-        },
-    )
-    try:
-        result = handler(**arguments) if arguments else handler()  # type: ignore[misc]
-    except Exception as exc:  # noqa: BLE001
-        _journal_safe(
-            "tool.result", {"call_id": call_id, "ok": False, "error": str(exc)}
-        )
-        raise
-    finally:
-        _set_repo_root(previous_root)
-    summary_limit = truncate_limit if truncate_limit is not None else 2000
-    result_payload = _summarize_result(result, limit=summary_limit)
-    _journal_safe(
-        "tool.result",
-        {"call_id": call_id, "ok": True, "result": result_payload},
-    )
-    content_payload = {
-        "content": [
-            {
-                "type": "text",
-                "text": json.dumps(result_payload, ensure_ascii=False),
-            }
-        ]
-    }
-    return content_payload
+    return _TOOL_ROUTER.tools_call(name, arguments)
 
 
 def handle_request(req: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    method = req.get("method")
-    params = req.get("params") or {}
-    req_id = req.get("id")
-
-    if method == "initialize":
-        result = {
-            "protocolVersion": "2024-11-05",
-            "serverInfo": {"name": "agentops-server", "version": "0.2.0"},
-            "capabilities": {"tools": {}},
-        }
-    elif method == "initialized":
-        result = None
-    elif method == "shutdown":
-        result = None
-    elif method == "exit":
-        sys.exit(0)
-    elif method == "tools/list":
-        result = tools_list()
-    elif method == "tools/call":
-        name = params.get("name")
-        raw_arguments = params.get("arguments")
-        arguments = raw_arguments if raw_arguments is not None else {}
-        if not isinstance(name, str):
-            raise ValueError("tools/call requires 'name' (string)")
-        if not isinstance(arguments, dict):
-            raise ValueError("tools/call requires 'arguments' (object)")
-        result = tools_call(name, arguments)
-    else:
-        raise ValueError(f"Unknown method: {method}")
-
-    if req_id is None:
-        return None
-    return {"jsonrpc": "2.0", "id": req_id, "result": result}
+    return _RPC_SERVER.handle_request(req)
 
 
 def main() -> None:
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            req = json.loads(line)
-            if not isinstance(req, dict):
-                raise ValueError("Request must be a JSON object")
-            req_id = req.get("id") if isinstance(req, dict) else None
-            resp = handle_request(req)
-            if resp is not None:
-                _write_json(resp)
-        except Exception as exc:  # noqa: BLE001
-            req_id = None
-            try:
-                req_id = req.get("id") if isinstance(req, dict) else None
-            except Exception:  # noqa: BLE001
-                req_id = None
-            _journal_safe("error", {"message": str(exc), "kind": "request"})
-            if req_id is not None:
-                _write_json(
-                    {
-                        "jsonrpc": "2.0",
-                        "id": req_id,
-                        "error": {"code": -32000, "message": str(exc)},
-                    }
-                )
+    _RPC_SERVER.run()
 
 
 if __name__ == "__main__":
