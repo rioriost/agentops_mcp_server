@@ -2,7 +2,7 @@
   "id": "p1-t03",
   "title": "Verify behavior parity with 0.2.3",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Validate that tool calls and responses match 0.2.3 after the 0.3.1 class/file refactor.",
   "inputs": [
     "docs/draft.md",
