@@ -32,6 +32,12 @@ brew install agentops_mcp_server
   - `ops_compact_context` を実行（`include_diff=false` 推奨）
   - 必要に応じて `ops_handoff_export` で `.agent/handoff.json` を出力
 - すぐ再開する場合は `ops_resume_brief` を実行
+- タスクの進行記録:
+  - `ops_start_task` / `ops_update_task` / `ops_end_task`
+  - 例: `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ops_start_task","arguments":{"title":"Review docs","task_id":"t-123","session_id":"s1"}}}`
+- 状態スナップショットと要約:
+  - `ops_capture_state` / `ops_task_summary` / `ops_observability_summary`
+  - 例: `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ops_task_summary","arguments":{"session_id":"s1","max_chars":200}}}`
 - トークン節約: フル diff より要約・diff stats を優先し、出力は短く保つ
 
 ## 主要ファイルの配置
@@ -133,6 +139,24 @@ Tool Settings (settings.json):
       },
       "mcp:agentops-server:ops_resume_brief": {
         "default": "allow"
+      },
+      "mcp:agentops-server:ops_start_task": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_update_task": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_end_task": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_capture_state": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_task_summary": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_observability_summary": {
+        "default": "allow"
       }
     }
   },
@@ -162,6 +186,12 @@ Tool Settings (settings.json):
 - `ops_compact_context`
 - `ops_handoff_export`
 - `ops_resume_brief`
+- `ops_start_task`
+- `ops_update_task`
+- `ops_end_task`
+- `ops_capture_state`
+- `ops_task_summary`
+- `ops_observability_summary`
 - 互換: ドット区切り（例: `roll_forward.replay`）は snake_case にマップされます
 
 使用メモ:

@@ -34,6 +34,18 @@ For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-c
 - To resume quickly: run `ops_resume_brief`
 - Token discipline: prefer summaries/diff stats over full diffs and keep outputs short
 
+### Ops tool examples
+
+Minimal `tools/call` requests:
+```json
+{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"ops_start_task","arguments":{"title":"Investigate flaky tests","task_id":"t-42","session_id":"s1"}}}
+{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"ops_update_task","arguments":{"status":"blocked","note":"waiting on CI","session_id":"s1"}}}
+{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"ops_end_task","arguments":{"summary":"fixed and verified","next_action":"merge PR","session_id":"s1"}}}
+{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"ops_task_summary","arguments":{"session_id":"s1","max_chars":200}}}
+{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"ops_observability_summary","arguments":{"session_id":"s1","max_events":20,"path":".agent/observability_summary.json"}}}
+{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"ops_capture_state","arguments":{"session_id":"s1"}}}
+```
+
 ## Where things live
 
 - `.rules` : project rules auto-injected into Zed Agent context
@@ -132,6 +144,24 @@ Tool Settings (settings.json):
       },
       "mcp:agentops-server:ops_resume_brief": {
         "default": "allow"
+      },
+      "mcp:agentops-server:ops_start_task": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_update_task": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_end_task": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_capture_state": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_task_summary": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_observability_summary": {
+        "default": "allow"
       }
     }
   },
@@ -161,6 +191,12 @@ MCP tools (snake_case):
 - `ops_compact_context`
 - `ops_handoff_export`
 - `ops_resume_brief`
+- `ops_start_task`
+- `ops_update_task`
+- `ops_end_task`
+- `ops_capture_state`
+- `ops_task_summary`
+- `ops_observability_summary`
 - Aliases: dotted names (e.g. `roll_forward.replay`) map to snake_case for compatibility.
 
 Usage notes:
