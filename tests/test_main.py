@@ -122,3 +122,10 @@ def test_ops_handoff_export_writes_json(temp_repo):
     journal_lines = m.JOURNAL.read_text(encoding="utf-8").splitlines()
     kinds = [json.loads(line)["kind"] for line in journal_lines if line.strip()]
     assert "session.handoff" in kinds
+
+
+def test_ops_resume_brief_is_bounded(temp_repo):
+    result = m.ops_resume_brief(max_chars=40)
+    assert result["ok"] is True
+    assert isinstance(result["brief"], str)
+    assert len(result["brief"]) <= 40

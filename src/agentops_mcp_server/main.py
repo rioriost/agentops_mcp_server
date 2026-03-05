@@ -1353,6 +1353,37 @@ def ops_handoff_export(path: Optional[str] = None) -> Dict[str, Any]:
     return {"ok": True, "handoff": handoff, "path": resolved_path, "wrote": wrote}
 
 
+def ops_resume_brief(max_chars: Optional[int] = None) -> Dict[str, Any]:
+    resolved_max_chars = (
+        max_chars if isinstance(max_chars, int) and max_chars > 0 else 400
+    )
+    replay = continue_state_rebuild()
+    if replay.get("ok"):
+        state = replay.get("state") or {}
+    else:
+        state = _init_replay_state(None)
+
+    lines = ["resume_brief:"]
+
+    def _line(label: str, key: str) -> None:
+        value = state.get(key)
+        if isinstance(value, str) and value.strip():
+            lines.append(f"- {label}: {value.strip()}")
+
+    _line("session_id", "session_id")
+    _line("current_task", "current_task")
+    _line("last_action", "last_action")
+    _line("next_step", "next_step")
+    _line("verification_status", "verification_status")
+    _line("last_commit", "last_commit")
+    _line("last_error", "last_error")
+
+    brief = "\n".join(lines).strip()
+    brief = _truncate_text(brief, limit=resolved_max_chars) or ""
+
+    return {"ok": True, "brief": brief, "max_chars": resolved_max_chars}
+
+
 TOOL_REGISTRY = {
     "commit_if_verified": {
         "description": "Verify then commit",
@@ -1540,6 +1571,17 @@ TOOL_REGISTRY = {
         },
         "handler": ops_handoff_export,
     },
+    "ops_resume_brief": {
+        "description": "Generate resume brief",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "max_chars": {"type": ["integer", "null"]},
+            },
+            "required": [],
+        },
+        "handler": ops_resume_brief,
+    },
 }
 
 
@@ -1581,6 +1623,7 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         "tests.suggest_from_failures": "tests_suggest_from_failures",
         "ops.compact_context": "ops_compact_context",
         "ops.handoff_export": "ops_handoff_export",
+        "ops.resume_brief": "ops_resume_brief",
     }
 
     if resolved_name not in TOOL_REGISTRY:
