@@ -159,9 +159,8 @@ def _truncate_text(value: Optional[str], limit: int = 2000) -> Optional[str]:
     if len(value) <= limit:
         return value
     suffix = "...(truncated)"
-    if limit <= len(suffix):
-        return suffix[:limit]
-    return value[: limit - len(suffix)].rstrip() + suffix
+    prefix = value[:limit].rstrip()
+    return prefix + suffix
 
 
 def _build_compact_context(
@@ -1579,6 +1578,8 @@ def ops_resume_brief(max_chars: Optional[int] = None) -> Dict[str, Any]:
 
     brief = "\n".join(lines).strip()
     brief = _truncate_text(brief, limit=resolved_max_chars) or ""
+    if len(brief) > resolved_max_chars:
+        brief = brief[:resolved_max_chars].rstrip()
 
     return {"ok": True, "brief": brief, "max_chars": resolved_max_chars}
 
@@ -1730,6 +1731,8 @@ def ops_task_summary(
 
     text = "\n".join(lines).strip()
     text = _truncate_text(text, limit=resolved_max_chars) or ""
+    if len(text) > resolved_max_chars:
+        text = text[:resolved_max_chars].rstrip()
 
     _journal_safe(
         "task.summary",
