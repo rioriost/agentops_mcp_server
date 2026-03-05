@@ -137,3 +137,64 @@ def test_tools_call_truncate_limit_summarizes(temp_repo):
     result = json.loads(content)
     assert result["truncated"] is True
     assert "summary" in result
+
+
+def test_ops_task_lifecycle_records_events(temp_repo):
+    start = m.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    update = m.ops_update_task(status="blocked", note="waiting", session_id="s1")
+    end = m.ops_end_task(summary="done", next_action="next", session_id="s1")
+
+    assert start["ok"] is True
+    assert update["ok"] is True
+    assert end["ok"] is True
+
+    journal_lines = m.JOURNAL.read_text(encoding="utf-8").splitlines()
+    kinds = [json.loads(line)["kind"] for line in journal_lines if line.strip()]
+    assert "task.start" in kinds
+    assert "task.update" in kinds
+    assert "task.end" in kinds
+
+
+def test_ops_capture_state_updates_snapshot_and_checkpoint(temp_repo):
+    m.snapshot_save(
+        state={"current_phase": "session"}, session_id="s1", last_applied_seq=0
+    )
+    m.checkpoint_update(last_applied_seq=0, snapshot_path=m.SNAPSHOT.name)
+    m.journal_append(
+        kind="session.start",
+        payload={"note": "start"},
+        session_id="s1",
+    )
+
+    result = m.ops_capture_state(session_id="s1")
+    assert result["ok"] is True
+
+    snapshot = m.snapshot_load()
+    checkpoint = m.checkpoint_read()
+    assert snapshot["ok"] is True
+    assert checkpoint["ok"] is True
+
+    journal_lines = m.JOURNAL.read_text(encoding="utf-8").splitlines()
+    kinds = [json.loads(line)["kind"] for line in journal_lines if line.strip()]
+    assert "state.capture" in kinds
+
+
+def test_ops_task_summary_emits_journal_and_text(temp_repo):
+    m.snapshot_save(
+        state={"current_phase": "session"}, session_id="s1", last_applied_seq=0
+    )
+    m.journal_append(
+        kind="task.start",
+        payload={"title": "Build", "task_id": "t-1"},
+        session_id="s1",
+    )
+    m.checkpoint_update(last_applied_seq=0, snapshot_path=m.SNAPSHOT.name)
+
+    result = m.ops_task_summary(session_id="s1", max_chars=40)
+    assert result["ok"] is True
+    assert result["summary"]["task_title"] == "Build"
+    assert len(result["text"]) <= 40
+
+    journal_lines = m.JOURNAL.read_text(encoding="utf-8").splitlines()
+    kinds = [json.loads(line)["kind"] for line in journal_lines if line.strip()]
+    assert "task.summary" in kinds

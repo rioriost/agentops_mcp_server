@@ -26,6 +26,14 @@ Tools (snake_case):
 - session_capture_context(run_verify?, log?) -> capture repo context
 - tests_suggest(diff?, failures?) -> suggest tests
 - tests_suggest_from_failures(log_path) -> suggest tests from failure logs
+- ops_compact_context(max_chars?, include_diff?) -> generate compact context
+- ops_handoff_export(path?) -> export handoff JSON
+- ops_resume_brief(max_chars?) -> generate resume brief
+- ops_start_task(title, task_id?, session_id?, agent_id?, status?) -> record task start
+- ops_update_task(status?, note?, task_id?, session_id?, agent_id?) -> record task update
+- ops_end_task(summary, next_action?, status?, task_id?, session_id?, agent_id?) -> record task end
+- ops_capture_state(session_id?) -> snapshot and checkpoint state
+- ops_task_summary(session_id?, max_chars?) -> summarize task state
 """
 
 from __future__ import annotations
@@ -1517,6 +1525,172 @@ def ops_resume_brief(max_chars: Optional[int] = None) -> Dict[str, Any]:
     return {"ok": True, "brief": brief, "max_chars": resolved_max_chars}
 
 
+def ops_start_task(
+    title: str,
+    task_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    status: Optional[str] = None,
+) -> Dict[str, Any]:
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError("title is required")
+    payload: Dict[str, Any] = {"title": title.strip()}
+    if isinstance(task_id, str) and task_id.strip():
+        payload["task_id"] = task_id.strip()
+    if isinstance(status, str) and status.strip():
+        payload["status"] = status.strip()
+    event = journal_append(
+        kind="task.start",
+        payload=payload,
+        session_id=session_id,
+        agent_id=agent_id,
+    )
+    return {"ok": True, "event": event, "payload": payload}
+
+
+def ops_update_task(
+    status: Optional[str] = None,
+    note: Optional[str] = None,
+    task_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {}
+    if isinstance(status, str) and status.strip():
+        payload["status"] = status.strip()
+    if isinstance(note, str) and note.strip():
+        payload["note"] = note.strip()
+    if isinstance(task_id, str) and task_id.strip():
+        payload["task_id"] = task_id.strip()
+    if not payload:
+        raise ValueError("status or note is required")
+    event = journal_append(
+        kind="task.update",
+        payload=payload,
+        session_id=session_id,
+        agent_id=agent_id,
+    )
+    return {"ok": True, "event": event, "payload": payload}
+
+
+def ops_end_task(
+    summary: str,
+    next_action: Optional[str] = None,
+    status: Optional[str] = None,
+    task_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    if not isinstance(summary, str) or not summary.strip():
+        raise ValueError("summary is required")
+    payload: Dict[str, Any] = {"summary": summary.strip()}
+    if isinstance(next_action, str) and next_action.strip():
+        payload["next_action"] = next_action.strip()
+    if isinstance(status, str) and status.strip():
+        payload["status"] = status.strip()
+    if isinstance(task_id, str) and task_id.strip():
+        payload["task_id"] = task_id.strip()
+    event = journal_append(
+        kind="task.end",
+        payload=payload,
+        session_id=session_id,
+        agent_id=agent_id,
+    )
+    return {"ok": True, "event": event, "payload": payload}
+
+
+def ops_capture_state(session_id: Optional[str] = None) -> Dict[str, Any]:
+    replay = continue_state_rebuild(session_id=session_id)
+    if not replay.get("ok"):
+        return replay
+
+    state = replay.get("state") or {}
+    last_seq = replay.get("last_applied_seq")
+    last_seq_value = last_seq if isinstance(last_seq, int) else 0
+
+    resolved_session_id = session_id
+    if not resolved_session_id and isinstance(state.get("session_id"), str):
+        resolved_session_id = state.get("session_id")
+
+    snapshot_result = snapshot_save(
+        state=state, session_id=resolved_session_id, last_applied_seq=last_seq_value
+    )
+    checkpoint_result = checkpoint_update(
+        last_applied_seq=last_seq_value, snapshot_path=SNAPSHOT.name
+    )
+    _journal_safe(
+        "state.capture",
+        {"session_id": resolved_session_id, "last_applied_seq": last_seq_value},
+    )
+
+    return {
+        "ok": True,
+        "snapshot": snapshot_result,
+        "checkpoint": checkpoint_result,
+        "last_applied_seq": last_seq_value,
+    }
+
+
+def ops_task_summary(
+    session_id: Optional[str] = None, max_chars: Optional[int] = None
+) -> Dict[str, Any]:
+    resolved_max_chars = (
+        max_chars if isinstance(max_chars, int) and max_chars > 0 else 400
+    )
+    replay = continue_state_rebuild(session_id=session_id)
+    if not replay.get("ok"):
+        return replay
+
+    state = replay.get("state") or {}
+    summary = {
+        "session_id": state.get("session_id") or "",
+        "task_id": state.get("task_id") or "",
+        "task_title": state.get("task_title") or "",
+        "task_status": state.get("task_status") or "",
+        "current_task": state.get("current_task") or "",
+        "last_action": state.get("last_action") or "",
+        "next_step": state.get("next_step") or "",
+        "plan_steps": state.get("plan_steps") or [],
+        "artifact_summary": state.get("artifact_summary") or "",
+        "failure_reason": state.get("failure_reason") or "",
+        "verification_status": state.get("verification_status") or "",
+        "last_verification": state.get("last_verification") or {},
+    }
+
+    lines = ["task_summary:"]
+
+    def _line(label: str, value: Any) -> None:
+        if isinstance(value, str) and value.strip():
+            lines.append(f"- {label}: {value.strip()}")
+
+    _line("task_title", summary["task_title"])
+    _line("task_status", summary["task_status"])
+    _line("last_action", summary["last_action"])
+    _line("next_step", summary["next_step"])
+    _line("artifact_summary", summary["artifact_summary"])
+    _line("failure_reason", summary["failure_reason"])
+
+    text = "\n".join(lines).strip()
+    text = _truncate_text(text, limit=resolved_max_chars) or ""
+
+    _journal_safe(
+        "task.summary",
+        {
+            "session_id": summary["session_id"],
+            "task_id": summary["task_id"],
+            "task_status": summary["task_status"],
+            "length": len(text),
+        },
+    )
+
+    return {
+        "ok": True,
+        "summary": summary,
+        "text": text,
+        "max_chars": resolved_max_chars,
+    }
+
+
 TOOL_REGISTRY = {
     "commit_if_verified": {
         "description": "Verify then commit",
@@ -1715,6 +1889,75 @@ TOOL_REGISTRY = {
         },
         "handler": ops_resume_brief,
     },
+    "ops_start_task": {
+        "description": "Record task start",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "task_id": {"type": ["string", "null"]},
+                "session_id": {"type": ["string", "null"]},
+                "agent_id": {"type": ["string", "null"]},
+                "status": {"type": ["string", "null"]},
+            },
+            "required": ["title"],
+        },
+        "handler": ops_start_task,
+    },
+    "ops_update_task": {
+        "description": "Record task update",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "status": {"type": ["string", "null"]},
+                "note": {"type": ["string", "null"]},
+                "task_id": {"type": ["string", "null"]},
+                "session_id": {"type": ["string", "null"]},
+                "agent_id": {"type": ["string", "null"]},
+            },
+            "required": [],
+        },
+        "handler": ops_update_task,
+    },
+    "ops_end_task": {
+        "description": "Record task end",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string"},
+                "next_action": {"type": ["string", "null"]},
+                "status": {"type": ["string", "null"]},
+                "task_id": {"type": ["string", "null"]},
+                "session_id": {"type": ["string", "null"]},
+                "agent_id": {"type": ["string", "null"]},
+            },
+            "required": ["summary"],
+        },
+        "handler": ops_end_task,
+    },
+    "ops_capture_state": {
+        "description": "Snapshot and checkpoint state",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "session_id": {"type": ["string", "null"]},
+            },
+            "required": [],
+        },
+        "handler": ops_capture_state,
+    },
+    "ops_task_summary": {
+        "description": "Summarize task state",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "session_id": {"type": ["string", "null"]},
+                "max_chars": {"type": ["integer", "null"]},
+            },
+            "required": [],
+        },
+        "handler": ops_task_summary,
+    },
 }
 
 
@@ -1758,6 +2001,11 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         "ops.compact_context": "ops_compact_context",
         "ops.handoff_export": "ops_handoff_export",
         "ops.resume_brief": "ops_resume_brief",
+        "ops.start_task": "ops_start_task",
+        "ops.update_task": "ops_update_task",
+        "ops.end_task": "ops_end_task",
+        "ops.capture_state": "ops_capture_state",
+        "ops.task_summary": "ops_task_summary",
     }
 
     if resolved_name not in TOOL_REGISTRY:
