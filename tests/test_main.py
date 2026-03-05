@@ -110,7 +110,7 @@ def test_ops_compact_context_updates_state_and_journal(temp_repo):
 
 
 def test_ops_handoff_export_writes_json(temp_repo):
-    result = m.ops_handoff_export(path=".agent/handoff.json")
+    result = m.ops_handoff_export()
     assert result["ok"] is True
     assert result["wrote"] is True
     assert result["path"]
@@ -221,9 +221,7 @@ def test_ops_observability_summary_includes_failures_and_artifacts(temp_repo):
         session_id="s1",
     )
 
-    result = m.ops_observability_summary(
-        session_id="s1", max_events=5, max_chars=200, path=".agent/obs.json"
-    )
+    result = m.ops_observability_summary(session_id="s1", max_events=5, max_chars=200)
     assert result["ok"] is True
     recent_events = result["summary"]["recent_events"]
     assert recent_events
@@ -234,7 +232,7 @@ def test_ops_observability_summary_includes_failures_and_artifacts(temp_repo):
     assert "src/app.py" in result["summary"]["artifacts"]
     assert "out/log.txt" in result["summary"]["artifacts"]
 
-    summary_path = m.REPO_ROOT / ".agent" / "obs.json"
-    text_path = m.REPO_ROOT / ".agent" / "obs.txt"
+    summary_path = m.REPO_ROOT / ".agent" / "observability_summary.json"
+    text_path = m.REPO_ROOT / ".agent" / "observability_summary.txt"
     assert summary_path.exists()
     assert text_path.exists()

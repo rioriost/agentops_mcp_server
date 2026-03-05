@@ -27,14 +27,14 @@ Tools (snake_case):
 - tests_suggest(diff?, failures?) -> suggest tests
 - tests_suggest_from_failures(log_path) -> suggest tests from failure logs
 - ops_compact_context(max_chars?, include_diff?) -> generate compact context
-- ops_handoff_export(path?) -> export handoff JSON
+- ops_handoff_export() -> export handoff JSON
 - ops_resume_brief(max_chars?) -> generate resume brief
 - ops_start_task(title, task_id?, session_id?, agent_id?, status?) -> record task start
 - ops_update_task(status?, note?, task_id?, session_id?, agent_id?) -> record task update
 - ops_end_task(summary, next_action?, status?, task_id?, session_id?, agent_id?) -> record task end
 - ops_capture_state(session_id?) -> snapshot and checkpoint state
 - ops_task_summary(session_id?, max_chars?) -> summarize task state
-- ops_observability_summary(session_id?, max_events?, max_chars?, path?) -> write observability summary
+- ops_observability_summary(session_id?, max_events?, max_chars?) -> write observability summary
 """
 
 from __future__ import annotations
@@ -48,13 +48,31 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+STATE_ARTIFACT_FILES = {
+    "journal": "journal.jsonl",
+    "snapshot": "snapshot.json",
+    "checkpoint": "checkpoint.json",
+    "handoff": "handoff.json",
+    "observability": "observability_summary.json",
+}
+
+
+def _state_artifact_path(kind: str, root: Optional[Path] = None) -> Path:
+    resolved_root = root or REPO_ROOT
+    filename = STATE_ARTIFACT_FILES.get(kind)
+    if not filename:
+        raise ValueError(f"unknown state artifact: {kind}")
+    return resolved_root / ".agent" / filename
+
 
 def _set_repo_root(root: Path) -> None:
-    global REPO_ROOT, JOURNAL, SNAPSHOT, CHECKPOINT, VERIFY
+    global REPO_ROOT, JOURNAL, SNAPSHOT, CHECKPOINT, HANDOFF, OBSERVABILITY, VERIFY
     REPO_ROOT = root
-    JOURNAL = REPO_ROOT / ".agent" / "journal.jsonl"
-    SNAPSHOT = REPO_ROOT / ".agent" / "snapshot.json"
-    CHECKPOINT = REPO_ROOT / ".agent" / "checkpoint.json"
+    JOURNAL = _state_artifact_path("journal", root)
+    SNAPSHOT = _state_artifact_path("snapshot", root)
+    CHECKPOINT = _state_artifact_path("checkpoint", root)
+    HANDOFF = _state_artifact_path("handoff", root)
+    OBSERVABILITY = _state_artifact_path("observability", root)
     VERIFY = REPO_ROOT / ".zed" / "scripts" / "verify"
 
 
@@ -1516,7 +1534,7 @@ def ops_compact_context(
     }
 
 
-def ops_handoff_export(path: Optional[str] = None) -> Dict[str, Any]:
+def ops_handoff_export() -> Dict[str, Any]:
     replay = continue_state_rebuild()
     if replay.get("ok"):
         state = replay.get("state") or {}
@@ -1537,17 +1555,7 @@ def ops_handoff_export(path: Optional[str] = None) -> Dict[str, Any]:
 
     wrote = False
     resolved_path = None
-    base_dir = REPO_ROOT / ".agent"
-    if path:
-        candidate = Path(path)
-        if candidate.is_absolute():
-            target = base_dir / candidate.name
-        elif candidate.parts and candidate.parts[0] == ".agent":
-            target = REPO_ROOT / candidate
-        else:
-            target = base_dir / candidate
-    else:
-        target = base_dir / "handoff.json"
+    target = HANDOFF
     _write_text(target, json.dumps(handoff, ensure_ascii=False, indent=2) + "\n")
     wrote = True
     resolved_path = str(target)
@@ -1765,7 +1773,6 @@ def ops_observability_summary(
     session_id: Optional[str] = None,
     max_events: Optional[int] = None,
     max_chars: Optional[int] = None,
-    path: Optional[str] = None,
 ) -> Dict[str, Any]:
     resolved_max_events = (
         max_events if isinstance(max_events, int) and max_events > 0 else 20
@@ -1810,9 +1817,7 @@ def ops_observability_summary(
         "artifacts": artifacts,
     }
 
-    resolved_path = _resolve_path(
-        path, REPO_ROOT / ".agent" / "observability_summary.json"
-    )
+    resolved_path = OBSERVABILITY
     if resolved_path.suffix:
         text_path = resolved_path.with_suffix(".txt")
     else:
@@ -2046,9 +2051,7 @@ TOOL_REGISTRY = {
         "description": "Export handoff JSON",
         "input_schema": {
             "type": "object",
-            "properties": {
-                "path": {"type": ["string", "null"]},
-            },
+            "properties": {},
             "required": [],
         },
         "handler": ops_handoff_export,
@@ -2141,7 +2144,6 @@ TOOL_REGISTRY = {
                 "session_id": {"type": ["string", "null"]},
                 "max_events": {"type": ["integer", "null"]},
                 "max_chars": {"type": ["integer", "null"]},
-                "path": {"type": ["string", "null"]},
             },
             "required": [],
         },

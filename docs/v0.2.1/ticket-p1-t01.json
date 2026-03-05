@@ -1,0 +1,33 @@
+{
+  "id": "p1-t01",
+  "title": "Unify agent state file paths and remove ops path overrides",
+  "priority": "P1",
+  "status": "blocked",
+  "summary": "Centralize path resolution for journal/checkpoint/snapshot/handoff under <workspace_root>/.agent and remove/ignore ops tool path overrides.",
+  "inputs": ["docs/draft.md", "docs/plan.md"],
+  "outputs": [
+    "Unified path resolver function for state artifacts",
+    "All state read/write paths routed through the resolver",
+    "ops* tools no longer accept or rely on a path argument",
+    "Updated tests if necessary"
+  ],
+  "acceptance_criteria": [
+    "All state artifacts are saved under <workspace_root>/.agent/.",
+    "Exactly one function computes the file paths for journal, checkpoint, snapshot, and handoff.",
+    "ops* tools do not accept or rely on a path parameter.",
+    "Tests pass after the change."
+  ],
+  "tasks": [
+    "Inventory all path construction call sites for state artifacts.",
+    "Define and implement a single state path resolver.",
+    "Refactor read/write logic to use the resolver.",
+    "Remove or ignore ops tool path arguments.",
+    "Update tests and verify."
+  ],
+  "dependencies": [],
+  "notes": [
+    "Preserve legacy filenames (e.g., checkpoint.json, snapshot.json, journal.jsonl).",
+    "No file format changes are required.",
+    "Blocked: git is not installed or not in PATH, so commit could not be performed."
+  ]
+}
