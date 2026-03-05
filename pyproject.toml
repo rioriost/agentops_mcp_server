@@ -3,14 +3,12 @@ name = "agentops-mcp-server"
 authors = [
     {name = "Rio Fujita", email = "rifujita@microsoft.com"},
 ]
-version = "0.2.2"
+version = "0.3.1"
 license = {file = "LICENSE"}
 description = "Simple MCP server for AgentOps with Zed"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "pytest>=9.0.2",
-    "pytest-cov>=7.0.0",
 ]
 
 [project.optional-dependencies]
