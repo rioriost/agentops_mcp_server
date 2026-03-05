@@ -78,7 +78,7 @@ def normalize_test_candidate(path: str, suffix: str) -> str:
     return path
 
 
-def test_candidates_for_path(path: str) -> List[str]:
+def candidates_for_path(path: str) -> List[str]:
     if is_test_path(path):
         return [path]
 
@@ -129,6 +129,8 @@ def parse_changed_files(diff: str) -> List[str]:
 
 
 class TestSuggester:
+    __test__ = False
+
     def __init__(self, git_repo: GitRepo, repo_context: RepoContext) -> None:
         self.git_repo = git_repo
         self.repo_context = repo_context
@@ -158,7 +160,7 @@ class TestSuggester:
         changed_files = parse_changed_files(diff)
 
         for path in changed_files:
-            candidates = test_candidates_for_path(path)
+            candidates = candidates_for_path(path)
             if not candidates:
                 continue
             if is_test_path(path):
