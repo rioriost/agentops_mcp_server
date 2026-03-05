@@ -2,7 +2,7 @@
   "id": "p1-t02",
   "title": "Refactor main.py into classes",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Introduce class-based structure in main.py while preserving public tool behavior.",
   "inputs": [
     "docs/draft.md",
