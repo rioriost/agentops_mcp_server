@@ -2,7 +2,7 @@
   "id": "p1-t01",
   "title": "Fix workspace_root resolution to avoid nested .agent paths",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Ensure relative workspace_root matching the CWD name resolves to CWD to prevent nested .agent paths.",
   "inputs": ["docs/draft.md", "docs/plan.md"],
   "outputs": [

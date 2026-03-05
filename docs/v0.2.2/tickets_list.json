@@ -6,7 +6,7 @@
       "id": "p1-t01",
       "priority": "P1",
       "title": "Fix workspace_root resolution to avoid nested .agent paths",
-      "status": "verified",
+      "status": "done",
       "file": "v0.2.2/ticket-p1-t01.json"
     }
   ]
