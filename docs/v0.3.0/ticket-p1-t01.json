@@ -2,7 +2,7 @@
   "id": "p1-t01",
   "title": "Design class boundaries for main.py refactor",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Define class-based structure and responsibilities for splitting main.py without behavior changes.",
   "inputs": ["docs/draft.md", "docs/v0.3.0/plan.md"],
   "outputs": [
