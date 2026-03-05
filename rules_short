@@ -1,0 +1,37 @@
+# AgentOps (short rules)
+# Goal: Always resumable, ticket-driven, verify->commit discipline.
+
+## Start (must)
+- Rebuild state: handoff -> snapshot -> checkpoint -> journal.
+- Resume latest active ticket (status != done).
+- If unclear, emit a short resume brief before changes.
+
+## Planning (must)
+- draft.md -> plan.md -> tickets_list.json + ticket JSONs.
+
+## Work loop (must)
+- Tickets are the unit of work.
+- Status: planned -> in-progress -> checking -> verified -> committed -> done.
+- For any code change:
+  1) status -> in-progress
+  2) implement smallest safe change
+  3) run "${VERIFY_REL}" (fix+repeat on failure)
+  4) status -> checking, verify against plan.md for omissions
+  5) status -> verified
+  6) commit changes
+  7) status -> committed
+  8) update snapshot/checkpoint
+  9) status -> done
+
+## Persistence (must)
+- Journal key events (plan/task/progress/verify/commit).
+- Keep outputs short; prefer summaries.
+
+## Handoff (must)
+- When context feels tight or before ending:
+  - compact context
+  - handoff summary
+
+## Tools (must)
+- Prefer MCP tools if available.
+- Always pass workspace_root to MCP tools.
