@@ -29,22 +29,11 @@ For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-c
 ## Workflow tips
 
 - Before ending a session or when context is tight:
-  - Run `ops_compact_context` (prefer `include_diff=false`)
-  - Run `ops_handoff_export` to write `.agent/handoff.json` if needed
+  - Run `ops_compact_context` (prefer `include_diff=false`, `max_chars` optional)
+  - Run `ops_handoff_export` (writes a file only when `path` is provided)
 - To resume quickly: run `ops_resume_brief`
 - Token discipline: prefer summaries/diff stats over full diffs and keep outputs short
-
-### Ops tool examples
-
-Minimal `tools/call` requests:
-```json
-{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"ops_start_task","arguments":{"title":"Investigate flaky tests","task_id":"t-42","session_id":"s1"}}}
-{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"ops_update_task","arguments":{"status":"blocked","note":"waiting on CI","session_id":"s1"}}}
-{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"ops_end_task","arguments":{"summary":"fixed and verified","next_action":"merge PR","session_id":"s1"}}}
-{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"ops_task_summary","arguments":{"session_id":"s1","max_chars":200}}}
-{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"ops_observability_summary","arguments":{"session_id":"s1","max_events":20,"path":".agent/observability_summary.json"}}}
-{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"ops_capture_state","arguments":{"session_id":"s1"}}}
-```
+- All MCP tools accept optional `workspace_root` and `truncate_limit` (as exposed by `tools/list`)
 
 ## Where things live
 

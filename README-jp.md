@@ -29,16 +29,13 @@ brew install agentops_mcp_server
 ## ワークフローのヒント
 
 - セッション終了前／コンテキストが厳しいとき:
-  - `ops_compact_context` を実行（`include_diff=false` 推奨）
-  - 必要に応じて `ops_handoff_export` で `.agent/handoff.json` を出力
+  - `ops_compact_context` を実行（`include_diff=false` 推奨、`max_chars` は任意）
+  - `ops_handoff_export` は `path` を渡したときだけファイル出力
 - すぐ再開する場合は `ops_resume_brief` を実行
-- タスクの進行記録:
-  - `ops_start_task` / `ops_update_task` / `ops_end_task`
-  - 例: `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ops_start_task","arguments":{"title":"Review docs","task_id":"t-123","session_id":"s1"}}}`
-- 状態スナップショットと要約:
-  - `ops_capture_state` / `ops_task_summary` / `ops_observability_summary`
-  - 例: `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ops_task_summary","arguments":{"session_id":"s1","max_chars":200}}}`
+- タスクの進行記録: `ops_start_task` / `ops_update_task` / `ops_end_task`
+- 状態スナップショットと要約: `ops_capture_state` / `ops_task_summary` / `ops_observability_summary`
 - トークン節約: フル diff より要約・diff stats を優先し、出力は短く保つ
+- 全ての MCP ツールは `workspace_root` と `truncate_limit` を任意で受け付ける（`tools/list` で確認）
 
 ## 主要ファイルの配置
 
