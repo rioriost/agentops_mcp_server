@@ -13,10 +13,10 @@
 
 ## Planning flow (mandatory)
 - User provides docs/draft.md.
-- Generate docs/plan.md with phases.
+- Generate docs/__version__/plan.md with phases.
 - Split phases into tasks and generate:
-  - docs/tickets_list.json (metadata)
-  - docs/pX-tY.json (full ticket with status/inputs/outputs/deps)
+  - docs/__version__/tickets_list.json (metadata)
+  - docs/__version__/pX-tY.json (full ticket with status/inputs/outputs/deps)
 - Ticket status enum: planned, in-progress, checking, verified, committed, done, blocked.
 
 ## Work loop (mandatory)
