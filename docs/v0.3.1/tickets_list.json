@@ -13,7 +13,7 @@
       "id": "p1-t02",
       "priority": "P1",
       "title": "Split main.py into class-based modules",
-      "status": "verified",
+      "status": "done",
       "file": "v0.3.1/ticket-p1-t02.json"
     },
     {
