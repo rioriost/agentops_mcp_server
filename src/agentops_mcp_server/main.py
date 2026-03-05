@@ -150,6 +150,36 @@ def _truncate_text(value: Optional[str], limit: int = 2000) -> Optional[str]:
     return value[:limit].rstrip() + "...(truncated)"
 
 
+def _build_compact_context(
+    state: Dict[str, Any],
+    diff_stat: Optional[str],
+    max_chars: int,
+) -> str:
+    lines: List[str] = []
+
+    def _add(label: str, value: Any) -> None:
+        if isinstance(value, str) and value.strip():
+            lines.append(f"{label}: {value.strip()}")
+
+    _add("session_id", state.get("session_id"))
+    _add("current_phase", state.get("current_phase"))
+    _add("current_task", state.get("current_task"))
+    _add("last_action", state.get("last_action"))
+    _add("next_step", state.get("next_step"))
+    _add("verification_status", state.get("verification_status"))
+    _add("last_commit", state.get("last_commit"))
+    _add("last_error", state.get("last_error"))
+
+    if diff_stat and diff_stat.strip():
+        lines.append("diff_stat:")
+        lines.append(diff_stat.strip())
+
+    summary = "\n".join(lines).strip()
+    if not summary:
+        summary = "no recent state available"
+    return _truncate_text(summary, limit=max_chars) or ""
+
+
 def _sanitize_args(args: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     if not args:
         return {}
@@ -506,6 +536,7 @@ def _init_replay_state(snapshot_state: Optional[Dict[str, Any]]) -> Dict[str, An
     state.setdefault("verification_status", "")
     state.setdefault("last_commit", "")
     state.setdefault("last_error", "")
+    state.setdefault("compact_context", "")
 
     warnings = state.get("replay_warnings")
     if not isinstance(warnings, dict):
@@ -1246,6 +1277,82 @@ def tests_suggest_from_failures(log_path: str) -> Dict[str, Any]:
     return tests_suggest(failures=content)
 
 
+def ops_compact_context(
+    max_chars: Optional[int] = None, include_diff: Optional[bool] = None
+) -> Dict[str, Any]:
+    resolved_max_chars = (
+        max_chars if isinstance(max_chars, int) and max_chars > 0 else 800
+    )
+    resolved_include_diff = bool(include_diff)
+
+    replay = continue_state_rebuild()
+    if replay.get("ok"):
+        state = replay.get("state") or {}
+        last_seq = replay.get("last_applied_seq")
+    else:
+        state = _init_replay_state(None)
+        last_seq = None
+
+    diff_stat = _git_diff_stat() if resolved_include_diff else None
+    summary = _build_compact_context(state, diff_stat, resolved_max_chars)
+
+    state["compact_context"] = summary
+    session_id = (
+        state.get("session_id") if isinstance(state.get("session_id"), str) else None
+    )
+    snapshot_save(state=state, session_id=session_id, last_applied_seq=last_seq)
+    _journal_safe(
+        "context.compact",
+        {
+            "length": len(summary),
+            "max_chars": resolved_max_chars,
+            "include_diff": resolved_include_diff,
+        },
+    )
+
+    return {
+        "ok": True,
+        "compact_context": summary,
+        "max_chars": resolved_max_chars,
+        "include_diff": resolved_include_diff,
+    }
+
+
+def ops_handoff_export(path: Optional[str] = None) -> Dict[str, Any]:
+    replay = continue_state_rebuild()
+    if replay.get("ok"):
+        state = replay.get("state") or {}
+    else:
+        state = _init_replay_state(None)
+
+    handoff = {
+        "ts": _now_iso(),
+        "session_id": state.get("session_id") or "",
+        "current_task": state.get("current_task") or "",
+        "last_action": state.get("last_action") or "",
+        "next_step": state.get("next_step") or "",
+        "verification_status": state.get("verification_status") or "",
+        "last_commit": state.get("last_commit") or "",
+        "last_error": state.get("last_error") or "",
+        "compact_context": state.get("compact_context") or "",
+    }
+
+    wrote = False
+    resolved_path = None
+    if path:
+        target = _resolve_path(path, REPO_ROOT / ".agent" / "handoff.json")
+        _write_text(target, json.dumps(handoff, ensure_ascii=False, indent=2) + "\n")
+        wrote = True
+        resolved_path = str(target)
+
+    _journal_safe(
+        "session.handoff",
+        {"path": resolved_path, "wrote": wrote, "fields": list(handoff.keys())},
+    )
+
+    return {"ok": True, "handoff": handoff, "path": resolved_path, "wrote": wrote}
+
+
 TOOL_REGISTRY = {
     "commit_if_verified": {
         "description": "Verify then commit",
@@ -1410,6 +1517,29 @@ TOOL_REGISTRY = {
         },
         "handler": tests_suggest_from_failures,
     },
+    "ops_compact_context": {
+        "description": "Generate compact context",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "max_chars": {"type": ["integer", "null"]},
+                "include_diff": {"type": ["boolean", "null"]},
+            },
+            "required": [],
+        },
+        "handler": ops_compact_context,
+    },
+    "ops_handoff_export": {
+        "description": "Export handoff JSON",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": ["string", "null"]},
+            },
+            "required": [],
+        },
+        "handler": ops_handoff_export,
+    },
 }
 
 
@@ -1449,6 +1579,8 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         "repo.commit_message_suggest": "repo_commit_message_suggest",
         "tests.suggest": "tests_suggest",
         "tests.suggest_from_failures": "tests_suggest_from_failures",
+        "ops.compact_context": "ops_compact_context",
+        "ops.handoff_export": "ops_handoff_export",
     }
 
     if resolved_name not in TOOL_REGISTRY:

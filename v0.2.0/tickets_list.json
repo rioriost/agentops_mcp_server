@@ -6,48 +6,56 @@
       "id": "p1-t01",
       "priority": "P1",
       "title": "Compact context and handoff export for session transitions",
+      "status": "done",
       "file": "v0.2.0/ticket-p1-t01.json"
     },
     {
       "id": "p1-t02",
       "priority": "P1",
       "title": "Resume brief for in-session self-driving",
+      "status": "planned",
       "file": "v0.2.0/ticket-p1-t02.json"
     },
     {
       "id": "p1-t03",
       "priority": "P1",
       "title": "Update .rules workflow for handoff and summaries",
+      "status": "planned",
       "file": "v0.2.0/ticket-p1-t03.json"
     },
     {
       "id": "p1-t04",
       "priority": "P1",
       "title": "Token reduction controls in summaries and truncation",
+      "status": "planned",
       "file": "v0.2.0/ticket-p1-t04.json"
     },
     {
       "id": "p2-t05",
       "priority": "P2",
       "title": "Extend state model and event application",
+      "status": "planned",
       "file": "v0.2.0/ticket-p2-t05.json"
     },
     {
       "id": "p2-t06",
       "priority": "P2",
       "title": "Add high-level ops tools for task lifecycle",
+      "status": "planned",
       "file": "v0.2.0/ticket-p2-t06.json"
     },
     {
       "id": "p2-t07",
       "priority": "P2",
       "title": "Lightweight observability summaries",
+      "status": "planned",
       "file": "v0.2.0/ticket-p2-t07.json"
     },
     {
       "id": "p2-t08",
       "priority": "P2",
       "title": "Tests and documentation for v0.2.0 additions",
+      "status": "planned",
       "file": "v0.2.0/ticket-p2-t08.json"
     }
   ]

@@ -92,3 +92,33 @@ def test_main_emits_response(monkeypatch):
     resp = json.loads(output)
     assert resp["id"] == 1
     assert "result" in resp
+
+
+def test_ops_compact_context_updates_state_and_journal(temp_repo):
+    result = m.ops_compact_context(max_chars=80, include_diff=False)
+    assert result["ok"] is True
+    assert isinstance(result["compact_context"], str)
+
+    loaded = m.snapshot_load()
+    assert loaded["ok"] is True
+    snapshot_state = loaded["snapshot"]["state"]
+    assert snapshot_state["compact_context"] == result["compact_context"]
+
+    journal_lines = m.JOURNAL.read_text(encoding="utf-8").splitlines()
+    kinds = [json.loads(line)["kind"] for line in journal_lines if line.strip()]
+    assert "context.compact" in kinds
+
+
+def test_ops_handoff_export_writes_json(temp_repo):
+    result = m.ops_handoff_export(path=".agent/handoff.json")
+    assert result["ok"] is True
+    assert result["wrote"] is True
+    assert result["path"]
+
+    handoff_path = m.REPO_ROOT / ".agent" / "handoff.json"
+    handoff_payload = json.loads(handoff_path.read_text(encoding="utf-8"))
+    assert "compact_context" in handoff_payload
+
+    journal_lines = m.JOURNAL.read_text(encoding="utf-8").splitlines()
+    kinds = [json.loads(line)["kind"] for line in journal_lines if line.strip()]
+    assert "session.handoff" in kinds
