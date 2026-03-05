@@ -1,5 +1,5 @@
 {
-  "id": "p1-t01",
+  "id": "p1-t03",
   "title": "Update .rules to pass CWD as workspace_root",
   "priority": "P1",
   "status": "done",

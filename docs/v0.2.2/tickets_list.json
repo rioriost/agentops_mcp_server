@@ -8,6 +8,20 @@
       "title": "Fix workspace_root resolution to avoid nested .agent paths",
       "status": "done",
       "file": "v0.2.2/ticket-p1-t01.json"
+    },
+    {
+      "id": "p1-t02",
+      "priority": "P1",
+      "title": "Unify agent state file paths and remove ops path overrides",
+      "status": "done",
+      "file": "v0.2.2/ticket-p1-t02.json"
+    },
+    {
+      "id": "p1-t03",
+      "priority": "P1",
+      "title": "Update .rules to pass CWD as workspace_root",
+      "status": "done",
+      "file": "v0.2.2/ticket-p1-t03.json"
     }
   ]
 }

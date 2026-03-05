@@ -1,4 +1,4 @@
-# Draft: Pass CWD as workspace_root to MCP tools
+# Draft for 0.2.2: Pass CWD as workspace_root to MCP tools
 
 ## Background
 The current .rules says to always pass `workspace_root` to MCP tools, but it does not specify what value to pass. This led to passing a relative root name, which caused nested paths such as `<cwd>/<root>/<root>/.agent`.
