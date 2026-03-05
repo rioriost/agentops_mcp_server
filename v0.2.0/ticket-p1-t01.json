@@ -3,11 +3,11 @@
   "priority": "P1",
   "title": "Compact context and handoff export for session transitions",
   "scope": "session handoff",
-  "description": "Implement compact context generation and handoff export to reduce context loss between sessions while keeping output minimal and reusable.",
+  "description": "Implement compact context generation and JSON handoff export to reduce context loss between sessions while keeping output minimal and reusable.",
   "acceptance_criteria": [
     "A compact context is generated and stored in state under compact_context",
     "A context.compact journal event is recorded with metadata",
-    "Handoff export returns a short markdown summary and can optionally write .agent/handoff.md",
+    "Handoff export returns a short JSON summary and can optionally write .agent/handoff.json",
     "Unknown events remain safely ignored"
   ],
   "files": [
