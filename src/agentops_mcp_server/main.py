@@ -1127,29 +1127,14 @@ def _auto_snapshot_checkpoint_after_commit() -> Dict[str, Any]:
     }
 
 
-def commit_if_verified(
-    message: str, timeout_sec: Optional[int] = None
-) -> Dict[str, str]:
-    verify_result = run_verify(timeout_sec=timeout_sec)
-    if not verify_result["ok"]:
-        raise RuntimeError(
-            f"verify failed (code={verify_result['returncode']}): {verify_result['stderr']}"
-        )
-    _journal_safe("commit.start", {"message": message, "files": "auto"})
-    git("add", "-A")
-
+def _normalize_commit_message(message: str) -> str:
     msg = message.strip().replace("\n", " ")
     if len(msg) > 80:
         msg = msg[:77].rstrip() + "..."
+    return msg
 
-    summary = _git_diff_stat_cached()
-    try:
-        subprocess.run(["git", "commit", "-m", msg], cwd=str(REPO_ROOT), check=True)
-        sha = git("rev-parse", "HEAD")
-    except Exception as exc:  # noqa: BLE001
-        _journal_safe("commit.end", {"ok": False, "summary": str(exc)})
-        raise
-    _journal_safe("commit.end", {"ok": True, "sha": sha, "summary": summary})
+
+def _post_commit_snapshot_checkpoint() -> None:
     try:
         auto_result = _auto_snapshot_checkpoint_after_commit()
         if not auto_result.get("ok"):
@@ -1165,6 +1150,34 @@ def commit_if_verified(
             "error",
             {"message": "auto snapshot/checkpoint failed", "context": str(exc)},
         )
+
+
+def _run_git_commit(message: str) -> Tuple[str, str]:
+    summary = _git_diff_stat_cached()
+    try:
+        subprocess.run(["git", "commit", "-m", message], cwd=str(REPO_ROOT), check=True)
+        sha = git("rev-parse", "HEAD")
+    except Exception as exc:  # noqa: BLE001
+        _journal_safe("commit.end", {"ok": False, "summary": str(exc)})
+        raise
+    _journal_safe("commit.end", {"ok": True, "sha": sha, "summary": summary})
+    _post_commit_snapshot_checkpoint()
+    return sha, summary
+
+
+def commit_if_verified(
+    message: str, timeout_sec: Optional[int] = None
+) -> Dict[str, str]:
+    verify_result = run_verify(timeout_sec=timeout_sec)
+    if not verify_result["ok"]:
+        raise RuntimeError(
+            f"verify failed (code={verify_result['returncode']}): {verify_result['stderr']}"
+        )
+    _journal_safe("commit.start", {"message": message, "files": "auto"})
+    git("add", "-A")
+
+    msg = _normalize_commit_message(message)
+    sha, _summary = _run_git_commit(msg)
     return {"sha": sha, "message": msg}
 
 
@@ -1216,32 +1229,9 @@ def repo_commit(
     msg = (message or "").strip().replace("\n", " ")
     if not msg:
         msg = _commit_message_from_status(status_lines)
-    if len(msg) > 80:
-        msg = msg[:77].rstrip() + "..."
+    msg = _normalize_commit_message(msg)
 
-    summary = _git_diff_stat_cached()
-    try:
-        subprocess.run(["git", "commit", "-m", msg], cwd=str(REPO_ROOT), check=True)
-        sha = git("rev-parse", "HEAD")
-    except Exception as exc:  # noqa: BLE001
-        _journal_safe("commit.end", {"ok": False, "summary": str(exc)})
-        raise
-    _journal_safe("commit.end", {"ok": True, "sha": sha, "summary": summary})
-    try:
-        auto_result = _auto_snapshot_checkpoint_after_commit()
-        if not auto_result.get("ok"):
-            _journal_safe(
-                "error",
-                {
-                    "message": "auto snapshot/checkpoint skipped",
-                    "context": auto_result,
-                },
-            )
-    except Exception as exc:  # noqa: BLE001
-        _journal_safe(
-            "error",
-            {"message": "auto snapshot/checkpoint failed", "context": str(exc)},
-        )
+    sha, summary = _run_git_commit(msg)
     return {"ok": True, "sha": sha, "message": msg, "summary": summary}
 
 
