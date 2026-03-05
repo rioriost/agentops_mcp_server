@@ -12,6 +12,7 @@ class AgentopsMcpServer < Formula
   def install
     virtualenv_install_with_resources
     prefix.install "README-jp.md"
+    prefix.install "docs"
   end
 
   test do
