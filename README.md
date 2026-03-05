@@ -35,7 +35,7 @@ For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-c
 - Token discipline: prefer summaries/diff stats over full diffs and keep outputs short
 - All MCP tools accept optional `workspace_root` and `truncate_limit` (as exposed by `tools/list`)
 
-## .rulesについて（from v0.2.0）
+## About .rules (from v0.2.0)
 `zed-agentops-init` generates `.rules`, but if needed, try `docs/rules_short` or `docs/rules_long`.
 
 ## Where things live
