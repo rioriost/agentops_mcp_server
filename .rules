@@ -1,65 +1,67 @@
-# AgentOps (project rules)
-# Goal: Max automation for (1) journal/snapshot/checkpoint persistence, (2) verify->commit loop, (3) test generation.
+# AgentOps (strict rules)
+# Goal: Maximize resumability and stable execution under session interruption.
 
-## Always do this at the start
-- Review `.agent/snapshot.json` and `.agent/checkpoint.json` for current state and last applied seq.
-- Inspect `.agent/journal.jsonl` for recent events if needed.
+## Start (mandatory)
+- Read/restore in this order:
+  1) handoff
+  2) snapshot
+  3) checkpoint
+  4) journal (replay)
+- If resume state is incomplete:
+  - run ops_resume_brief (or equivalent) and emit a short brief
+- Identify active ticket (status != done) and resume it.
+
+## Planning flow (mandatory)
+- User provides docs/draft.md.
+- Generate docs/plan.md with phases.
+- Split phases into tasks and generate:
+  - docs/tickets_list.json (metadata)
+  - docs/pX-tY.json (full ticket with status/inputs/outputs/deps)
+- Ticket status enum: planned, in-progress, checking, verified, committed, done, blocked.
 
 ## Work loop (mandatory)
+- Tickets are the only unit of work.
 - For any code change:
-  1) Implement smallest safe change
-  2) Run "${VERIFY_REL}"
-  3) If it fails: fix and repeat
-  4) If it passes: commit changes
-  5) Update snapshot/checkpoint as needed
+  1) Set status -> in-progress
+  2) Implement smallest safe change
+  3) Run "${VERIFY_REL}"
+     - If fails: fix and repeat
+  4) Set status -> checking
+     - Compare acceptance_criteria AND plan.md to avoid omissions
+  5) Set status -> verified
+  6) Commit changes
+  7) Set status -> committed
+  8) Update snapshot/checkpoint
+  9) Set status -> done
 
-## Handoff checklist
-- Before ending a session or when context is tight:
-  - Run `ops_compact_context` (keep output short; prefer include_diff=false)
-  - Run `ops_handoff_export` (write `.agent/handoff.json` if needed)
+## Persistence & logging (mandatory)
+- Always record events for plan/task/progress/verify/commit.
+- Keep log outputs short (summaries over full diffs).
+- Prefer diff stats over full diffs.
 
-## Task wrap-up
-- At task end: record a short summary and next action (e.g. `journal_append` task.end)
+## Handoff & session safety (mandatory)
+- When context feels tight OR before ending:
+  1) ops_compact_context (compact context)
+  2) ops_capture_state (snapshot + checkpoint)
+  3) ops_handoff_export (handoff summary, optional file write)
 
-## Token discipline
-- Prefer summaries and diff stats over full diffs
-- Keep outputs short and avoid repeating large logs
+## Tooling (mandatory)
+- Prefer MCP tools if available.
+- Use:
+  - journal_append
+  - snapshot_save
+  - checkpoint_update
+  - roll_forward_replay / continue_state_rebuild (if needed)
+  - ops_compact_context
+  - ops_handoff_export
+  - ops_resume_brief
+  - repo_commit
+- Always pass workspace_root to MCP tools.
 
-## State persistence (v0.1.0)
-- Use `.agent/journal.jsonl` for append-only events.
-- Use `.agent/snapshot.json` for state snapshots.
-- Use `.agent/checkpoint.json` for roll-forward start.
+## Commit rules (mandatory)
+- After verify: check repo status; commit only if changes exist.
+- Commit message: ~80 chars, add scope if useful.
 
-## Roll-forward recovery
-- Rebuild state by replaying journal from checkpoint/snapshot when resuming.
-- Use continue-ready state reconstruction if provided.
-
-## Commit message
-- ~80 chars, semantic summary (not strict conventional commits)
-- Mention scope if useful (e.g. "rust:", "py:", "swift:", "infra:")
-
-## Prefer MCP tools if available
-- If MCP tools exist:
-  - use mcp:agentops:journal_append for events
-  - use mcp:agentops:snapshot_save to persist state
-  - use mcp:agentops:checkpoint_update to advance replay
-  - use mcp:agentops:roll_forward_replay for recovery
-  - use mcp:agentops:continue_state_rebuild for continue-ready state
-  - use mcp:agentops:ops_compact_context for compact context
-  - use mcp:agentops:ops_handoff_export for handoff JSON
-  - use mcp:agentops:ops_resume_brief for quick resume
-  - use mcp:agentops:repo_commit to commit after verify
-
-## MCP tool usage requirements
-- Call `tools/list` only once at session start; re-fetch only when tool errors indicate a schema mismatch or when tools are unavailable.
-- When calling `tools/call`, always include all fields listed in `inputSchema.required`.
-- If required fields are unclear or missing, re-fetch `tools/list` before calling.
-
-## Commit suggestion guardrails
-- After `repo_verify`, call `repo_status_summary` and confirm there are changes.
-- If `diff` and `files` are empty, do not call `repo_commit_message_suggest` or `repo_commit`.
-- Do not retry `repo_commit_message_suggest` on parsing errors; treat as a hard error and stop.
-
-## MCP workspace_root requirement
-- When calling MCP tools, always pass `workspace_root` as the absolute project root path.
-- If `workspace_root` is omitted, the server falls back to its current working directory.
+## Token discipline (mandatory)
+- Keep outputs short; avoid large logs.
+- Prefer summaries and diff stats.
