@@ -1,0 +1,27 @@
+{
+  "id": "p1-t01",
+  "title": "Design class boundaries for full main.py split",
+  "priority": "P1",
+  "status": "verified",
+  "summary": "Define class-based structure and file boundaries to fully split main.py while preserving external behavior.",
+  "inputs": ["docs/draft.md"],
+  "outputs": [
+    "Documented class boundaries and responsibilities",
+    "Proposed file/module layout for main.py split",
+    "docs/v0.3.1/p1-t01-design.md"
+  ],
+  "acceptance_criteria": [
+    "Proposed classes cover all remaining main.py responsibilities with minimal overlap.",
+    "Design explicitly preserves tool call inputs/outputs matching 0.2.3."
+  ],
+  "tasks": [
+    "Audit current main.py responsibilities and remaining large sections.",
+    "Define class responsibilities and interfaces for full split.",
+    "Map classes to files/modules and document migration order."
+  ],
+  "dependencies": [],
+  "notes": [
+    "Refactor only; no external behavior changes.",
+    "Keep logging and error handling consistent."
+  ]
+}

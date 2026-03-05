@@ -1,0 +1,31 @@
+{
+  "id": "p1-t02",
+  "title": "Refactor main.py into classes and split by file",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Complete the class-based refactor of main.py and split classes into separate files while preserving external behavior.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.3.1/plan.md",
+    "docs/v0.3.1/ticket-p1-t01.json"
+  ],
+  "outputs": [
+    "Class-based implementation extracted into separate files",
+    "Module-level entrypoints preserved as thin wrappers"
+  ],
+  "acceptance_criteria": [
+    "Tool call inputs/outputs match 0.2.3 behavior.",
+    "No changes to external tool schemas.",
+    "main.py responsibilities are fully moved into class files."
+  ],
+  "tasks": [
+    "Implement classes per design notes and move them into separate modules.",
+    "Update imports and wiring in main.py to use the new class modules.",
+    "Keep module-level entrypoints as thin wrappers preserving current behavior."
+  ],
+  "dependencies": ["p1-t01"],
+  "notes": [
+    "Avoid behavior changes; refactor only.",
+    "Keep logging and error handling consistent with 0.2.3."
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "version": "0.3.1",
+  "source": "draft.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P1",
+      "title": "Design full class decomposition for main.py",
+      "status": "verified",
+      "file": "v0.3.1/ticket-p1-t01.json"
+    },
+    {
+      "id": "p1-t02",
+      "priority": "P1",
+      "title": "Split main.py into class-based modules",
+      "status": "planned",
+      "file": "v0.3.1/ticket-p1-t02.json"
+    },
+    {
+      "id": "p1-t03",
+      "priority": "P1",
+      "title": "Verify behavior parity with 0.2.3",
+      "status": "planned",
+      "file": "v0.3.1/ticket-p1-t03.json"
+    }
+  ]
+}
