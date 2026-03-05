@@ -22,6 +22,13 @@
       "title": "Verify behavior parity with 0.2.3",
       "status": "done",
       "file": "v0.3.1/ticket-p1-t03.json"
+    },
+    {
+      "id": "p1-t04",
+      "priority": "P1",
+      "title": "Achieve coverage >= 90%",
+      "status": "in-progress",
+      "file": "v0.3.1/ticket-p1-t04.json"
     }
   ]
 }

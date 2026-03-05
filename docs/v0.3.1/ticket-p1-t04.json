@@ -1,0 +1,27 @@
+{
+  "id": "p1-t04",
+  "title": "Achieve coverage >= 90%",
+  "priority": "P1",
+  "status": "in-progress",
+  "summary": "Rewrite most tests impacted by the refactor and reach >= 90% coverage in the existing pytest configuration.",
+  "inputs": ["docs/draft.md", "docs/v0.3.1/plan.md"],
+  "outputs": [
+    "Coverage report showing >= 90%",
+    "Rewritten test suite covering refactored code paths"
+  ],
+  "acceptance_criteria": [
+    "Coverage >= 90% in the existing pytest configuration.",
+    "Tests pass with ${VERIFY_REL}."
+  ],
+  "tasks": [
+    "Rewrite most tests impacted by the refactor and rebuild the baseline.",
+    "Run pytest with coverage and capture current percentage.",
+    "Identify gaps and add/update tests to reach >= 90%.",
+    "Re-run ${VERIFY_REL} and confirm coverage."
+  ],
+  "dependencies": ["p1-t02", "p1-t03"],
+  "notes": [
+    "Focus on critical paths and error handling coverage.",
+    "Avoid changing tool schemas or behavior."
+  ]
+}

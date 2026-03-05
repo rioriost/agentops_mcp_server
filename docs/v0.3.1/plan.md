@@ -7,7 +7,7 @@
 
 ## Assumptions
 - Refactor is internal only; public tool schemas and JSON-RPC behavior remain unchanged.
-- Existing tests are the baseline for behavior validation.
+- Existing tests will be largely rewritten to match the refactor.
 
 ## Phases
 
@@ -40,13 +40,15 @@
 - Ensure behavior parity with 0.2.3.
 
 **Tasks**
+- Rewrite most tests impacted by the refactor and rebuild the baseline.
 - Run `${VERIFY_REL}` and review results.
+- Ensure coverage >= 90%.
 - Spot-check critical tool call flows for parity.
-- Add or update tests only if required for parity.
 
 ## Acceptance Criteria Mapping
 - External tool behavior unchanged (request/response parity).
 - Tests pass after refactor.
+- Coverage >= 90%.
 
 ## Rollout Notes
 - Avoid any schema or API changes.
