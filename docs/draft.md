@@ -1,10 +1,10 @@
-# Draft for 0.3.0: Refactor main.py continued
+# Draft for 0.3.1: Refactor main.py continued
 
 ## Background
-現在のmain.pyは、サイズが肥大化しており、メンテ性が悪化している。
+0.3.0でmain.pyを部分的にクラスに分割したが、main.pyはまだ大きい。
 
 ## Goal
-- main.pyをクラスを導入して分割する
+- main.py全体にクラスを導入して、クラスごとにファイルを分割する。
 
 ## Acceptance criteria
-- 前バージョン0.2.3と外面的な動作が変わらないこと＝tool呼び出しと結果は同じ
+- バージョン0.2.3と外面的な動作が変わらないこと＝tool呼び出しと結果は同じ
