@@ -40,7 +40,7 @@
 - Prefer diff stats over full diffs.
 
 ## Handoff & session safety (mandatory)
-- When context feels tight OR before ending:
+- When a tool execution adds/modifies files:
   1) ops_compact_context (compact context)
   2) ops_capture_state (snapshot + checkpoint)
   3) ops_handoff_export (handoff summary, optional file write)
