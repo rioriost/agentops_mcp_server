@@ -2,7 +2,7 @@
   "id": "p1-t04",
   "title": "Achieve coverage >= 90%",
   "priority": "P1",
-  "status": "in-progress",
+  "status": "done",
   "summary": "Rewrite most tests impacted by the refactor and reach >= 90% coverage in the existing pytest configuration.",
   "inputs": ["docs/draft.md", "docs/v0.3.1/plan.md"],
   "outputs": [
