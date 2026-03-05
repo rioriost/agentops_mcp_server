@@ -11,8 +11,6 @@ import pytest
 from agentops_mcp_server import init as init_mod
 from agentops_mcp_server import main as m
 
-pytestmark = pytest.mark.release
-
 
 @pytest.fixture
 def temp_repo(tmp_path):

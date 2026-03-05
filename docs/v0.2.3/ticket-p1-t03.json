@@ -2,12 +2,9 @@
   "id": "p1-t03",
   "title": "Update tests and reach coverage >= 90%",
   "priority": "P1",
-  "status": "planned",
+  "status": "verified",
   "summary": "Align tests with the refactor and raise coverage to at least 90%.",
-  "inputs": [
-    "docs/draft.md",
-    "docs/plan.md"
-  ],
+  "inputs": ["docs/draft.md", "docs/plan.md"],
   "outputs": [
     "Updated test suite covering refactored code paths",
     "Coverage >= 90%"
@@ -21,10 +18,6 @@
     "Add tests for newly extracted helpers and critical branches.",
     "Run verification and confirm coverage threshold."
   ],
-  "dependencies": [
-    "p1-t02"
-  ],
-  "notes": [
-    "Focus on critical paths and error handling coverage."
-  ]
+  "dependencies": ["p1-t02"],
+  "notes": ["Focus on critical paths and error handling coverage."]
 }
