@@ -153,9 +153,14 @@ def journal_append(
 def _truncate_text(value: Optional[str], limit: int = 2000) -> Optional[str]:
     if value is None:
         return None
+    if limit <= 0:
+        return ""
     if len(value) <= limit:
         return value
-    return value[:limit].rstrip() + "...(truncated)"
+    suffix = "...(truncated)"
+    if limit <= len(suffix):
+        return suffix[:limit]
+    return value[: limit - len(suffix)].rstrip() + suffix
 
 
 def _build_compact_context(

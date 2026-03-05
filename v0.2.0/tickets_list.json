@@ -41,14 +41,14 @@
       "id": "p2-t06",
       "priority": "P2",
       "title": "Add high-level ops tools for task lifecycle",
-      "status": "in-progress",
+      "status": "done",
       "file": "v0.2.0/ticket-p2-t06.json"
     },
     {
       "id": "p2-t07",
       "priority": "P2",
       "title": "Lightweight observability summaries",
-      "status": "planned",
+      "status": "in-progress",
       "file": "v0.2.0/ticket-p2-t07.json"
     },
     {
