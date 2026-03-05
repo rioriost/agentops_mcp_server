@@ -1,0 +1,26 @@
+{
+  "id": "p1-t01",
+  "title": "Design class boundaries for main.py refactor",
+  "priority": "P1",
+  "status": "verified",
+  "summary": "Define class-based structure and responsibilities for splitting main.py without behavior changes.",
+  "inputs": ["docs/draft.md", "docs/v0.3.0/plan.md"],
+  "outputs": [
+    "Documented class boundaries and responsibilities",
+    "Refactor approach notes for main.py"
+  ],
+  "acceptance_criteria": [
+    "Proposed classes cover main.py responsibilities with minimal overlap.",
+    "Notes explicitly preserve current tool behavior and schemas."
+  ],
+  "tasks": [
+    "Audit main.py responsibilities and identify cohesive modules.",
+    "Define class responsibilities and interfaces.",
+    "Document migration steps and risk areas."
+  ],
+  "dependencies": [],
+  "notes": [
+    "Avoid any change to external tool behavior.",
+    "Keep the proposal minimal and incremental."
+  ]
+}

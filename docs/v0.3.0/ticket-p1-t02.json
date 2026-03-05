@@ -1,0 +1,31 @@
+{
+  "id": "p1-t02",
+  "title": "Refactor main.py into classes",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Introduce class-based structure in main.py while preserving public tool behavior.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.3.0/plan.md",
+    "docs/v0.3.0/ticket-p1-t01.json"
+  ],
+  "outputs": [
+    "Class-based implementation in main.py",
+    "Module-level API wrappers preserving existing behavior"
+  ],
+  "acceptance_criteria": [
+    "Tool call inputs/outputs match 0.2.3 behavior.",
+    "No changes to external tool schemas.",
+    "Refactor is split into minimal, reviewable steps."
+  ],
+  "tasks": [
+    "Implement classes per design notes.",
+    "Migrate tool registry and routing into class-based structure.",
+    "Keep module-level entrypoints as thin wrappers."
+  ],
+  "dependencies": ["p1-t01"],
+  "notes": [
+    "Avoid behavior changes; refactor only.",
+    "Keep error handling and logging consistent."
+  ]
+}

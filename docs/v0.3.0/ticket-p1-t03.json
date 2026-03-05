@@ -1,0 +1,30 @@
+{
+  "id": "p1-t03",
+  "title": "Verify behavior parity with 0.2.3",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Validate that tool calls and responses match 0.2.3 after class-based refactor.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.3.0/plan.md",
+    "docs/v0.3.0/ticket-p1-t02.json"
+  ],
+  "outputs": [
+    "Verification notes confirming behavior parity",
+    "Updated/added tests for any newly introduced class boundaries"
+  ],
+  "acceptance_criteria": [
+    "Tool call inputs/outputs match 0.2.3 for representative cases.",
+    "Tests pass with `${VERIFY_REL}`."
+  ],
+  "tasks": [
+    "Identify critical tool call flows to compare.",
+    "Run verification and review outputs.",
+    "Add or update tests only if required for parity."
+  ],
+  "dependencies": ["p1-t02"],
+  "notes": [
+    "Do not change external tool schemas.",
+    "Focus on parity and regression coverage."
+  ]
+}
