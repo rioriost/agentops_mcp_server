@@ -1,0 +1,17 @@
+{
+  "id": "p1-t04",
+  "priority": "P1",
+  "title": "Token reduction controls in summaries and truncation",
+  "scope": "token budget",
+  "description": "Add configurable truncation and diff-stat preference to reduce output size across tools.",
+  "acceptance_criteria": [
+    "Truncation limits can be set per tool call",
+    "Summary generation prefers diff-stat over full diff",
+    "Task summaries remain short and template-based"
+  ],
+  "files": [
+    "src/agentops_mcp_server/main.py",
+    "tests/test_main.py"
+  ],
+  "dependencies": []
+}

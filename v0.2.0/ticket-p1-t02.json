@@ -1,0 +1,20 @@
+{
+  "id": "p1-t02",
+  "priority": "P1",
+  "title": "Resume brief for in-session self-driving",
+  "scope": "session resume",
+  "description": "Add a short resume brief that summarizes last state, open task, and next action without long output.",
+  "acceptance_criteria": [
+    "ops_resume_brief returns a short template-based summary",
+    "Summary uses replayed state and avoids long diffs",
+    "Output size is bounded"
+  ],
+  "files": [
+    "src/agentops_mcp_server/main.py",
+    "tests/test_main.py"
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p2-t05"
+  ]
+}

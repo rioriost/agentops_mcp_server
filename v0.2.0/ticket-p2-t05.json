@@ -1,0 +1,17 @@
+{
+  "id": "p2-t05",
+  "priority": "P2",
+  "title": "Extend state model and event application",
+  "scope": "state and replay",
+  "description": "Expand replayed state with task fields, plan steps, artifact summary, last verification, and failure reason.",
+  "acceptance_criteria": [
+    "Default state includes new fields with safe defaults",
+    "Event application updates new fields where applicable",
+    "Continue state rebuild preserves compatibility with old snapshots"
+  ],
+  "files": [
+    "src/agentops_mcp_server/main.py",
+    "tests/test_persistence.py"
+  ],
+  "dependencies": []
+}

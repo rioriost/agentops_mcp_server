@@ -1,0 +1,21 @@
+{
+  "id": "p1-t03",
+  "priority": "P1",
+  "title": "Update .rules workflow for handoff and summaries",
+  "scope": "workflow rules",
+  "description": "Improve the .rules guidance to include handoff checks and task summaries with token-saving guidance.",
+  "acceptance_criteria": [
+    ".rules template includes handoff pre-check steps",
+    ".rules template includes task-end summary step",
+    "Token-saving guidance is documented"
+  ],
+  "files": [
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "README.md",
+    "README-jp.md"
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02"
+  ]
+}

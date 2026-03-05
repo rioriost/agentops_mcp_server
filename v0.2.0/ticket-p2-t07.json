@@ -1,0 +1,19 @@
+{
+  "id": "p2-t07",
+  "priority": "P2",
+  "title": "Lightweight observability summaries",
+  "scope": "observability",
+  "description": "Provide recent-event and failure summaries without external services.",
+  "acceptance_criteria": [
+    "Recent journal events can be summarized into short output",
+    "Failure reasons are surfaced from replayed state",
+    "Artifacts are summarized by path only"
+  ],
+  "files": [
+    "src/agentops_mcp_server/main.py",
+    "tests/test_main.py"
+  ],
+  "dependencies": [
+    "p2-t05"
+  ]
+}

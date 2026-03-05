@@ -1,0 +1,161 @@
+{
+  "version": "0.2.0",
+  "source": "implementation_plan.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P1",
+      "title": "Compact context and handoff export for session transitions",
+      "scope": "session handoff",
+      "description": "Implement compact context generation and handoff export to reduce context loss between sessions while keeping output minimal and reusable.",
+      "acceptance_criteria": [
+        "A compact context is generated and stored in state under compact_context",
+        "A context.compact journal event is recorded with metadata",
+        "Handoff export returns a short markdown summary and can optionally write .agent/handoff.md",
+        "Unknown events remain safely ignored"
+      ],
+      "files": [
+        "src/agentops_mcp_server/main.py",
+        "tests/test_main.py",
+        "tests/test_persistence.py"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "p1-t02",
+      "priority": "P1",
+      "title": "Resume brief for in-session self-driving",
+      "scope": "session resume",
+      "description": "Add a short resume brief that summarizes last state, open task, and next action without long output.",
+      "acceptance_criteria": [
+        "ops_resume_brief returns a short template-based summary",
+        "Summary uses replayed state and avoids long diffs",
+        "Output size is bounded"
+      ],
+      "files": [
+        "src/agentops_mcp_server/main.py",
+        "tests/test_main.py"
+      ],
+      "dependencies": [
+        "p1-t01",
+        "p2-t05"
+      ]
+    },
+    {
+      "id": "p1-t03",
+      "priority": "P1",
+      "title": "Update .rules workflow for handoff and summaries",
+      "scope": "workflow rules",
+      "description": "Improve the .rules guidance to include handoff checks and task summaries with token-saving guidance.",
+      "acceptance_criteria": [
+        ".rules template includes handoff pre-check steps",
+        ".rules template includes task-end summary step",
+        "Token-saving guidance is documented"
+      ],
+      "files": [
+        "src/agentops_mcp_server/zed-agentops-init.sh",
+        "README.md",
+        "README-jp.md"
+      ],
+      "dependencies": [
+        "p1-t01",
+        "p1-t02"
+      ]
+    },
+    {
+      "id": "p1-t04",
+      "priority": "P1",
+      "title": "Token reduction controls in summaries and truncation",
+      "scope": "token budget",
+      "description": "Add configurable truncation and diff-stat preference to reduce output size across tools.",
+      "acceptance_criteria": [
+        "Truncation limits can be set per tool call",
+        "Summary generation prefers diff-stat over full diff",
+        "Task summaries remain short and template-based"
+      ],
+      "files": [
+        "src/agentops_mcp_server/main.py",
+        "tests/test_main.py"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "p2-t05",
+      "priority": "P2",
+      "title": "Extend state model and event application",
+      "scope": "state and replay",
+      "description": "Expand replayed state with task fields, plan steps, artifact summary, last verification, and failure reason.",
+      "acceptance_criteria": [
+        "Default state includes new fields with safe defaults",
+        "Event application updates new fields where applicable",
+        "Continue state rebuild preserves compatibility with old snapshots"
+      ],
+      "files": [
+        "src/agentops_mcp_server/main.py",
+        "tests/test_persistence.py"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "p2-t06",
+      "priority": "P2",
+      "title": "Add high-level ops tools for task lifecycle",
+      "scope": "ops tools",
+      "description": "Implement ops_start_task, ops_update_task, ops_end_task, ops_capture_state, ops_task_summary in tool registry.",
+      "acceptance_criteria": [
+        "All ops_* tools are registered and callable",
+        "Each tool records appropriate journal events",
+        "ops_capture_state updates snapshot and checkpoint"
+      ],
+      "files": [
+        "src/agentops_mcp_server/main.py",
+        "tests/test_main.py"
+      ],
+      "dependencies": [
+        "p2-t05"
+      ]
+    },
+    {
+      "id": "p2-t07",
+      "priority": "P2",
+      "title": "Lightweight observability summaries",
+      "scope": "observability",
+      "description": "Provide recent-event and failure summaries without external services.",
+      "acceptance_criteria": [
+        "Recent journal events can be summarized into short output",
+        "Failure reasons are surfaced from replayed state",
+        "Artifacts are summarized by path only"
+      ],
+      "files": [
+        "src/agentops_mcp_server/main.py",
+        "tests/test_main.py"
+      ],
+      "dependencies": [
+        "p2-t05"
+      ]
+    },
+    {
+      "id": "p2-t08",
+      "priority": "P2",
+      "title": "Tests and documentation for v0.2.0 additions",
+      "scope": "tests and docs",
+      "description": "Add tests for new tools and update README usage examples.",
+      "acceptance_criteria": [
+        "Unit tests cover compact context, resume brief, and ops tools",
+        "README includes minimal usage examples for new ops tools",
+        "All tests pass"
+      ],
+      "files": [
+        "tests/test_main.py",
+        "tests/test_persistence.py",
+        "README.md",
+        "README-jp.md"
+      ],
+      "dependencies": [
+        "p1-t01",
+        "p1-t02",
+        "p2-t06"
+      ]
+    }
+  ]
+}

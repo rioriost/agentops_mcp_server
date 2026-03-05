@@ -1,0 +1,19 @@
+{
+  "id": "p2-t06",
+  "priority": "P2",
+  "title": "Add high-level ops tools for task lifecycle",
+  "scope": "ops tools",
+  "description": "Implement ops_start_task, ops_update_task, ops_end_task, ops_capture_state, ops_task_summary in tool registry.",
+  "acceptance_criteria": [
+    "All ops_* tools are registered and callable",
+    "Each tool records appropriate journal events",
+    "ops_capture_state updates snapshot and checkpoint"
+  ],
+  "files": [
+    "src/agentops_mcp_server/main.py",
+    "tests/test_main.py"
+  ],
+  "dependencies": [
+    "p2-t05"
+  ]
+}

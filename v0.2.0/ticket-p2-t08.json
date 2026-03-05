@@ -1,0 +1,23 @@
+{
+  "id": "p2-t08",
+  "priority": "P2",
+  "title": "Tests and documentation for v0.2.0 additions",
+  "scope": "tests and docs",
+  "description": "Add tests for new tools and update README usage examples.",
+  "acceptance_criteria": [
+    "Unit tests cover compact context, resume brief, and ops tools",
+    "README includes minimal usage examples for new ops tools",
+    "All tests pass"
+  ],
+  "files": [
+    "tests/test_main.py",
+    "tests/test_persistence.py",
+    "README.md",
+    "README-jp.md"
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p2-t06"
+  ]
+}
