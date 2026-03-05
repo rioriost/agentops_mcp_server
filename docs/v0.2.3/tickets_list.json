@@ -1,0 +1,27 @@
+{
+  "version": "0.2.3",
+  "source": "draft.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P1",
+      "title": "Audit main.py duplication and refactor plan",
+      "status": "verified",
+      "file": "v0.2.3/ticket-p1-t01.json"
+    },
+    {
+      "id": "p1-t02",
+      "priority": "P1",
+      "title": "Refactor main.py to reduce duplication",
+      "status": "planned",
+      "file": "v0.2.3/ticket-p1-t02.json"
+    },
+    {
+      "id": "p1-t03",
+      "priority": "P1",
+      "title": "Update tests and reach coverage >= 90%",
+      "status": "planned",
+      "file": "v0.2.3/ticket-p1-t03.json"
+    }
+  ]
+}

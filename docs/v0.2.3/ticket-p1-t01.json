@@ -1,0 +1,30 @@
+{
+  "id": "p1-t01",
+  "title": "Audit main.py duplication and refactor plan",
+  "priority": "P1",
+  "status": "verified",
+  "summary": "Identify duplicated logic in main.py and define a safe refactor approach.",
+  "inputs": ["docs/draft.md", "docs/plan.md"],
+  "outputs": [
+    "Duplication audit summary",
+    "Refactor approach outlining extracted helpers"
+  ],
+  "acceptance_criteria": [
+    "Duplicated logic is inventoried.",
+    "Refactor approach minimizes behavior changes."
+  ],
+  "tasks": [
+    "Audit main.py for repeated patterns.",
+    "Document refactor targets and helper candidates."
+  ],
+  "dependencies": [],
+  "notes": [
+    "No code changes in this ticket; planning only.",
+    "Audit summary:",
+    "- Repeated max_chars/max_events normalization in ops_* handlers.",
+    "- Repeated replay/state fetch patterns in ops_* handlers.",
+    "- Repeated payload assembly for task lifecycle ops (start/update/end).",
+    "- Repeated JSON read/write patterns for snapshot/checkpoint/journal.",
+    "- Repeated tool schema plumbing in tools_list/tools_call."
+  ]
+}

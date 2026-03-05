@@ -1,0 +1,31 @@
+{
+  "id": "p1-t02",
+  "title": "Refactor main.py to reduce duplication",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Refactor main.py by extracting shared helpers and reducing repeated logic while preserving external behavior.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/plan.md"
+  ],
+  "outputs": [
+    "Refactored main.py with reduced duplication",
+    "Updated helper utilities for shared logic"
+  ],
+  "acceptance_criteria": [
+    "Duplication is reduced (diff stats show net code reduction).",
+    "Behavior of tool handlers remains unchanged."
+  ],
+  "tasks": [
+    "Extract shared helpers for repeated logic (validation, IO, schema wiring).",
+    "Refactor main.py in small, verifiable steps.",
+    "Update any internal references to new helpers."
+  ],
+  "dependencies": [
+    "p1-t01"
+  ],
+  "notes": [
+    "Keep external tool behavior stable.",
+    "Avoid changing tool schemas unless required by refactor."
+  ]
+}

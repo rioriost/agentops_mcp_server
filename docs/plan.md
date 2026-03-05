@@ -1,31 +1,54 @@
-# Implementation Plan: Pass CWD as workspace_root
+# Implementation Plan: Refactor main.py and improve test coverage
 
 ## Objectives
-- Update `.rules` to instruct passing CWD as `workspace_root`.
-- Avoid ambiguity in `workspace_root` usage.
+- Reduce duplication in `main.py` through targeted refactoring.
+- Update tests to match refactored behavior.
+- Achieve >= 90% coverage.
 
 ## Assumptions
-- MCP server runs with CWD set to repository root.
-- The rule change is documentation-only.
+- `main.py` can be reorganized without changing public tool behavior.
+- Coverage is measured by the existing pytest configuration.
 
 ## Phases
 
-### Phase 1: Update rules
+### Phase 1: Discovery & design
 **Goals**
-- Make the rule explicit about using CWD for `workspace_root`.
+- Identify duplicated logic in `main.py`.
+- Define refactor approach that minimizes behavior changes.
 
 **Tasks**
-- Edit `.rules` to say “Always pass CWD as workspace_root to MCP tools.”
+- Audit `main.py` for repeated patterns (parsing, I/O, error handling, schema wiring).
+- Define helper functions and shared utilities to consolidate duplication.
+- Identify tests that will need updates or additions.
 
 ---
 
-### Phase 2: Verification
+### Phase 2: Refactor implementation
 **Goals**
-- Ensure the rule text is correct and unambiguous.
+- Reduce duplication while preserving external behavior.
 
 **Tasks**
-- Review `.rules` for the updated wording.
+- Extract shared helpers for repeated logic.
+- Simplify tool registry handling and common request/response flows.
+- Refactor in small, verifiable steps.
+
+---
+
+### Phase 3: Tests & coverage
+**Goals**
+- Ensure tests align with refactor.
+- Reach coverage >= 90%.
+
+**Tasks**
+- Update existing tests for refactored behavior.
+- Add tests for newly extracted helpers and critical code paths.
+- Run `${VERIFY_REL}` and review coverage output.
 
 ## Acceptance Criteria Mapping
-- `.rules` clearly instructs using CWD as `workspace_root`.
-- No other behavior changes are introduced.
+- Code size reduction is demonstrable (diff stats).
+- Coverage >= 90%.
+- Tests pass after refactor.
+
+## Rollout Notes
+- Refactor is internal; no API changes expected.
+- Keep behavior identical unless explicitly required by tests.

@@ -1,11 +1,12 @@
-# Draft for 0.2.2: Pass CWD as workspace_root to MCP tools
+# Draft for 0.2.3: Refactor main.py
 
 ## Background
-The current .rules says to always pass `workspace_root` to MCP tools, but it does not specify what value to pass. This led to passing a relative root name, which caused nested paths such as `<cwd>/<root>/<root>/.agent`.
+現在のmain.pyには、処理が重複した部分がある可能性が高い。
 
 ## Goal
-- Update the rule to explicitly pass the **CWD** as `workspace_root`.
+- main.pyをリファクタリングして、重複を減らす。
+- 新たなmain.pyにあわせて、テストコードも修正する。
 
 ## Acceptance criteria
-- `.rules` instructs to pass CWD as `workspace_root`.
-- No other behavior changes are required.
+- コード量が減ること
+- カバレッジ90%以上
