@@ -1591,6 +1591,7 @@ def tools_list() -> Dict[str, Any]:
         input_schema = dict(spec["input_schema"])
         properties = dict(input_schema.get("properties") or {})
         properties["workspace_root"] = {"type": ["string", "null"]}
+        properties["truncate_limit"] = {"type": ["integer", "null"]}
         input_schema["properties"] = properties
         input_schema["required"] = list(input_schema.get("required") or [])
         tools.append(
@@ -1638,6 +1639,13 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         _set_repo_root(Path(workspace_root).expanduser().resolve())
         arguments = {k: v for k, v in arguments.items() if k != "workspace_root"}
 
+    truncate_limit = None
+    if arguments and "truncate_limit" in arguments:
+        raw_limit = arguments.get("truncate_limit")
+        if isinstance(raw_limit, int) and raw_limit > 0:
+            truncate_limit = raw_limit
+        arguments = {k: v for k, v in arguments.items() if k != "truncate_limit"}
+
     handler = TOOL_REGISTRY[resolved_name]["handler"]
     call_id = str(uuid.uuid4())
     _journal_safe(
@@ -1657,15 +1665,17 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         raise
     finally:
         _set_repo_root(previous_root)
+    summary_limit = truncate_limit if truncate_limit is not None else 2000
+    result_payload = _summarize_result(result, limit=summary_limit)
     _journal_safe(
         "tool.result",
-        {"call_id": call_id, "ok": True, "result": _summarize_result(result)},
+        {"call_id": call_id, "ok": True, "result": result_payload},
     )
     content_payload = {
         "content": [
             {
                 "type": "text",
-                "text": json.dumps(result, ensure_ascii=False),
+                "text": json.dumps(result_payload, ensure_ascii=False),
             }
         ]
     }

@@ -27,7 +27,7 @@
       "id": "p1-t04",
       "priority": "P1",
       "title": "Token reduction controls in summaries and truncation",
-      "status": "planned",
+      "status": "done",
       "file": "v0.2.0/ticket-p1-t04.json"
     },
     {

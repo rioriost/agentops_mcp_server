@@ -129,3 +129,11 @@ def test_ops_resume_brief_is_bounded(temp_repo):
     assert result["ok"] is True
     assert isinstance(result["brief"], str)
     assert len(result["brief"]) <= 40
+
+
+def test_tools_call_truncate_limit_summarizes(temp_repo):
+    payload = m.tools_call("snapshot_load", {"truncate_limit": 1})
+    content = payload["content"][0]["text"]
+    result = json.loads(content)
+    assert result["truncated"] is True
+    assert "summary" in result
