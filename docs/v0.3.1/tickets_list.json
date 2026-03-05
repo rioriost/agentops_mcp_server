@@ -20,7 +20,7 @@
       "id": "p1-t03",
       "priority": "P1",
       "title": "Verify behavior parity with 0.2.3",
-      "status": "planned",
+      "status": "verified",
       "file": "v0.3.1/ticket-p1-t03.json"
     }
   ]
