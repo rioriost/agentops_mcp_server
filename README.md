@@ -26,6 +26,14 @@ It also auto-appends common entries to `.gitignore`.
 Open the directory in Zed and use the Agent Panel.
 For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-cov`).
 
+## Workflow tips
+
+- Before ending a session or when context is tight:
+  - Run `ops_compact_context` (prefer `include_diff=false`)
+  - Run `ops_handoff_export` to write `.agent/handoff.json` if needed
+- To resume quickly: run `ops_resume_brief`
+- Token discipline: prefer summaries/diff stats over full diffs and keep outputs short
+
 ## Where things live
 
 - `.rules` : project rules auto-injected into Zed Agent context
@@ -115,6 +123,15 @@ Tool Settings (settings.json):
       },
       "mcp:agentops-server:commit_if_verified": {
         "default": "allow"
+      },
+      "mcp:agentops-server:ops_compact_context": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_handoff_export": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_resume_brief": {
+        "default": "allow"
       }
     }
   },
@@ -141,6 +158,9 @@ MCP tools (snake_case):
 - `tests_suggest`
 - `tests_suggest_from_failures`
 - `commit_if_verified`
+- `ops_compact_context`
+- `ops_handoff_export`
+- `ops_resume_brief`
 - Aliases: dotted names (e.g. `roll_forward.replay`) map to snake_case for compatibility.
 
 Usage notes:

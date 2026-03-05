@@ -167,6 +167,18 @@ else
       '  4) If it passes: commit changes' \
       '  5) Update snapshot/checkpoint as needed' \
       '' \
+      '## Handoff checklist' \
+      '- Before ending a session or when context is tight:' \
+      '  - Run `ops_compact_context` (keep output short; prefer include_diff=false)' \
+      '  - Run `ops_handoff_export` (write `.agent/handoff.json` if needed)' \
+      '' \
+      '## Task wrap-up' \
+      '- At task end: record a short summary and next action (e.g. `journal_append` task.end)' \
+      '' \
+      '## Token discipline' \
+      '- Prefer summaries and diff stats over full diffs' \
+      '- Keep outputs short and avoid repeating large logs' \
+      '' \
       '## State persistence (v0.1.0)' \
       '- Use `.agent/journal.jsonl` for append-only events.' \
       '- Use `.agent/snapshot.json` for state snapshots.' \
@@ -187,6 +199,9 @@ else
       '  - use mcp:agentops:checkpoint_update to advance replay' \
       '  - use mcp:agentops:roll_forward_replay for recovery' \
       '  - use mcp:agentops:continue_state_rebuild for continue-ready state' \
+      '  - use mcp:agentops:ops_compact_context for compact context' \
+      '  - use mcp:agentops:ops_handoff_export for handoff JSON' \
+      '  - use mcp:agentops:ops_resume_brief for quick resume' \
       '  - use mcp:agentops:repo_commit to commit after verify' \
       '' \
       '## MCP tool usage requirements' \

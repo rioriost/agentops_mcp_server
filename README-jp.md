@@ -26,6 +26,14 @@ brew install agentops_mcp_server
 リリース向けのカバレッジ計測は `.zed/scripts/verify-release`（`pytest-cov` が必要）を使ってください。
 `.gitignore` にはエントリが自動追記されます。
 
+## ワークフローのヒント
+
+- セッション終了前／コンテキストが厳しいとき:
+  - `ops_compact_context` を実行（`include_diff=false` 推奨）
+  - 必要に応じて `ops_handoff_export` で `.agent/handoff.json` を出力
+- すぐ再開する場合は `ops_resume_brief` を実行
+- トークン節約: フル diff より要約・diff stats を優先し、出力は短く保つ
+
 ## 主要ファイルの配置
 
 - `.rules` : Zed Agent のコンテキストに自動注入されるプロジェクトルール
@@ -116,6 +124,15 @@ Tool Settings (settings.json):
       },
       "mcp:agentops-server:commit_if_verified": {
         "default": "allow"
+      },
+      "mcp:agentops-server:ops_compact_context": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_handoff_export": {
+        "default": "allow"
+      },
+      "mcp:agentops-server:ops_resume_brief": {
+        "default": "allow"
       }
     }
   },
@@ -142,6 +159,9 @@ Tool Settings (settings.json):
 - `tests_suggest`
 - `tests_suggest_from_failures`
 - `commit_if_verified`
+- `ops_compact_context`
+- `ops_handoff_export`
+- `ops_resume_brief`
 - 互換: ドット区切り（例: `roll_forward.replay`）は snake_case にマップされます
 
 使用メモ:
