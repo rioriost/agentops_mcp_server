@@ -46,7 +46,8 @@ include = [
   "README.md",
   "README-jp.md",
   "LICENSE",
-  "src/agentops_mcp_server/zed-agentops-init.sh"
+  "src/agentops_mcp_server/zed-agentops-init.sh",
+  "docs/**"
 ]
 exclude = [
   "agentops_mcp_server.rb",
