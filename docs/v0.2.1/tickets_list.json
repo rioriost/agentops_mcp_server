@@ -6,7 +6,7 @@
       "id": "p1-t01",
       "priority": "P1",
       "title": "Unify agent state file paths and remove ops path overrides",
-      "status": "blocked",
+      "status": "done",
       "file": "v0.2.1/ticket-p1-t01.json"
     }
   ]

@@ -2,7 +2,7 @@
   "id": "p1-t01",
   "title": "Unify agent state file paths and remove ops path overrides",
   "priority": "P1",
-  "status": "blocked",
+  "status": "done",
   "summary": "Centralize path resolution for journal/checkpoint/snapshot/handoff under <workspace_root>/.agent and remove/ignore ops tool path overrides.",
   "inputs": ["docs/draft.md", "docs/plan.md"],
   "outputs": [
@@ -27,7 +27,6 @@
   "dependencies": [],
   "notes": [
     "Preserve legacy filenames (e.g., checkpoint.json, snapshot.json, journal.jsonl).",
-    "No file format changes are required.",
-    "Blocked: git is not installed or not in PATH, so commit could not be performed."
+    "No file format changes are required."
   ]
 }
