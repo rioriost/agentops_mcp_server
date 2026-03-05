@@ -1,6 +1,7 @@
 import io
 import json
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -41,6 +42,15 @@ def test_tools_call_workspace_root_restores_repo_root(tmp_path):
     result = json.loads(content)
     assert result["ok"] is False
     assert m.REPO_ROOT == original_root
+
+
+def test_tools_call_workspace_root_relative_matches_cwd(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    payload = m.tools_call("snapshot_load", {"workspace_root": tmp_path.name})
+    content = payload["content"][0]["text"]
+    result = json.loads(content)
+    assert result["ok"] is False
+    assert Path(result["path"]).parent == tmp_path / ".agent"
 
 
 def test_handle_request_tools_list():

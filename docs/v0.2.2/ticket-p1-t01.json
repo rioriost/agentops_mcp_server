@@ -1,0 +1,25 @@
+{
+  "id": "p1-t01",
+  "title": "Fix workspace_root resolution to avoid nested .agent paths",
+  "priority": "P1",
+  "status": "verified",
+  "summary": "Ensure relative workspace_root matching the CWD name resolves to CWD to prevent nested .agent paths.",
+  "inputs": ["docs/draft.md", "docs/plan.md"],
+  "outputs": [
+    "Workspace root resolution updated to avoid nested paths",
+    "Tests updated/added for relative workspace_root behavior"
+  ],
+  "acceptance_criteria": [
+    "Relative workspace_root matching CWD name resolves to CWD.",
+    "No nested .agent directories are created.",
+    "Tests pass after the change."
+  ],
+  "tasks": [
+    "Locate workspace_root resolution logic in tools_call.",
+    "Implement relative resolution rule for CWD name matches.",
+    "Update/add tests for relative workspace_root behavior.",
+    "Run verification."
+  ],
+  "dependencies": [],
+  "notes": ["CWD is expected to be the repository root when the server starts."]
+}

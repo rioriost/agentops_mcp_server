@@ -1,0 +1,13 @@
+{
+  "version": "0.2.2",
+  "source": "draft.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P1",
+      "title": "Fix workspace_root resolution to avoid nested .agent paths",
+      "status": "verified",
+      "file": "v0.2.2/ticket-p1-t01.json"
+    }
+  ]
+}

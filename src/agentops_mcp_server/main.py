@@ -2171,6 +2171,16 @@ def tools_list() -> Dict[str, Any]:
     return {"tools": tools}
 
 
+def _resolve_workspace_root(value: str) -> Path:
+    candidate = Path(value).expanduser()
+    if candidate.is_absolute():
+        return candidate.resolve()
+    cwd = Path.cwd().resolve()
+    if candidate in {Path("."), Path(cwd.name)}:
+        return cwd
+    return (cwd / candidate).resolve()
+
+
 def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     resolved_name = name
 
@@ -2209,7 +2219,7 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     previous_root = REPO_ROOT
     workspace_root = arguments.get("workspace_root") if arguments else None
     if isinstance(workspace_root, str) and workspace_root.strip():
-        _set_repo_root(Path(workspace_root).expanduser().resolve())
+        _set_repo_root(_resolve_workspace_root(workspace_root.strip()))
         arguments = {k: v for k, v in arguments.items() if k != "workspace_root"}
 
     truncate_limit = None
