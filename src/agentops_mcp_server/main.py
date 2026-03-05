@@ -34,6 +34,7 @@ Tools (snake_case):
 - ops_end_task(summary, next_action?, status?, task_id?, session_id?, agent_id?) -> record task end
 - ops_capture_state(session_id?) -> snapshot and checkpoint state
 - ops_task_summary(session_id?, max_chars?) -> summarize task state
+- ops_observability_summary(session_id?, max_events?, max_chars?, path?) -> write observability summary
 """
 
 from __future__ import annotations
@@ -471,6 +472,39 @@ def _read_journal_events(
         "last_seq": last_seq,
         "path": str(path),
     }
+
+
+def _read_recent_journal_events(
+    max_events: int,
+    session_id: Optional[str] = None,
+    journal_path: Optional[Path] = None,
+) -> List[Dict[str, Any]]:
+    if max_events <= 0:
+        return []
+    path = journal_path or JOURNAL
+    if not path.exists():
+        return []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    events: List[Dict[str, Any]] = []
+    for raw_line in reversed(lines):
+        if len(events) >= max_events:
+            break
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(rec, dict):
+            continue
+        if session_id is not None:
+            rec_session = rec.get("session_id")
+            if rec_session != session_id:
+                continue
+        events.append(rec)
+    events.reverse()
+    return events
 
 
 def roll_forward_replay(
@@ -1296,6 +1330,25 @@ def _unique_preserve_order(items: List[str]) -> List[str]:
     return ordered
 
 
+def _extract_artifact_paths(events: List[Dict[str, Any]]) -> List[str]:
+    paths: List[str] = []
+    for event in events:
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        for key in ("path", "file"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                paths.append(value.strip())
+        for key in ("paths", "files"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, str) and item.strip():
+                        paths.append(item.strip())
+    return _unique_preserve_order(paths)
+
+
 def _is_test_path(path: str) -> bool:
     return (
         "/tests/" in path
@@ -1696,6 +1749,111 @@ def ops_task_summary(
     }
 
 
+def ops_observability_summary(
+    session_id: Optional[str] = None,
+    max_events: Optional[int] = None,
+    max_chars: Optional[int] = None,
+    path: Optional[str] = None,
+) -> Dict[str, Any]:
+    resolved_max_events = (
+        max_events if isinstance(max_events, int) and max_events > 0 else 20
+    )
+    resolved_max_chars = (
+        max_chars if isinstance(max_chars, int) and max_chars > 0 else 800
+    )
+
+    recent_events = _read_recent_journal_events(
+        resolved_max_events, session_id=session_id
+    )
+
+    replay = continue_state_rebuild(session_id=session_id)
+    if replay.get("ok"):
+        state = replay.get("state") or {}
+    else:
+        state = _init_replay_state(None)
+
+    resolved_session_id = (
+        session_id if isinstance(session_id, str) else state.get("session_id") or ""
+    )
+
+    event_summaries = []
+    for event in recent_events:
+        event_summaries.append(
+            {
+                "seq": event.get("seq"),
+                "ts": event.get("ts"),
+                "kind": event.get("kind"),
+                "session_id": event.get("session_id"),
+            }
+        )
+
+    artifacts = _extract_artifact_paths(recent_events)
+    summary = {
+        "ts": _now_iso(),
+        "session_id": resolved_session_id,
+        "recent_events": event_summaries,
+        "failure_reason": state.get("failure_reason") or "",
+        "last_error": state.get("last_error") or "",
+        "verification_status": state.get("verification_status") or "",
+        "artifacts": artifacts,
+    }
+
+    resolved_path = _resolve_path(
+        path, REPO_ROOT / ".agent" / "observability_summary.json"
+    )
+    if resolved_path.suffix:
+        text_path = resolved_path.with_suffix(".txt")
+    else:
+        text_path = Path(str(resolved_path) + ".txt")
+
+    _write_text(resolved_path, json.dumps(summary, ensure_ascii=False, indent=2) + "\n")
+
+    lines = ["observability_summary:"]
+    if event_summaries:
+        lines.append("recent_events:")
+        for event in event_summaries:
+            seq = event.get("seq")
+            kind = event.get("kind")
+            ts = event.get("ts")
+            label = f"- {seq} {kind}"
+            if isinstance(ts, str) and ts:
+                label = f"{label} @ {ts}"
+            lines.append(label)
+    if summary["failure_reason"]:
+        lines.append(f"- failure_reason: {summary['failure_reason']}")
+    if summary["last_error"]:
+        lines.append(f"- last_error: {summary['last_error']}")
+    if artifacts:
+        lines.append("artifacts:")
+        for artifact in artifacts:
+            lines.append(f"- {artifact}")
+
+    text = _truncate_text("\n".join(lines).strip(), limit=resolved_max_chars) or ""
+    _write_text(text_path, text + "\n")
+
+    _journal_safe(
+        "observability.summary",
+        {
+            "session_id": resolved_session_id,
+            "events": len(event_summaries),
+            "artifacts": len(artifacts),
+            "path": str(resolved_path),
+            "text_path": str(text_path),
+            "length": len(text),
+        },
+    )
+
+    return {
+        "ok": True,
+        "summary": summary,
+        "text": text,
+        "path": str(resolved_path),
+        "text_path": str(text_path),
+        "max_events": resolved_max_events,
+        "max_chars": resolved_max_chars,
+    }
+
+
 TOOL_REGISTRY = {
     "commit_if_verified": {
         "description": "Verify then commit",
@@ -1963,6 +2121,20 @@ TOOL_REGISTRY = {
         },
         "handler": ops_task_summary,
     },
+    "ops_observability_summary": {
+        "description": "Write observability summary",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "session_id": {"type": ["string", "null"]},
+                "max_events": {"type": ["integer", "null"]},
+                "max_chars": {"type": ["integer", "null"]},
+                "path": {"type": ["string", "null"]},
+            },
+            "required": [],
+        },
+        "handler": ops_observability_summary,
+    },
 }
 
 
@@ -2011,6 +2183,7 @@ def tools_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         "ops.end_task": "ops_end_task",
         "ops.capture_state": "ops_capture_state",
         "ops.task_summary": "ops_task_summary",
+        "ops.observability_summary": "ops_observability_summary",
     }
 
     if resolved_name not in TOOL_REGISTRY:

@@ -198,3 +198,43 @@ def test_ops_task_summary_emits_journal_and_text(temp_repo):
     journal_lines = m.JOURNAL.read_text(encoding="utf-8").splitlines()
     kinds = [json.loads(line)["kind"] for line in journal_lines if line.strip()]
     assert "task.summary" in kinds
+
+
+def test_ops_observability_summary_includes_failures_and_artifacts(temp_repo):
+    m.snapshot_save(
+        state={"current_phase": "session"}, session_id="s1", last_applied_seq=0
+    )
+    m.checkpoint_update(last_applied_seq=0, snapshot_path=m.SNAPSHOT.name)
+    m.journal_append(
+        kind="task.blocked",
+        payload={"reason": "network down", "note": "blocked"},
+        session_id="s1",
+    )
+    m.journal_append(
+        kind="file.edit",
+        payload={"action": "edit", "path": "src/app.py"},
+        session_id="s1",
+    )
+    m.journal_append(
+        kind="artifact.summary",
+        payload={"paths": ["out/log.txt"]},
+        session_id="s1",
+    )
+
+    result = m.ops_observability_summary(
+        session_id="s1", max_events=5, max_chars=200, path=".agent/obs.json"
+    )
+    assert result["ok"] is True
+    recent_events = result["summary"]["recent_events"]
+    assert recent_events
+    allowed_keys = {"seq", "ts", "kind", "session_id"}
+    for event in recent_events:
+        assert set(event.keys()).issubset(allowed_keys)
+    assert result["summary"]["failure_reason"] == "network down"
+    assert "src/app.py" in result["summary"]["artifacts"]
+    assert "out/log.txt" in result["summary"]["artifacts"]
+
+    summary_path = m.REPO_ROOT / ".agent" / "obs.json"
+    text_path = m.REPO_ROOT / ".agent" / "obs.txt"
+    assert summary_path.exists()
+    assert text_path.exists()
