@@ -150,3 +150,100 @@ def test_roll_forward_replay_and_continue_state_rebuild(temp_repo):
     assert state["last_action"] == "done"
     assert state["next_step"] == "next up"
     assert state["replay_warnings"]["invalid_lines"] == 0
+
+
+def test_replay_state_defaults_include_extended_fields(temp_repo):
+    state = m.replay_events_to_state(
+        snapshot_state={"current_phase": "session"},
+        events=[],
+    )
+    assert state["task_id"] == ""
+    assert state["task_title"] == ""
+    assert state["task_status"] == ""
+    assert state["plan_steps"] == []
+    assert state["artifact_summary"] == ""
+    assert state["last_verification"] == {}
+    assert state["failure_reason"] == ""
+
+
+def test_continue_state_rebuild_coerces_extended_fields(temp_repo):
+    snapshot_state = {
+        "current_phase": "session",
+        "plan_steps": "oops",
+        "artifact_summary": 123,
+        "last_verification": "nope",
+        "failure_reason": 5,
+        "task_id": None,
+        "task_title": 77,
+        "task_status": {},
+    }
+    m.snapshot_save(state=snapshot_state, session_id="s1", last_applied_seq=0)
+    m.checkpoint_update(last_applied_seq=0, snapshot_path=m.SNAPSHOT.name)
+
+    rebuilt = m.continue_state_rebuild(session_id="s1")
+    assert rebuilt["ok"] is True
+    state = rebuilt["state"]
+    assert state["task_id"] == ""
+    assert state["task_title"] == ""
+    assert state["task_status"] == ""
+    assert state["plan_steps"] == []
+    assert state["artifact_summary"] == ""
+    assert state["last_verification"] == {}
+    assert state["failure_reason"] == ""
+
+
+def test_replay_applies_extended_fields_from_events(temp_repo):
+    m.snapshot_save(
+        state={"current_phase": "session"}, session_id="s1", last_applied_seq=0
+    )
+
+    m.journal_append(
+        kind="task.start",
+        payload={"title": "Build", "task_id": "t-1"},
+        session_id="s1",
+        event_id="evt-1",
+    )
+    m.journal_append(
+        kind="plan.start",
+        payload={"steps": ["one"]},
+        session_id="s1",
+        event_id="evt-2",
+    )
+    m.journal_append(
+        kind="plan.step",
+        payload={"step": "two"},
+        session_id="s1",
+        event_id="evt-3",
+    )
+    m.journal_append(
+        kind="artifact.summary",
+        payload={"summary": "done"},
+        session_id="s1",
+        event_id="evt-4",
+    )
+    m.journal_append(
+        kind="verify.end",
+        payload={"ok": False, "returncode": 1, "stdout": "", "stderr": "failed"},
+        session_id="s1",
+        event_id="evt-5",
+    )
+    m.journal_append(
+        kind="task.blocked",
+        payload={"reason": "waiting", "note": "blocked"},
+        session_id="s1",
+        event_id="evt-6",
+    )
+
+    m.checkpoint_update(last_applied_seq=0, snapshot_path=m.SNAPSHOT.name)
+
+    rebuilt = m.continue_state_rebuild(session_id="s1")
+    assert rebuilt["ok"] is True
+    state = rebuilt["state"]
+    assert state["task_id"] == "t-1"
+    assert state["task_title"] == "Build"
+    assert state["task_status"] == "blocked"
+    assert state["plan_steps"] == ["one", "two"]
+    assert state["artifact_summary"] == "done"
+    assert state["last_verification"]["ok"] is False
+    assert state["failure_reason"] == "waiting"
+    assert state["last_action"] == "blocked"

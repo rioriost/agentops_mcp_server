@@ -537,6 +537,28 @@ def _init_replay_state(snapshot_state: Optional[Dict[str, Any]]) -> Dict[str, An
     state.setdefault("last_commit", "")
     state.setdefault("last_error", "")
     state.setdefault("compact_context", "")
+    state.setdefault("task_id", "")
+    state.setdefault("task_title", "")
+    state.setdefault("task_status", "")
+    state.setdefault("plan_steps", [])
+    state.setdefault("artifact_summary", "")
+    state.setdefault("last_verification", {})
+    state.setdefault("failure_reason", "")
+
+    if not isinstance(state.get("task_id"), str):
+        state["task_id"] = ""
+    if not isinstance(state.get("task_title"), str):
+        state["task_title"] = ""
+    if not isinstance(state.get("task_status"), str):
+        state["task_status"] = ""
+    if not isinstance(state.get("plan_steps"), list):
+        state["plan_steps"] = []
+    if not isinstance(state.get("artifact_summary"), str):
+        state["artifact_summary"] = ""
+    if not isinstance(state.get("last_verification"), dict):
+        state["last_verification"] = {}
+    if not isinstance(state.get("failure_reason"), str):
+        state["failure_reason"] = ""
 
     warnings = state.get("replay_warnings")
     if not isinstance(warnings, dict):
@@ -612,6 +634,11 @@ def _apply_event_to_state(state: Dict[str, Any], event: Dict[str, Any]) -> None:
         title = (
             payload.get("title") if isinstance(payload.get("title"), str) else "unknown"
         )
+        task_id = payload.get("task_id")
+        if isinstance(task_id, str):
+            state["task_id"] = task_id
+        state["task_title"] = title
+        state["task_status"] = "in-progress"
         state["current_task"] = title
         state["current_phase"] = "task"
         state["last_action"] = "task started"
@@ -645,9 +672,75 @@ def _apply_event_to_state(state: Dict[str, Any], event: Dict[str, Any]) -> None:
             if isinstance(payload.get("next_action"), str)
             else ""
         )
+        state["task_status"] = "done"
         state["last_action"] = summary
         state["next_step"] = next_action
         state["current_task"] = ""
+        return
+
+    if kind == "task.created":
+        task_id = payload.get("task_id")
+        title = payload.get("title")
+        status = payload.get("status")
+        if isinstance(task_id, str):
+            state["task_id"] = task_id
+        if isinstance(title, str):
+            state["task_title"] = title
+            state["current_task"] = title
+        if isinstance(status, str):
+            state["task_status"] = status
+        state["last_action"] = "task created"
+        return
+
+    if kind == "task.progress":
+        status = payload.get("status")
+        note = payload.get("note")
+        if isinstance(status, str):
+            state["task_status"] = status
+            state["current_phase"] = status
+        if isinstance(note, str) and note:
+            state["last_action"] = note
+        else:
+            state["last_action"] = "task progress"
+        return
+
+    if kind == "task.blocked":
+        reason = payload.get("reason")
+        note = payload.get("note")
+        state["task_status"] = "blocked"
+        if isinstance(reason, str) and reason:
+            state["failure_reason"] = reason
+        if isinstance(note, str) and note:
+            state["last_action"] = note
+        else:
+            state["last_action"] = "task blocked"
+        return
+
+    if kind == "plan.start":
+        steps = payload.get("steps")
+        if isinstance(steps, list):
+            state["plan_steps"] = steps
+        state["last_action"] = "plan started"
+        return
+
+    if kind == "plan.step":
+        step = payload.get("step") or payload.get("title")
+        if isinstance(step, str):
+            if not isinstance(state.get("plan_steps"), list):
+                state["plan_steps"] = []
+            state["plan_steps"].append(step)
+        state["last_action"] = "plan step recorded"
+        return
+
+    if kind == "plan.end":
+        state["last_action"] = "plan ended"
+        return
+
+    if kind == "artifact.summary":
+        summary = payload.get("summary")
+        if isinstance(summary, str):
+            state["artifact_summary"] = summary
+        state["last_action"] = "artifact summarized"
         return
 
     if kind == "verify.start":
@@ -657,8 +750,48 @@ def _apply_event_to_state(state: Dict[str, Any], event: Dict[str, Any]) -> None:
 
     if kind == "verify.end":
         ok = payload.get("ok")
+        returncode = payload.get("returncode")
+        stdout = payload.get("stdout")
+        stderr = payload.get("stderr")
         state["verification_status"] = "passed" if ok else "failed"
+        state["last_verification"] = {
+            "ok": ok,
+            "returncode": returncode if isinstance(returncode, int) else None,
+            "stdout": _truncate_text(stdout, limit=500)
+            if isinstance(stdout, str)
+            else None,
+            "stderr": _truncate_text(stderr, limit=500)
+            if isinstance(stderr, str)
+            else None,
+        }
+        if ok is False:
+            if isinstance(stderr, str) and stderr:
+                state["failure_reason"] = stderr
         state["last_action"] = "verify finished"
+        return
+
+    if kind == "verify.result":
+        ok = payload.get("ok")
+        returncode = payload.get("returncode")
+        stdout = payload.get("stdout")
+        stderr = payload.get("stderr")
+        reason = payload.get("reason")
+        state["last_verification"] = {
+            "ok": ok,
+            "returncode": returncode if isinstance(returncode, int) else None,
+            "stdout": _truncate_text(stdout, limit=500)
+            if isinstance(stdout, str)
+            else None,
+            "stderr": _truncate_text(stderr, limit=500)
+            if isinstance(stderr, str)
+            else None,
+        }
+        if ok is False:
+            if isinstance(reason, str) and reason:
+                state["failure_reason"] = reason
+            elif isinstance(stderr, str) and stderr:
+                state["failure_reason"] = stderr
+        state["last_action"] = "verify result recorded"
         return
 
     if kind == "commit.start":
