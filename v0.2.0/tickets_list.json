@@ -34,7 +34,7 @@
       "id": "p2-t05",
       "priority": "P2",
       "title": "Extend state model and event application",
-      "status": "planned",
+      "status": "done",
       "file": "v0.2.0/ticket-p2-t05.json"
     },
     {
