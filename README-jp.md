@@ -37,6 +37,9 @@ brew install agentops_mcp_server
 - トークン節約: フル diff より要約・diff stats を優先し、出力は短く保つ
 - 全ての MCP ツールは `workspace_root` と `truncate_limit` を任意で受け付ける（`tools/list` で確認）
 
+## .rulesについて（from v0.2.0）
+zed-agentops-init は `.rules` を生成しますが、必要に応じて `docs/rules_short` か `docs/rules_long` も試してみてください。
+
 ## 主要ファイルの配置
 
 - `.rules` : Zed Agent のコンテキストに自動注入されるプロジェクトルール
