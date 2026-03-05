@@ -2,7 +2,7 @@
   "id": "p1-t01",
   "title": "Audit main.py duplication and refactor plan",
   "priority": "P1",
-  "status": "verified",
+  "status": "committed",
   "summary": "Identify duplicated logic in main.py and define a safe refactor approach.",
   "inputs": ["docs/draft.md", "docs/plan.md"],
   "outputs": [

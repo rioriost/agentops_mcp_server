@@ -6,7 +6,7 @@
       "id": "p1-t01",
       "priority": "P1",
       "title": "Audit main.py duplication and refactor plan",
-      "status": "verified",
+      "status": "committed",
       "file": "v0.2.3/ticket-p1-t01.json"
     },
     {
