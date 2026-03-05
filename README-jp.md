@@ -30,7 +30,7 @@ brew install agentops_mcp_server
 
 - セッション終了前／コンテキストが厳しいとき:
   - `ops_compact_context` を実行（`include_diff=false` 推奨、`max_chars` は任意）
-  - `ops_handoff_export` は `path` を渡したときだけファイル出力
+  - `ops_handoff_export` は `.agent/handoff.json` に書き出し（`path` 指定時は `.agent/` 配下の相対パスとして扱う）
 - すぐ再開する場合は `ops_resume_brief` を実行
 - タスクの進行記録: `ops_start_task` / `ops_update_task` / `ops_end_task`
 - 状態スナップショットと要約: `ops_capture_state` / `ops_task_summary` / `ops_observability_summary`

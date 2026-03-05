@@ -30,7 +30,7 @@ For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-c
 
 - Before ending a session or when context is tight:
   - Run `ops_compact_context` (prefer `include_diff=false`, `max_chars` optional)
-  - Run `ops_handoff_export` (writes a file only when `path` is provided)
+  - Run `ops_handoff_export` (writes `.agent/handoff.json` by default; optional path writes under `.agent`)
 - To resume quickly: run `ops_resume_brief`
 - Token discipline: prefer summaries/diff stats over full diffs and keep outputs short
 - All MCP tools accept optional `workspace_root` and `truncate_limit` (as exposed by `tools/list`)

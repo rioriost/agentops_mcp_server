@@ -1537,11 +1537,20 @@ def ops_handoff_export(path: Optional[str] = None) -> Dict[str, Any]:
 
     wrote = False
     resolved_path = None
+    base_dir = REPO_ROOT / ".agent"
     if path:
-        target = _resolve_path(path, REPO_ROOT / ".agent" / "handoff.json")
-        _write_text(target, json.dumps(handoff, ensure_ascii=False, indent=2) + "\n")
-        wrote = True
-        resolved_path = str(target)
+        candidate = Path(path)
+        if candidate.is_absolute():
+            target = base_dir / candidate.name
+        elif candidate.parts and candidate.parts[0] == ".agent":
+            target = REPO_ROOT / candidate
+        else:
+            target = base_dir / candidate
+    else:
+        target = base_dir / "handoff.json"
+    _write_text(target, json.dumps(handoff, ensure_ascii=False, indent=2) + "\n")
+    wrote = True
+    resolved_path = str(target)
 
     _journal_safe(
         "session.handoff",
