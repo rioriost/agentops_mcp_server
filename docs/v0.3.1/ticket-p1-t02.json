@@ -2,7 +2,7 @@
   "id": "p1-t02",
   "title": "Refactor main.py into classes and split by file",
   "priority": "P1",
-  "status": "planned",
+  "status": "verified",
   "summary": "Complete the class-based refactor of main.py and split classes into separate files while preserving external behavior.",
   "inputs": [
     "docs/draft.md",
