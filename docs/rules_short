@@ -28,8 +28,9 @@
 - Keep outputs short; prefer summaries.
 
 ## Handoff (must)
-- When context feels tight or before ending:
+- When a tool execution adds/modifies files:
   - compact context
+  - capture state (snapshot + checkpoint)
   - handoff summary
 
 ## Tools (must)
