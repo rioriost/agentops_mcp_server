@@ -1,0 +1,13 @@
+{
+  "version": "0.2.3",
+  "source": "draft.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P1",
+      "title": "Update .rules to pass CWD as workspace_root",
+      "status": "verified",
+      "file": "v0.2.3/ticket-p1-t01.json"
+    }
+  ]
+}

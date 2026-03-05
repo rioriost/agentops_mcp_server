@@ -1,51 +1,31 @@
-# Implementation Plan: Fix workspace_root resolution
+# Implementation Plan: Pass CWD as workspace_root
 
 ## Objectives
-- Ensure `workspace_root` resolves to the actual CWD when passed as a relative root name.
-- Prevent creation of nested paths like `<cwd>/<root>/<root>/.agent`.
-- Keep behavior stable for absolute `workspace_root` inputs.
+- Update `.rules` to instruct passing CWD as `workspace_root`.
+- Avoid ambiguity in `workspace_root` usage.
 
 ## Assumptions
-- CWD is the repository root when the MCP server is launched.
-- Clients may pass `workspace_root` as either absolute or relative.
+- MCP server runs with CWD set to repository root.
+- The rule change is documentation-only.
 
 ## Phases
 
-### Phase 1: Discovery & design
+### Phase 1: Update rules
 **Goals**
-- Locate `workspace_root` handling logic.
-- Define resolution rules for relative inputs.
+- Make the rule explicit about using CWD for `workspace_root`.
 
 **Tasks**
-- Identify where `workspace_root` is parsed and applied.
-- Decide on resolution logic:
-  - If relative and matches `Path.cwd().name`, use `Path.cwd()`.
-  - Otherwise resolve relative to CWD.
+- Edit `.rules` to say “Always pass CWD as workspace_root to MCP tools.”
 
 ---
 
-### Phase 2: Implementation
+### Phase 2: Verification
 **Goals**
-- Apply the new resolution logic.
-- Ensure state paths use the corrected root.
+- Ensure the rule text is correct and unambiguous.
 
 **Tasks**
-- Update `tools_call` to use the new resolver for `workspace_root`.
-- Add/adjust tests to cover relative workspace_root behavior.
-
----
-
-### Phase 3: Verification
-**Goals**
-- Confirm `.agent` writes happen under `<cwd>/.agent`.
-
-**Tasks**
-- Run `${VERIFY_REL}` and ensure tests pass.
+- Review `.rules` for the updated wording.
 
 ## Acceptance Criteria Mapping
-- Relative `workspace_root` matching CWD name resolves to CWD.
-- No nested `.agent` directories are created.
-- Tests pass after the change.
-
-## Rollout Notes
-- No file format or state migration changes required.
+- `.rules` clearly instructs using CWD as `workspace_root`.
+- No other behavior changes are introduced.

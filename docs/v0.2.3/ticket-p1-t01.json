@@ -1,0 +1,19 @@
+{
+  "id": "p1-t01",
+  "title": "Update .rules to pass CWD as workspace_root",
+  "priority": "P1",
+  "status": "verified",
+  "summary": "Clarify .rules to explicitly pass CWD as workspace_root for MCP tools.",
+  "inputs": ["docs/draft.md", "docs/plan.md"],
+  "outputs": ["Updated .rules line to pass CWD as workspace_root"],
+  "acceptance_criteria": [
+    ".rules instructs passing CWD as workspace_root.",
+    "No other behavior changes are introduced."
+  ],
+  "tasks": [
+    "Edit .rules to specify CWD as workspace_root.",
+    "Review .rules wording for clarity."
+  ],
+  "dependencies": [],
+  "notes": ["Documentation-only change."]
+}
