@@ -20,7 +20,7 @@
       "id": "p3-t01",
       "priority": "P1",
       "title": "Build deterministic recovery test strategy and gates",
-      "status": "planned",
+      "status": "done",
       "file": "v0.4.0/ticket-p3-t01.json"
     }
   ]

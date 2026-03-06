@@ -2,7 +2,7 @@
   "id": "p3-t01",
   "title": "Define Phase 3 test strategy and verification gates",
   "priority": "P1",
-  "status": "planned",
+  "status": "done",
   "summary": "Specify interruption recovery test matrix, replay determinism checks, integrity mismatch recovery tests, and coverage targets for 0.4.0.",
   "inputs": ["docs/v0.4.0/plan.md"],
   "outputs": [
