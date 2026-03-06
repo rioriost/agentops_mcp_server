@@ -2,7 +2,7 @@
   "id": "p5-t4",
   "phase": 5,
   "title": "Add spec compliance tests for 0.4.0 runtime",
-  "status": "planned",
+  "status": "done",
   "summary": "Add tests that assert 0.4.0 spec compliance for taxonomy, invariants, legacy artifacts, and resume logic.",
   "inputs": [
     "docs/v0.4.0/plan.md",

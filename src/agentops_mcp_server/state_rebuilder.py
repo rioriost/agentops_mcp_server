@@ -322,6 +322,8 @@ class StateRebuilder:
                 context["intent_states"].get(path)
             ):
                 return False, "file intent state must be monotonic"
+            if new_state == "verified" and not context.get("verify_passed"):
+                return False, "file intent verified requires verify.pass"
             if event_type == "tx.file_intent.complete" and new_state != "verified":
                 return False, "file intent complete requires verified"
             context["intent_states"][path] = new_state
@@ -734,39 +736,6 @@ class StateRebuilder:
             "event_log_path": str(resolved_event_log),
             "source": "rebuild",
         }
-
-    def read_recent_journal_events(
-        self,
-        max_events: int,
-        session_id: Optional[str] = None,
-        journal_path: Optional[Path] = None,
-    ) -> List[Dict[str, Any]]:
-        if max_events <= 0:
-            return []
-        path = journal_path or self.repo_context.journal
-        if not path.exists():
-            return []
-        lines = path.read_text(encoding="utf-8").splitlines()
-        events: List[Dict[str, Any]] = []
-        for raw_line in reversed(lines):
-            if len(events) >= max_events:
-                break
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                rec = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(rec, dict):
-                continue
-            if session_id is not None:
-                rec_session = rec.get("session_id")
-                if rec_session != session_id:
-                    continue
-            events.append(rec)
-        events.reverse()
-        return events
 
     def parse_iso_ts(self, value: str) -> Optional[datetime]:
         try:
@@ -1229,116 +1198,3 @@ class StateRebuilder:
         if not state.get("session_id"):
             state["session_id"] = target_session_id
         return state
-
-    def roll_forward_replay(
-        self,
-        checkpoint_path: Optional[str] = None,
-        snapshot_path: Optional[str] = None,
-        start_seq: Optional[int] = None,
-        end_seq: Optional[int] = None,
-    ) -> Dict[str, Any]:
-        resolved_checkpoint_path = self.resolve_path(
-            checkpoint_path, self.repo_context.checkpoint
-        )
-        checkpoint = self.state_store.read_json_file(resolved_checkpoint_path)
-        if checkpoint is None:
-            return {
-                "ok": False,
-                "reason": "checkpoint not found",
-                "path": str(resolved_checkpoint_path),
-            }
-
-        resolved_snapshot_path = snapshot_path
-        if not resolved_snapshot_path:
-            snapshot_ref = checkpoint.get("snapshot_path")
-            if isinstance(snapshot_ref, str) and snapshot_ref.strip():
-                resolved_snapshot_path = snapshot_ref
-
-        resolved_snapshot_file = None
-        if resolved_snapshot_path:
-            candidate = Path(resolved_snapshot_path)
-            if not candidate.is_absolute():
-                agent_candidate = self.repo_context.snapshot.parent / candidate
-                if agent_candidate.exists():
-                    resolved_snapshot_file = agent_candidate
-        if resolved_snapshot_file is None:
-            resolved_snapshot_file = self.resolve_path(
-                resolved_snapshot_path, self.repo_context.snapshot
-            )
-        snapshot = self.state_store.read_json_file(resolved_snapshot_file)
-        if snapshot is None:
-            return {
-                "ok": False,
-                "reason": "snapshot not found",
-                "path": str(resolved_snapshot_file),
-            }
-
-        if start_seq is None:
-            checkpoint_seq = checkpoint.get("last_applied_seq")
-            if isinstance(checkpoint_seq, int):
-                start_seq = checkpoint_seq
-            else:
-                snapshot_seq = snapshot.get("last_applied_seq")
-                if isinstance(snapshot_seq, int):
-                    start_seq = snapshot_seq
-                else:
-                    start_seq = 0
-
-        journal_result = self.read_journal_events(start_seq=start_seq, end_seq=end_seq)
-        return {
-            "ok": True,
-            "checkpoint": checkpoint,
-            "checkpoint_path": str(resolved_checkpoint_path),
-            "snapshot": snapshot,
-            "snapshot_path": str(resolved_snapshot_file),
-            "start_seq": start_seq,
-            "end_seq": end_seq,
-            "events": journal_result["events"],
-            "invalid_lines": journal_result["invalid_lines"],
-            "last_seq": journal_result["last_seq"],
-            "journal_path": journal_result["path"],
-        }
-
-    def continue_state_rebuild(
-        self,
-        checkpoint_path: Optional[str] = None,
-        snapshot_path: Optional[str] = None,
-        start_seq: Optional[int] = None,
-        end_seq: Optional[int] = None,
-        session_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        replay = self.roll_forward_replay(
-            checkpoint_path=checkpoint_path,
-            snapshot_path=snapshot_path,
-            start_seq=start_seq,
-            end_seq=end_seq,
-        )
-        if not replay.get("ok"):
-            return replay
-
-        snapshot = replay.get("snapshot") or {}
-        snapshot_state = snapshot.get("state") if isinstance(snapshot, dict) else None
-        events = replay.get("events") or []
-        invalid_lines = (
-            replay.get("invalid_lines")
-            if isinstance(replay.get("invalid_lines"), int)
-            else 0
-        )
-        state = self.replay_events_to_state(
-            snapshot_state=snapshot_state,
-            events=events,
-            preferred_session_id=session_id,
-            invalid_lines=invalid_lines,
-        )
-
-        return {
-            "ok": True,
-            "state": state,
-            "last_applied_seq": replay.get("last_seq"),
-            "checkpoint_path": replay.get("checkpoint_path"),
-            "snapshot_path": replay.get("snapshot_path"),
-            "journal_path": replay.get("journal_path"),
-            "start_seq": replay.get("start_seq"),
-            "end_seq": replay.get("end_seq"),
-            "events_applied": len(events),
-        }

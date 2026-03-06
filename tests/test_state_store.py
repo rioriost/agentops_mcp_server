@@ -235,3 +235,101 @@ def test_tx_state_save_requires_active_tx_core_fields(state_store, mutator, matc
     mutator(state)
     with pytest.raises(ValueError, match=match):
         state_store.tx_state_save(state)
+
+
+def test_tx_event_append_rejects_unknown_event_type(state_store):
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.unknown"
+    with pytest.raises(ValueError, match="event_type is not defined in taxonomy"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_requires_intent_before_update(state_store):
+    state = _valid_tx_state()
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.file_intent.update"
+    args["payload"] = {"path": "missing.py", "state": "started"}
+    with pytest.raises(ValueError, match="file intent missing for path"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_verify_requires_applied_intents(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["file_intents"] = [
+        {
+            "path": "a.py",
+            "operation": "update",
+            "purpose": "update tests",
+            "planned_step": "p4-t1-s1",
+            "state": "planned",
+            "last_event_seq": 0,
+        }
+    ]
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.verify.start"
+    args["payload"] = {}
+    with pytest.raises(ValueError, match="verify.start requires applied intents"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_commit_requires_verify_pass(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["verify_state"] = {"status": "failed", "last_result": None}
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.commit.start"
+    args["payload"] = {
+        "message": "commit",
+        "branch": "main",
+        "diff_summary": "diff",
+    }
+    with pytest.raises(ValueError, match="commit.start requires verify.pass"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_requires_tx_begin_when_no_state(state_store):
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.verify.start"
+    args["payload"] = {}
+    with pytest.raises(ValueError, match="tx.begin required before other events"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_rejects_event_after_terminal(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["status"] = "done"
+    state["active_tx"]["phase"] = "done"
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.step.enter"
+    args["payload"] = {"step_id": "p4-t1-s1", "description": "step"}
+    with pytest.raises(ValueError, match="event after terminal"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_requires_verify_pass_for_verified_intent(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["file_intents"] = [
+        {
+            "path": "a.py",
+            "operation": "update",
+            "purpose": "update tests",
+            "planned_step": "p4-t1-s1",
+            "state": "applied",
+            "last_event_seq": 0,
+        }
+    ]
+    state["active_tx"]["verify_state"] = {"status": "failed", "last_result": None}
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.file_intent.update"
+    args["payload"] = {"path": "a.py", "state": "verified"}
+    with pytest.raises(ValueError, match="file intent verified requires verify.pass"):
+        state_store.tx_event_append(**args)

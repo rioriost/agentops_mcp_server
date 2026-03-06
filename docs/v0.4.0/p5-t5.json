@@ -1,0 +1,44 @@
+{
+  "id": "p5-t5",
+  "phase": 5,
+  "title": "Close remaining spec gaps (write-time invariants + legacy cleanup)",
+  "status": "done",
+  "summary": "Enforce remaining 0.4.0 spec requirements: tx.begin-first/terminal ordering at write-time, intent verified only after tx.verify.pass, and removal or deprecation of legacy replay APIs.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "docs/v0.4.0/architecture/event_taxonomy.md",
+    "docs/v0.4.0/architecture/lifecycle_invariants.md",
+    "docs/v0.4.0/specs/legacy-artifact-policy.md",
+    "docs/v0.4.0/specs/resume_logic.md"
+  ],
+  "outputs": [
+    "Write-time enforcement of tx.begin-first and terminal ordering",
+    "Write-time and replay enforcement of verified intent sequencing",
+    "Legacy replay APIs removed or clearly deprecated"
+  ],
+  "acceptance_criteria": [
+    "Non-tx.begin events are rejected when no active transaction exists.",
+    "Events after tx.end.* are rejected at write-time.",
+    "File intent state cannot advance to verified before tx.verify.pass.",
+    "Legacy replay APIs are removed or gated so they are not used by resume logic."
+  ],
+  "deps": ["p5-t4"],
+  "steps": [
+    {
+      "id": "p5-t5-s1",
+      "description": "Enforce tx.begin-first and terminal ordering constraints in write-time validation."
+    },
+    {
+      "id": "p5-t5-s2",
+      "description": "Enforce verified intent sequencing relative to tx.verify.pass in write-time and replay validation."
+    },
+    {
+      "id": "p5-t5-s3",
+      "description": "Remove or deprecate legacy replay APIs and ensure resume paths do not call them."
+    }
+  ],
+  "notes": [
+    "Keep invariants aligned with lifecycle_invariants.md.",
+    "Prefer explicit validation errors over silent truncation at write-time."
+  ]
+}

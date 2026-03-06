@@ -323,6 +323,9 @@ Tasks:
 - Enforce lifecycle invariants during validation/rebuild: intent-before-mutation, `planned_step` linkage, monotonic intent states, verify/commit ordering.
 - Require transaction event log presence for resume and tighten `tx_state` validation (`schema_version`, required fields).
 - Update `next_action` derivation to incorporate `semantic_summary` and `user_intent` deterministically.
+- Enforce `tx.begin` as the first event and reject events after `tx.end.*` at write-time.
+- Enforce file intent transitions so `verified` requires `tx.verify.pass`.
+- Remove or deprecate legacy replay APIs (`roll_forward_replay`, `continue_state_rebuild`, `read_recent_journal_events`) to prevent legacy-path use.
 Outputs:
 - Spec-compliant runtime behavior with deterministic resume decisions.
 

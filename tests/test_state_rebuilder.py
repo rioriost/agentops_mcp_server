@@ -2,6 +2,8 @@ import json
 
 import pytest
 
+from agentops_mcp_server.state_rebuilder import StateRebuilder
+
 
 def _append_tx_event(state_store, **overrides):
     base = {
@@ -15,7 +17,12 @@ def _append_tx_event(state_store, **overrides):
         "payload": {"ticket_id": "p4-t2", "ticket_title": "p4-t2"},
     }
     base.update(overrides)
-    return state_store.tx_event_append(**base)
+    result = state_store.tx_event_append(**base)
+    rebuilder = StateRebuilder(state_store.repo_context, state_store)
+    rebuild = rebuilder.rebuild_tx_state()
+    if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
+        state_store.tx_state_save(rebuild["state"])
+    return result
 
 
 def _append_raw_tx_event(repo_context, event):
@@ -188,10 +195,20 @@ def test_rebuild_tx_state_missing_file_intent_truncates(
     repo_context, state_store, state_rebuilder
 ):
     _append_tx_event(state_store)
-    _append_tx_event(
-        state_store,
-        event_type="tx.file_intent.update",
-        payload={"path": "missing.py", "state": "started"},
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-missing-intent",
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.file_intent.update",
+            "phase": "in-progress",
+            "step_id": "p4-t2-s1",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"path": "missing.py", "state": "started"},
+        },
     )
 
     rebuild = state_rebuilder.rebuild_tx_state()
@@ -225,3 +242,78 @@ def test_rebuild_tx_state_semantic_summary_fallback(
     active_tx = rebuild["state"]["active_tx"]
     assert isinstance(active_tx["semantic_summary"], str)
     assert active_tx["semantic_summary"]
+
+
+def test_rebuild_tx_state_ignores_legacy_artifacts(repo_context, state_rebuilder):
+    repo_context.journal.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.journal.write_text(
+        json.dumps({"event_type": "legacy", "ts": "2020-01-01T00:00:00Z"}) + "\n",
+        encoding="utf-8",
+    )
+    repo_context.snapshot.write_text(
+        json.dumps({"schema_version": "0.3.0"}) + "\n", encoding="utf-8"
+    )
+    repo_context.checkpoint.write_text("123\n", encoding="utf-8")
+
+    result = state_rebuilder.rebuild_tx_state()
+    assert result["ok"] is False
+    assert result["reason"] == "tx_event_log missing"
+
+
+def test_rebuild_tx_state_user_intent_guides_resume(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(state_store)
+    _append_tx_event(
+        state_store,
+        event_type="tx.user_intent.set",
+        payload={"user_intent": "continue"},
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+    assert rebuild["ok"] is True
+    active_tx = rebuild["state"]["active_tx"]
+    assert active_tx["user_intent"] == "continue"
+    assert active_tx["next_action"] == "continue file intents"
+
+
+def test_rebuild_tx_state_rejects_verified_intent_before_verify_pass(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(state_store)
+    _append_tx_event(
+        state_store,
+        event_type="tx.step.enter",
+        step_id="p4-t2-s1",
+        payload={"step_id": "p4-t2-s1", "description": "step"},
+    )
+    _append_tx_event(
+        state_store,
+        event_type="tx.file_intent.add",
+        payload={
+            "path": "a.py",
+            "operation": "update",
+            "purpose": "update tests",
+            "planned_step": "p4-t2-s1",
+            "state": "planned",
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 4,
+            "event_id": "evt-verified-before-pass",
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.file_intent.update",
+            "phase": "in-progress",
+            "step_id": "p4-t2-s1",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"path": "a.py", "state": "verified"},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 3
