@@ -488,6 +488,23 @@ class StateRebuilder:
                     phase if isinstance(phase, str) else "planned",
                     step_id if isinstance(step_id, str) else "none",
                 )
+            event_type = event.get("event_type")
+            payload = (
+                event.get("payload") if isinstance(event.get("payload"), dict) else {}
+            )
+            if event_type in {"tx.file_intent.update", "tx.file_intent.complete"}:
+                path = (
+                    payload.get("path") if isinstance(payload.get("path"), str) else ""
+                )
+                file_intents = active_tx.get("file_intents")
+                if not isinstance(file_intents, list):
+                    file_intents = []
+                has_intent = any(
+                    isinstance(intent, dict) and intent.get("path") == path
+                    for intent in file_intents
+                )
+                if not has_intent:
+                    break
             self._apply_tx_event_to_state(active_tx, event)
             if isinstance(event.get("seq"), int):
                 active_tx["_last_event_seq"] = event.get("seq")

@@ -2,7 +2,7 @@
   "id": "p3-t3",
   "phase": 3,
   "title": "Implement tx boundary events and semantic memory updates",
-  "status": "planned",
+  "status": "done",
   "summary": "Emit transaction boundary events and persist semantic_summary/user_intent updates for deterministic resume intent handling.",
   "inputs": [
     "docs/v0.4.0/plan.md",

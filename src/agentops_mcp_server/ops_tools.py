@@ -196,6 +196,48 @@ class OpsTools:
 
         return {"ok": True, "brief": brief, "max_chars": resolved_max_chars}
 
+    def _emit_tx_event(
+        self,
+        *,
+        event_type: str,
+        payload: Dict[str, Any],
+        title: str,
+        task_id: Optional[str],
+        phase: str,
+        step_id: str,
+        session_id: Optional[str],
+        agent_id: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        resolved_title = title.strip() if isinstance(title, str) else ""
+        resolved_task_id = task_id.strip() if isinstance(task_id, str) else ""
+        tx_id = resolved_task_id or resolved_title
+        if not tx_id:
+            return None
+        ticket_id = tx_id
+        resolved_session_id = (
+            session_id.strip()
+            if isinstance(session_id, str) and session_id.strip()
+            else "unknown"
+        )
+        actor: Dict[str, Any] = {"tool": "ops_tools"}
+        if isinstance(agent_id, str) and agent_id.strip():
+            actor["agent_id"] = agent_id.strip()
+
+        event = self.state_store.tx_event_append(
+            tx_id=tx_id,
+            ticket_id=ticket_id,
+            event_type=event_type,
+            phase=phase,
+            step_id=step_id,
+            actor=actor,
+            session_id=resolved_session_id,
+            payload=payload,
+        )
+        rebuild = self.state_rebuilder.rebuild_tx_state()
+        if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
+            self.state_store.tx_state_save(rebuild["state"])
+        return event
+
     def ops_start_task(
         self,
         title: str,
@@ -217,6 +259,36 @@ class OpsTools:
             session_id=session_id,
             agent_id=agent_id,
         )
+
+        tx_phase = (
+            status.strip()
+            if isinstance(status, str) and status.strip()
+            else "in-progress"
+        )
+        tx_step_id = (
+            task_id.strip() if isinstance(task_id, str) and task_id.strip() else "task"
+        )
+        self._emit_tx_event(
+            event_type="tx.begin",
+            payload={"ticket_id": task_id or title, "ticket_title": title.strip()},
+            title=title,
+            task_id=task_id,
+            phase=tx_phase,
+            step_id="none",
+            session_id=session_id,
+            agent_id=agent_id,
+        )
+        self._emit_tx_event(
+            event_type="tx.step.enter",
+            payload={"step_id": tx_step_id, "description": "task started"},
+            title=title,
+            task_id=task_id,
+            phase=tx_phase,
+            step_id=tx_step_id,
+            session_id=session_id,
+            agent_id=agent_id,
+        )
+
         return {"ok": True, "event": event, "payload": payload}
 
     def ops_update_task(
@@ -226,6 +298,7 @@ class OpsTools:
         task_id: Optional[str] = None,
         session_id: Optional[str] = None,
         agent_id: Optional[str] = None,
+        user_intent: Optional[str] = None,
     ) -> Dict[str, Any]:
         payload: Dict[str, Any] = {}
         if isinstance(status, str) and status.strip():
@@ -242,6 +315,42 @@ class OpsTools:
             session_id=session_id,
             agent_id=agent_id,
         )
+
+        tx_phase = (
+            status.strip()
+            if isinstance(status, str) and status.strip()
+            else "in-progress"
+        )
+        tx_step_id = (
+            task_id.strip()
+            if isinstance(task_id, str) and task_id.strip()
+            else (
+                status.strip() if isinstance(status, str) and status.strip() else "task"
+            )
+        )
+        description = payload.get("note") or "task updated"
+        self._emit_tx_event(
+            event_type="tx.step.enter",
+            payload={"step_id": tx_step_id, "description": description},
+            title=task_id or "task",
+            task_id=task_id,
+            phase=tx_phase,
+            step_id=tx_step_id,
+            session_id=session_id,
+            agent_id=agent_id,
+        )
+        if isinstance(user_intent, str) and user_intent.strip():
+            self._emit_tx_event(
+                event_type="tx.user_intent.set",
+                payload={"user_intent": user_intent.strip()},
+                title=task_id or "task",
+                task_id=task_id,
+                phase=tx_phase,
+                step_id=tx_step_id,
+                session_id=session_id,
+                agent_id=agent_id,
+            )
+
         return {"ok": True, "event": event, "payload": payload}
 
     def ops_end_task(
@@ -268,6 +377,30 @@ class OpsTools:
             session_id=session_id,
             agent_id=agent_id,
         )
+
+        tx_phase = (
+            status.strip() if isinstance(status, str) and status.strip() else "done"
+        )
+        tx_step_id = (
+            task_id.strip() if isinstance(task_id, str) and task_id.strip() else "task"
+        )
+        end_type = "tx.end.blocked" if tx_phase == "blocked" else "tx.end.done"
+        end_payload = {"summary": payload.get("summary", "")}
+        if isinstance(payload.get("next_action"), str) and payload.get("next_action"):
+            end_payload["next_action"] = payload.get("next_action")
+        if end_type == "tx.end.blocked":
+            end_payload["reason"] = payload.get("summary", "")
+        self._emit_tx_event(
+            event_type=end_type,
+            payload=end_payload,
+            title=task_id or "task",
+            task_id=task_id,
+            phase=tx_phase,
+            step_id=tx_step_id,
+            session_id=session_id,
+            agent_id=agent_id,
+        )
+
         return {"ok": True, "event": event, "payload": payload}
 
     def ops_capture_state(self, session_id: Optional[str] = None) -> Dict[str, Any]:

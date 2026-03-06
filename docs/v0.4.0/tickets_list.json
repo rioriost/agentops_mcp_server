@@ -87,7 +87,7 @@
       "id": "p3-t3",
       "phase": 3,
       "title": "Implement tx boundary events and semantic memory updates",
-      "status": "planned",
+      "status": "done",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p3-t3.json"],
       "deps": ["p3-t1", "p3-t2"]

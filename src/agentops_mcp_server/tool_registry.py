@@ -245,6 +245,7 @@ def build_tool_registry(
                     "task_id": {"type": ["string", "null"]},
                     "session_id": {"type": ["string", "null"]},
                     "agent_id": {"type": ["string", "null"]},
+                    "user_intent": {"type": ["string", "null"]},
                 },
                 "required": [],
             },
