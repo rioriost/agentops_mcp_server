@@ -53,6 +53,7 @@ Derive `next_action` strictly from:
 - `current_step` / `last_completed_step`
 - `verify_state` / `commit_state`
 - `file_intents` states
+- `semantic_summary` / `user_intent` (for interpreting resume prompts)
 
 ### Step 6: Emit resume boundary
 - Emit `tx.step.enter` for the selected step before resuming work.
@@ -92,6 +93,8 @@ A torn-state is detected when any of the following occurs:
 ---
 
 ## 7) `next_action` Derivation Rules (Summary)
+
+Semantic resume intents (e.g., `user_intent: "continue"`) must be applied when choosing the resume path.
 
 - If status is `planned`: `next_action = "tx.begin"`
 - If status is `in-progress`:
