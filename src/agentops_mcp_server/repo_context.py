@@ -22,7 +22,6 @@ LEGACY_ARTIFACT_FILES = {
 STATE_ARTIFACT_FILES = {
     **CANONICAL_ARTIFACT_FILES,
     **DERIVED_ARTIFACT_FILES,
-    **LEGACY_ARTIFACT_FILES,
 }
 
 
@@ -36,6 +35,13 @@ class RepoContext:
         filename = STATE_ARTIFACT_FILES.get(kind)
         if not filename:
             raise ValueError(f"unknown state artifact: {kind}")
+        return resolved_root / ".agent" / filename
+
+    def legacy_artifact_path(self, kind: str, root: Optional[Path] = None) -> Path:
+        resolved_root = root or self.repo_root
+        filename = LEGACY_ARTIFACT_FILES.get(kind)
+        if not filename:
+            raise ValueError(f"unknown legacy artifact: {kind}")
         return resolved_root / ".agent" / filename
 
     def resolve_workspace_root(self, value: str) -> Path:
@@ -58,9 +64,9 @@ class RepoContext:
 
     def set_repo_root(self, root: Path) -> None:
         self.repo_root = root
-        self.journal = self.state_artifact_path("journal", root)
-        self.snapshot = self.state_artifact_path("snapshot", root)
-        self.checkpoint = self.state_artifact_path("checkpoint", root)
+        self.journal = self.legacy_artifact_path("journal", root)
+        self.snapshot = self.legacy_artifact_path("snapshot", root)
+        self.checkpoint = self.legacy_artifact_path("checkpoint", root)
         self.handoff = self.state_artifact_path("handoff", root)
         self.observability = self.state_artifact_path("observability", root)
         self.tx_event_log = self.state_artifact_path("tx_event_log", root)

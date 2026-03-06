@@ -98,9 +98,7 @@ CANONICAL_EVENT_LOG_REL=".agent/tx_event_log.jsonl"
 CANONICAL_STATE_REL=".agent/tx_state.json"
 DERIVED_HANDOFF_REL=".agent/handoff.json"
 DERIVED_OBSERVABILITY_REL=".agent/observability_summary.json"
-JOURNAL_REL=".agent/journal.jsonl"
-SNAPSHOT_REL=".agent/snapshot.json"
-CHECKPOINT_REL=".agent/checkpoint.json"
+
 GITIGNORE_ENTRIES=(
   ".zed/"
   ".venv/"
@@ -115,19 +113,7 @@ GITIGNORE_ENTRIES=(
 
 mkdir -p "$AGENT_DIR"
 
-if (( update_mode == 1 )); then
-  legacy_paths=(
-    "$AGENT_DIR/handoff.md"
-    "$AGENT_DIR/snapshot-log.jsonl"
-    "$AGENT_DIR/work-in-progress.md"
-  )
-  for legacy_path in "${legacy_paths[@]}"; do
-    if [ -e "$legacy_path" ]; then
-      rm -f "$legacy_path"
-      echo "Removed legacy: ${legacy_path#$root/}"
-    fi
-  done
-fi
+
 
 # --- .gitignore ---
 if [ -e "$GITIGNORE_FILE" ] && [ ! -f "$GITIGNORE_FILE" ]; then
@@ -273,40 +259,7 @@ else
     '}' > "$AGENT_DIR/tx_state.json"
 fi
 
-# --- legacy artifacts (derived-only) ---
-if [ -f "$AGENT_DIR/journal.jsonl" ]; then
-  echo "Skipping .agent/journal.jsonl (already exists)."
-else
-  touch "$AGENT_DIR/journal.jsonl"
-fi
 
-if [ -f "$AGENT_DIR/snapshot.json" ]; then
-  echo "Skipping .agent/snapshot.json (already exists)."
-else
-  snapshot_ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-  printf '%s\n' \
-    '{' \
-    '  "snapshot_id": "init",' \
-    "  \"ts\": \"$snapshot_ts\"," \
-    "  \"project_root\": \"$root\"," \
-    '  "last_applied_seq": 0,' \
-    '  "state": {}' \
-    '}' > "$AGENT_DIR/snapshot.json"
-fi
-
-if [ -f "$AGENT_DIR/checkpoint.json" ]; then
-  echo "Skipping .agent/checkpoint.json (already exists)."
-else
-  checkpoint_ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-  printf '%s\n' \
-    '{' \
-    '  "checkpoint_id": "init",' \
-    "  \"ts\": \"$checkpoint_ts\"," \
-    "  \"project_root\": \"$root\"," \
-    '  "last_applied_seq": 0,' \
-    '  "snapshot_path": "snapshot.json"' \
-    '}' > "$AGENT_DIR/checkpoint.json"
-fi
 
 if (( update_mode == 1 )); then
   echo "Skipping .zed scaffold (update mode)."

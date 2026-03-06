@@ -8,7 +8,6 @@ from .git_repo import GitRepo
 from .repo_context import RepoContext
 from .state_rebuilder import StateRebuilder
 from .state_store import StateStore, now_iso
-from .test_suggestions import extract_artifact_paths
 
 
 def truncate_text(value: Optional[str], limit: int = 2000) -> Optional[str]:
@@ -53,18 +52,6 @@ def build_compact_context(
     return truncate_text(summary, limit=max_chars) or ""
 
 
-def sanitize_args(args: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    if not args:
-        return {}
-    sanitized: Dict[str, Any] = {}
-    for key, value in args.items():
-        if isinstance(value, str):
-            sanitized[key] = truncate_text(value)
-        else:
-            sanitized[key] = value
-    return sanitized
-
-
 def summarize_result(result: Any, limit: int = 2000) -> Any:
     try:
         text = json.dumps(result, ensure_ascii=False)
@@ -88,6 +75,40 @@ class OpsTools:
         self.state_rebuilder = state_rebuilder
         self.git_repo = git_repo
 
+    def _load_tx_state(self) -> Dict[str, Any]:
+        rebuild = self.state_rebuilder.rebuild_tx_state()
+        if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
+            return rebuild["state"]
+        return {}
+
+    def _active_tx(self) -> Dict[str, Any]:
+        state = self._load_tx_state()
+        active_tx = state.get("active_tx")
+        return active_tx if isinstance(active_tx, dict) else {}
+
+    def _extract_last_error(self, verify_state: Any, commit_state: Any) -> str:
+        for source in (verify_state, commit_state):
+            if not isinstance(source, dict):
+                continue
+            last_result = source.get("last_result")
+            if isinstance(last_result, dict):
+                error = last_result.get("error")
+                if isinstance(error, str) and error.strip():
+                    return error.strip()
+        return ""
+
+    def _extract_last_commit(self, commit_state: Any) -> str:
+        if not isinstance(commit_state, dict):
+            return ""
+        last_result = commit_state.get("last_result")
+        if not isinstance(last_result, dict):
+            return ""
+        for key in ("sha", "summary"):
+            value = last_result.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return ""
+
     def ops_compact_context(
         self, max_chars: Optional[int] = None, include_diff: Optional[bool] = None
     ) -> Dict[str, Any]:
@@ -96,35 +117,34 @@ class OpsTools:
         )
         resolved_include_diff = bool(include_diff)
 
-        replay = self.state_rebuilder.continue_state_rebuild()
-        if replay.get("ok"):
-            state = replay.get("state") or {}
-            last_seq = replay.get("last_applied_seq")
-        else:
-            state = self.state_rebuilder.init_replay_state(None)
-            last_seq = None
+        active_tx = self._active_tx()
+        verify_state = (
+            active_tx.get("verify_state")
+            if isinstance(active_tx.get("verify_state"), dict)
+            else {}
+        )
+        commit_state = (
+            active_tx.get("commit_state")
+            if isinstance(active_tx.get("commit_state"), dict)
+            else {}
+        )
+        last_error = self._extract_last_error(verify_state, commit_state)
+        last_commit = self._extract_last_commit(commit_state)
+        state_view = {
+            "session_id": "",
+            "current_phase": active_tx.get("status") or "",
+            "current_task": active_tx.get("ticket_id") or "",
+            "last_action": active_tx.get("semantic_summary") or "",
+            "next_step": active_tx.get("next_action")
+            or active_tx.get("current_step")
+            or "",
+            "verification_status": verify_state.get("status") or "",
+            "last_commit": last_commit,
+            "last_error": last_error,
+        }
 
         diff_stat = self.git_repo.diff_stat() if resolved_include_diff else None
-        summary = build_compact_context(state, diff_stat, resolved_max_chars)
-
-        state["compact_context"] = summary
-        session_id = (
-            state.get("session_id")
-            if isinstance(state.get("session_id"), str)
-            else None
-        )
-        last_seq_value = last_seq if isinstance(last_seq, int) else None
-        self.state_store.snapshot_save(
-            state=state, session_id=session_id, last_applied_seq=last_seq_value
-        )
-        self.state_store.journal_safe(
-            "context.compact",
-            {
-                "length": len(summary),
-                "max_chars": resolved_max_chars,
-                "include_diff": resolved_include_diff,
-            },
-        )
+        summary = build_compact_context(state_view, diff_stat, resolved_max_chars)
 
         return {
             "ok": True,
@@ -134,22 +154,37 @@ class OpsTools:
         }
 
     def ops_handoff_export(self) -> Dict[str, Any]:
-        replay = self.state_rebuilder.continue_state_rebuild()
-        if replay.get("ok"):
-            state = replay.get("state") or {}
+        rebuild = self.state_rebuilder.rebuild_tx_state()
+        if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
+            self.state_store.tx_state_save(rebuild["state"])
+            rebuilt_active = rebuild["state"].get("active_tx")
+            active_tx = rebuilt_active if isinstance(rebuilt_active, dict) else {}
         else:
-            state = self.state_rebuilder.init_replay_state(None)
+            active_tx = self._active_tx()
+        verify_state = (
+            active_tx.get("verify_state")
+            if isinstance(active_tx.get("verify_state"), dict)
+            else {}
+        )
+        commit_state = (
+            active_tx.get("commit_state")
+            if isinstance(active_tx.get("commit_state"), dict)
+            else {}
+        )
+        last_error = self._extract_last_error(verify_state, commit_state)
+        last_commit = self._extract_last_commit(commit_state)
+        next_step = active_tx.get("next_action") or active_tx.get("current_step") or ""
 
         handoff = {
             "ts": now_iso(),
-            "session_id": state.get("session_id") or "",
-            "current_task": state.get("current_task") or "",
-            "last_action": state.get("last_action") or "",
-            "next_step": state.get("next_step") or "",
-            "verification_status": state.get("verification_status") or "",
-            "last_commit": state.get("last_commit") or "",
-            "last_error": state.get("last_error") or "",
-            "compact_context": state.get("compact_context") or "",
+            "session_id": "",
+            "current_task": active_tx.get("ticket_id") or "",
+            "last_action": active_tx.get("semantic_summary") or "",
+            "next_step": next_step,
+            "verification_status": verify_state.get("status") or "",
+            "last_commit": last_commit,
+            "last_error": last_error,
+            "compact_context": active_tx.get("semantic_summary") or "",
         }
 
         target = self.repo_context.handoff
@@ -157,10 +192,6 @@ class OpsTools:
             target, json.dumps(handoff, ensure_ascii=False, indent=2) + "\n"
         )
         resolved_path = str(target)
-        self.state_store.journal_safe(
-            "session.handoff",
-            {"path": resolved_path, "wrote": True, "fields": list(handoff.keys())},
-        )
 
         return {"ok": True, "handoff": handoff, "path": resolved_path, "wrote": True}
 
@@ -168,26 +199,30 @@ class OpsTools:
         resolved_max_chars = (
             max_chars if isinstance(max_chars, int) and max_chars > 0 else 400
         )
-        replay = self.state_rebuilder.continue_state_rebuild()
-        if replay.get("ok"):
-            state = replay.get("state") or {}
-        else:
-            state = self.state_rebuilder.init_replay_state(None)
+        active_tx = self._active_tx()
+        verify_state = (
+            active_tx.get("verify_state")
+            if isinstance(active_tx.get("verify_state"), dict)
+            else {}
+        )
+        commit_state = (
+            active_tx.get("commit_state")
+            if isinstance(active_tx.get("commit_state"), dict)
+            else {}
+        )
 
         lines = ["resume_brief:"]
 
-        def _line(label: str, key: str) -> None:
-            value = state.get(key)
+        def _line(label: str, value: Any) -> None:
             if isinstance(value, str) and value.strip():
                 lines.append(f"- {label}: {value.strip()}")
 
-        _line("session_id", "session_id")
-        _line("current_task", "current_task")
-        _line("last_action", "last_action")
-        _line("next_step", "next_step")
-        _line("verification_status", "verification_status")
-        _line("last_commit", "last_commit")
-        _line("last_error", "last_error")
+        _line("ticket_id", active_tx.get("ticket_id"))
+        _line("status", active_tx.get("status"))
+        _line("current_step", active_tx.get("current_step"))
+        _line("next_action", active_tx.get("next_action"))
+        _line("verify_status", verify_state.get("status"))
+        _line("commit_status", commit_state.get("status"))
 
         brief = "\n".join(lines).strip()
         brief = truncate_text(brief, limit=resolved_max_chars) or ""
@@ -253,12 +288,7 @@ class OpsTools:
             payload["task_id"] = task_id.strip()
         if isinstance(status, str) and status.strip():
             payload["status"] = status.strip()
-        event = self.state_store.journal_append(
-            kind="task.start",
-            payload=payload,
-            session_id=session_id,
-            agent_id=agent_id,
-        )
+        event = None
 
         tx_phase = (
             status.strip()
@@ -309,12 +339,7 @@ class OpsTools:
             payload["task_id"] = task_id.strip()
         if not payload:
             raise ValueError("status or note is required")
-        event = self.state_store.journal_append(
-            kind="task.update",
-            payload=payload,
-            session_id=session_id,
-            agent_id=agent_id,
-        )
+        event = None
 
         tx_phase = (
             status.strip()
@@ -371,12 +396,7 @@ class OpsTools:
             payload["status"] = status.strip()
         if isinstance(task_id, str) and task_id.strip():
             payload["task_id"] = task_id.strip()
-        event = self.state_store.journal_append(
-            kind="task.end",
-            payload=payload,
-            session_id=session_id,
-            agent_id=agent_id,
-        )
+        event = None
 
         tx_phase = (
             status.strip() if isinstance(status, str) and status.strip() else "done"
@@ -404,34 +424,18 @@ class OpsTools:
         return {"ok": True, "event": event, "payload": payload}
 
     def ops_capture_state(self, session_id: Optional[str] = None) -> Dict[str, Any]:
-        replay = self.state_rebuilder.continue_state_rebuild(session_id=session_id)
-        if not replay.get("ok"):
-            return replay
+        rebuild = self.state_rebuilder.rebuild_tx_state()
+        if not rebuild.get("ok"):
+            return rebuild
 
-        state = replay.get("state") or {}
-        last_seq = replay.get("last_applied_seq")
+        state = rebuild.get("state") or {}
+        save_result = self.state_store.tx_state_save(state)
+        last_seq = state.get("last_applied_seq")
         last_seq_value = last_seq if isinstance(last_seq, int) else 0
-
-        resolved_session_id = session_id
-        if not resolved_session_id and isinstance(state.get("session_id"), str):
-            resolved_session_id = state.get("session_id")
-
-        snapshot_result = self.state_store.snapshot_save(
-            state=state, session_id=resolved_session_id, last_applied_seq=last_seq_value
-        )
-        checkpoint_result = self.state_store.checkpoint_update(
-            last_applied_seq=last_seq_value,
-            snapshot_path=self.repo_context.snapshot.name,
-        )
-        self.state_store.journal_safe(
-            "state.capture",
-            {"session_id": resolved_session_id, "last_applied_seq": last_seq_value},
-        )
 
         return {
             "ok": True,
-            "snapshot": snapshot_result,
-            "checkpoint": checkpoint_result,
+            "state": save_result,
             "last_applied_seq": last_seq_value,
         }
 
@@ -441,24 +445,38 @@ class OpsTools:
         resolved_max_chars = (
             max_chars if isinstance(max_chars, int) and max_chars > 0 else 400
         )
-        replay = self.state_rebuilder.continue_state_rebuild(session_id=session_id)
-        if not replay.get("ok"):
-            return replay
-
-        state = replay.get("state") or {}
+        active_tx = self._active_tx()
+        verify_state = (
+            active_tx.get("verify_state")
+            if isinstance(active_tx.get("verify_state"), dict)
+            else {}
+        )
+        commit_state = (
+            active_tx.get("commit_state")
+            if isinstance(active_tx.get("commit_state"), dict)
+            else {}
+        )
+        last_error = self._extract_last_error(verify_state, commit_state)
+        last_verification = (
+            verify_state.get("last_result") if isinstance(verify_state, dict) else {}
+        )
         summary = {
-            "session_id": state.get("session_id") or "",
-            "task_id": state.get("task_id") or "",
-            "task_title": state.get("task_title") or "",
-            "task_status": state.get("task_status") or "",
-            "current_task": state.get("current_task") or "",
-            "last_action": state.get("last_action") or "",
-            "next_step": state.get("next_step") or "",
-            "plan_steps": state.get("plan_steps") or [],
-            "artifact_summary": state.get("artifact_summary") or "",
-            "failure_reason": state.get("failure_reason") or "",
-            "verification_status": state.get("verification_status") or "",
-            "last_verification": state.get("last_verification") or {},
+            "session_id": "",
+            "task_id": active_tx.get("ticket_id") or "",
+            "task_title": "",
+            "task_status": active_tx.get("status") or "",
+            "current_task": active_tx.get("ticket_id") or "",
+            "last_action": active_tx.get("semantic_summary") or "",
+            "next_step": active_tx.get("next_action")
+            or active_tx.get("current_step")
+            or "",
+            "plan_steps": [],
+            "artifact_summary": "",
+            "failure_reason": last_error,
+            "verification_status": verify_state.get("status") or "",
+            "last_verification": last_verification
+            if isinstance(last_verification, dict)
+            else {},
         }
 
         lines = ["task_summary:"]
@@ -478,16 +496,6 @@ class OpsTools:
         text = truncate_text(text, limit=resolved_max_chars) or ""
         if len(text) > resolved_max_chars:
             text = text[:resolved_max_chars].rstrip()
-
-        self.state_store.journal_safe(
-            "task.summary",
-            {
-                "session_id": summary["session_id"],
-                "task_id": summary["task_id"],
-                "task_status": summary["task_status"],
-                "length": len(text),
-            },
-        )
 
         return {
             "ok": True,
@@ -509,19 +517,21 @@ class OpsTools:
             max_chars if isinstance(max_chars, int) and max_chars > 0 else 800
         )
 
-        recent_events = self.state_rebuilder.read_recent_journal_events(
-            resolved_max_events, session_id=session_id
-        )
+        recent_events = self.state_rebuilder.read_recent_tx_events(resolved_max_events)
 
-        replay = self.state_rebuilder.continue_state_rebuild(session_id=session_id)
-        if replay.get("ok"):
-            state = replay.get("state") or {}
-        else:
-            state = self.state_rebuilder.init_replay_state(None)
-
-        resolved_session_id = (
-            session_id if isinstance(session_id, str) else state.get("session_id") or ""
+        active_tx = self._active_tx()
+        verify_state = (
+            active_tx.get("verify_state")
+            if isinstance(active_tx.get("verify_state"), dict)
+            else {}
         )
+        commit_state = (
+            active_tx.get("commit_state")
+            if isinstance(active_tx.get("commit_state"), dict)
+            else {}
+        )
+        resolved_session_id = session_id if isinstance(session_id, str) else ""
+        last_error = self._extract_last_error(verify_state, commit_state)
 
         event_summaries = []
         for event in recent_events:
@@ -529,19 +539,19 @@ class OpsTools:
                 {
                     "seq": event.get("seq"),
                     "ts": event.get("ts"),
-                    "kind": event.get("kind"),
+                    "event_type": event.get("event_type"),
                     "session_id": event.get("session_id"),
                 }
             )
 
-        artifacts = extract_artifact_paths(recent_events)
+        artifacts = []
         summary = {
             "ts": now_iso(),
             "session_id": resolved_session_id,
             "recent_events": event_summaries,
-            "failure_reason": state.get("failure_reason") or "",
-            "last_error": state.get("last_error") or "",
-            "verification_status": state.get("verification_status") or "",
+            "failure_reason": last_error,
+            "last_error": last_error,
+            "verification_status": verify_state.get("status") or "",
             "artifacts": artifacts,
         }
 
@@ -560,9 +570,9 @@ class OpsTools:
             lines.append("recent_events:")
             for event in event_summaries:
                 seq = event.get("seq")
-                kind = event.get("kind")
+                event_type = event.get("event_type")
                 ts = event.get("ts")
-                label = f"- {seq} {kind}"
+                label = f"- {seq} {event_type}"
                 if isinstance(ts, str) and ts:
                     label = f"{label} @ {ts}"
                 lines.append(label)
@@ -577,18 +587,6 @@ class OpsTools:
 
         text = truncate_text("\n".join(lines).strip(), limit=resolved_max_chars) or ""
         self.state_store.write_text(text_path, text + "\n")
-
-        self.state_store.journal_safe(
-            "observability.summary",
-            {
-                "session_id": resolved_session_id,
-                "events": len(event_summaries),
-                "artifacts": len(artifacts),
-                "path": str(resolved_path),
-                "text_path": str(text_path),
-                "length": len(text),
-            },
-        )
 
         return {
             "ok": True,

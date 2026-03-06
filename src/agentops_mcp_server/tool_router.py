@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import json
-import uuid
 from typing import Any, Dict
 
-from .ops_tools import sanitize_args, summarize_result
+from .ops_tools import summarize_result
 from .repo_context import RepoContext
 from .state_store import StateStore
 
@@ -103,22 +102,8 @@ class ToolRouter:
             arguments = {k: v for k, v in arguments.items() if k != "truncate_limit"}
 
         handler = tool_spec["handler"]
-        call_id = str(uuid.uuid4())
-        self.state_store.journal_safe(
-            "tool.call",
-            {
-                "call_id": call_id,
-                "tool": resolved_name,
-                "args": sanitize_args(arguments),
-            },
-        )
         try:
             result = handler(**arguments) if arguments else handler()  # type: ignore[misc]
-        except Exception as exc:  # noqa: BLE001
-            self.state_store.journal_safe(
-                "tool.result", {"call_id": call_id, "ok": False, "error": str(exc)}
-            )
-            raise
         finally:
             self.repo_context.set_repo_root(previous_root)
 
@@ -135,10 +120,7 @@ class ToolRouter:
                     "result": result_payload,
                     "warnings": [{"code": "workspace_root.missing", "message": hint}],
                 }
-        self.state_store.journal_safe(
-            "tool.result",
-            {"call_id": call_id, "ok": True, "result": result_payload},
-        )
+
         content_payload = {
             "content": [
                 {

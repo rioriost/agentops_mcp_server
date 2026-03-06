@@ -1,4 +1,3 @@
-import json
 import subprocess
 from types import SimpleNamespace
 
@@ -9,14 +8,6 @@ def _write_verify_script(path):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("#!/bin/sh\necho ok\n", encoding="utf-8")
     path.chmod(0o755)
-
-
-def _journal_kinds(path):
-    return [
-        json.loads(line)["kind"]
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
 
 
 def test_run_verify_timeout_returns_error(repo_context, state_store, monkeypatch):
@@ -34,10 +25,6 @@ def test_run_verify_timeout_returns_error(repo_context, state_store, monkeypatch
     assert result["ok"] is False
     assert "timed out" in result["stderr"]
 
-    kinds = _journal_kinds(repo_context.journal)
-    assert "verify.start" in kinds
-    assert "verify.end" in kinds
-
 
 def test_run_verify_success_records_journal(repo_context, state_store, monkeypatch):
     _write_verify_script(repo_context.verify)
@@ -50,7 +37,3 @@ def test_run_verify_success_records_journal(repo_context, state_store, monkeypat
 
     result = runner.run_verify(timeout_sec=3)
     assert result["ok"] is True
-
-    kinds = _journal_kinds(repo_context.journal)
-    assert "verify.start" in kinds
-    assert "verify.end" in kinds

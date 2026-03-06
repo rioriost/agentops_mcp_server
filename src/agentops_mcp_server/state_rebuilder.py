@@ -34,62 +34,6 @@ class StateRebuilder:
             return candidate
         return self.repo_context.get_repo_root() / candidate
 
-    def read_journal_events(
-        self,
-        start_seq: int,
-        end_seq: Optional[int] = None,
-        journal_path: Optional[Path] = None,
-    ) -> Dict[str, Any]:
-        if start_seq < 0:
-            raise ValueError("start_seq must be >= 0")
-        if end_seq is not None and end_seq < start_seq:
-            raise ValueError("end_seq must be >= start_seq")
-
-        path = journal_path or self.repo_context.journal
-        events: List[Dict[str, Any]] = []
-        invalid_lines = 0
-        last_seq = start_seq
-
-        if not path.exists():
-            return {
-                "events": events,
-                "invalid_lines": invalid_lines,
-                "last_seq": last_seq,
-                "path": str(path),
-            }
-
-        with path.open("r", encoding="utf-8") as f:
-            for raw_line in f:
-                line = raw_line.strip()
-                if not line:
-                    continue
-                try:
-                    rec = json.loads(line)
-                except json.JSONDecodeError:
-                    invalid_lines += 1
-                    continue
-                if not isinstance(rec, dict):
-                    invalid_lines += 1
-                    continue
-                seq = rec.get("seq")
-                if not isinstance(seq, int):
-                    invalid_lines += 1
-                    continue
-                if seq <= start_seq:
-                    continue
-                if end_seq is not None and seq > end_seq:
-                    continue
-                events.append(rec)
-                if seq > last_seq:
-                    last_seq = seq
-
-        return {
-            "events": events,
-            "invalid_lines": invalid_lines,
-            "last_seq": last_seq,
-            "path": str(path),
-        }
-
     def read_tx_event_log(
         self,
         start_seq: int,
@@ -145,6 +89,30 @@ class StateRebuilder:
             "last_seq": last_seq,
             "path": str(path),
         }
+
+    def read_recent_tx_events(self, max_events: int) -> List[Dict[str, Any]]:
+        if max_events <= 0:
+            return []
+        path = self.repo_context.tx_event_log
+        if not path.exists():
+            return []
+        lines = path.read_text(encoding="utf-8").splitlines()
+        events: List[Dict[str, Any]] = []
+        for raw_line in reversed(lines):
+            if len(events) >= max_events:
+                break
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(rec, dict):
+                continue
+            events.append(rec)
+        events.reverse()
+        return events
 
     def _init_active_tx(
         self, tx_id: str, ticket_id: str, phase: str, step_id: str

@@ -8,13 +8,9 @@ def _dummy(**_kwargs):
 def test_build_tool_registry_includes_expected_keys():
     registry = build_tool_registry(
         commit_if_verified=_dummy,
-        journal_append=_dummy,
-        snapshot_save=_dummy,
-        snapshot_load=_dummy,
-        checkpoint_update=_dummy,
-        checkpoint_read=_dummy,
-        roll_forward_replay=_dummy,
-        continue_state_rebuild=_dummy,
+        tx_event_append=_dummy,
+        tx_state_save=_dummy,
+        tx_state_rebuild=_dummy,
         repo_verify=_dummy,
         repo_commit=_dummy,
         repo_status_summary=_dummy,
@@ -22,9 +18,6 @@ def test_build_tool_registry_includes_expected_keys():
         session_capture_context=_dummy,
         tests_suggest=_dummy,
         tests_suggest_from_failures=_dummy,
-        tx_event_append=_dummy,
-        tx_state_save=_dummy,
-        tx_state_rebuild=_dummy,
         ops_compact_context=_dummy,
         ops_handoff_export=_dummy,
         ops_resume_brief=_dummy,
@@ -38,13 +31,9 @@ def test_build_tool_registry_includes_expected_keys():
 
     expected_keys = {
         "commit_if_verified",
-        "journal_append",
-        "snapshot_save",
-        "snapshot_load",
-        "checkpoint_update",
-        "checkpoint_read",
-        "roll_forward_replay",
-        "continue_state_rebuild",
+        "tx_event_append",
+        "tx_state_save",
+        "tx_state_rebuild",
         "repo_verify",
         "repo_commit",
         "repo_status_summary",
@@ -52,9 +41,6 @@ def test_build_tool_registry_includes_expected_keys():
         "session_capture_context",
         "tests_suggest",
         "tests_suggest_from_failures",
-        "tx_event_append",
-        "tx_state_save",
-        "tx_state_rebuild",
         "ops_compact_context",
         "ops_handoff_export",
         "ops_resume_brief",
@@ -72,13 +58,9 @@ def test_build_tool_registry_includes_expected_keys():
 def test_registry_entries_include_schema_and_handler():
     registry = build_tool_registry(
         commit_if_verified=_dummy,
-        journal_append=_dummy,
-        snapshot_save=_dummy,
-        snapshot_load=_dummy,
-        checkpoint_update=_dummy,
-        checkpoint_read=_dummy,
-        roll_forward_replay=_dummy,
-        continue_state_rebuild=_dummy,
+        tx_event_append=_dummy,
+        tx_state_save=_dummy,
+        tx_state_rebuild=_dummy,
         repo_verify=_dummy,
         repo_commit=_dummy,
         repo_status_summary=_dummy,
@@ -86,9 +68,6 @@ def test_registry_entries_include_schema_and_handler():
         session_capture_context=_dummy,
         tests_suggest=_dummy,
         tests_suggest_from_failures=_dummy,
-        tx_event_append=_dummy,
-        tx_state_save=_dummy,
-        tx_state_rebuild=_dummy,
         ops_compact_context=_dummy,
         ops_handoff_export=_dummy,
         ops_resume_brief=_dummy,
@@ -100,10 +79,23 @@ def test_registry_entries_include_schema_and_handler():
         ops_observability_summary=_dummy,
     )
 
-    journal = registry["journal_append"]
-    assert journal["handler"] is _dummy
-    assert journal["input_schema"]["required"] == ["kind", "payload"]
+    tx_event = registry["tx_event_append"]
+    assert tx_event["handler"] is _dummy
+    assert set(tx_event["input_schema"]["required"]) == {
+        "tx_id",
+        "ticket_id",
+        "event_type",
+        "phase",
+        "step_id",
+        "actor",
+        "session_id",
+        "payload",
+    }
 
     commit = registry["commit_if_verified"]
     assert commit["handler"] is _dummy
     assert commit["input_schema"]["required"] == ["message"]
+
+    ops_capture_state = registry["ops_capture_state"]
+    assert ops_capture_state["handler"] is _dummy
+    assert ops_capture_state["input_schema"]["required"] == []

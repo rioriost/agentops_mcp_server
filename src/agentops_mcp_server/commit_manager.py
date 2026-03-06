@@ -92,94 +92,6 @@ class CommitManager:
             msg = msg[:77].rstrip() + "..."
         return msg
 
-    def _auto_snapshot_checkpoint_after_commit(self) -> Dict[str, Any]:
-        if not self.repo_context.journal.exists():
-            return {
-                "ok": False,
-                "reason": "journal not found",
-                "path": str(self.repo_context.journal),
-            }
-
-        snapshot = self.state_store.read_json_file(self.repo_context.snapshot)
-        snapshot_state = snapshot.get("state") if isinstance(snapshot, dict) else None
-        snapshot_session_id: Optional[str] = None
-        snapshot_last_seq: Optional[int] = None
-
-        if isinstance(snapshot, dict):
-            snapshot_session_id = snapshot.get("session_id")
-            if not isinstance(snapshot_session_id, str):
-                snapshot_session_id = None
-            snapshot_last_seq = snapshot.get("last_applied_seq")
-            if not isinstance(snapshot_last_seq, int):
-                snapshot_last_seq = None
-
-        if not snapshot_session_id and isinstance(snapshot_state, dict):
-            state_session_id = snapshot_state.get("session_id")
-            if isinstance(state_session_id, str):
-                snapshot_session_id = state_session_id
-
-        start_seq = snapshot_last_seq or 0
-        journal_result = self.state_rebuilder.read_journal_events(start_seq=start_seq)
-        events = journal_result.get("events") or []
-        invalid_lines = (
-            journal_result.get("invalid_lines")
-            if isinstance(journal_result.get("invalid_lines"), int)
-            else 0
-        )
-        last_seq = journal_result.get("last_seq")
-        if not isinstance(last_seq, int):
-            last_seq = start_seq
-
-        if not events and snapshot is None and last_seq == 0:
-            return {"ok": False, "reason": "no journal events", "last_seq": last_seq}
-
-        state = self.state_rebuilder.replay_events_to_state(
-            snapshot_state=snapshot_state,
-            events=events,
-            preferred_session_id=snapshot_session_id,
-            invalid_lines=invalid_lines,
-        )
-        session_id = snapshot_session_id
-        if not session_id and isinstance(state, dict):
-            state_session_id = state.get("session_id")
-            if isinstance(state_session_id, str):
-                session_id = state_session_id
-
-        snapshot_result = self.state_store.snapshot_save(
-            state=state, session_id=session_id, last_applied_seq=last_seq
-        )
-        checkpoint_result = self.state_store.checkpoint_update(
-            last_applied_seq=last_seq, snapshot_path=self.repo_context.snapshot.name
-        )
-        rotation_result = self.state_rebuilder.rotate_journal_if_prev_week()
-        if rotation_result.get("rotated"):
-            self.state_store.journal_safe("journal.rotate", rotation_result)
-        return {
-            "ok": True,
-            "snapshot": snapshot_result,
-            "checkpoint": checkpoint_result,
-            "journal_rotation": rotation_result,
-            "last_applied_seq": last_seq,
-            "events_applied": len(events),
-        }
-
-    def _post_commit_snapshot_checkpoint(self) -> None:
-        try:
-            auto_result = self._auto_snapshot_checkpoint_after_commit()
-            if not auto_result.get("ok"):
-                self.state_store.journal_safe(
-                    "error",
-                    {
-                        "message": "auto snapshot/checkpoint skipped",
-                        "context": auto_result,
-                    },
-                )
-        except Exception as exc:  # noqa: BLE001
-            self.state_store.journal_safe(
-                "error",
-                {"message": "auto snapshot/checkpoint failed", "context": str(exc)},
-            )
-
     def _run_git_commit(self, message: str) -> Tuple[str, str]:
         summary = self.git_repo.diff_stat_cached()
         try:
@@ -190,24 +102,17 @@ class CommitManager:
             )
             sha = self.git_repo.git("rev-parse", "HEAD")
         except Exception as exc:  # noqa: BLE001
-            self.state_store.journal_safe(
-                "commit.end", {"ok": False, "summary": str(exc)}
-            )
             self._emit_tx_event(
                 event_type="tx.commit.fail",
                 payload={"error": str(exc), "summary": "commit failed"},
                 phase_override="verified",
             )
             raise
-        self.state_store.journal_safe(
-            "commit.end", {"ok": True, "sha": sha, "summary": summary}
-        )
         self._emit_tx_event(
             event_type="tx.commit.done",
             payload={"sha": sha, "summary": summary},
             phase_override="committed",
         )
-        self._post_commit_snapshot_checkpoint()
         return sha, summary
 
     def commit_if_verified(
@@ -240,9 +145,6 @@ class CommitManager:
                 "summary": verify_result.get("stdout") or "verify passed",
             },
             phase_override="checking",
-        )
-        self.state_store.journal_safe(
-            "commit.start", {"message": message, "files": "auto"}
         )
         self._emit_tx_event(
             event_type="tx.commit.start",
@@ -295,9 +197,6 @@ class CommitManager:
                 phase_override="checking",
             )
 
-        self.state_store.journal_safe(
-            "commit.start", {"message": message, "files": files}
-        )
         self._emit_tx_event(
             event_type="tx.commit.start",
             payload={"message": message, "files": files},
@@ -305,9 +204,6 @@ class CommitManager:
         )
         status_lines = self.git_repo.status_porcelain()
         if not status_lines:
-            self.state_store.journal_safe(
-                "commit.end", {"ok": False, "summary": "no changes to commit"}
-            )
             self._emit_tx_event(
                 event_type="tx.commit.fail",
                 payload={
@@ -334,9 +230,6 @@ class CommitManager:
             else:
                 paths = [str(resolved_files)]
             if not paths:
-                self.state_store.journal_safe(
-                    "commit.end", {"ok": False, "summary": "no files specified"}
-                )
                 self._emit_tx_event(
                     event_type="tx.commit.fail",
                     payload={

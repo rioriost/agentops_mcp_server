@@ -28,7 +28,7 @@ Tools (snake_case):
 - ops_start_task(title, task_id?, session_id?, agent_id?, status?) -> record task start
 - ops_update_task(status?, note?, task_id?, session_id?, agent_id?, user_intent?) -> record task update
 - ops_end_task(summary, next_action?, status?, task_id?, session_id?, agent_id?) -> record task end
-- ops_capture_state(session_id?) -> snapshot and checkpoint state
+- ops_capture_state(session_id?) -> capture transaction state
 - ops_task_summary(session_id?, max_chars?) -> summarize task state
 - ops_observability_summary(session_id?, max_events?, max_chars?) -> write observability summary
 """

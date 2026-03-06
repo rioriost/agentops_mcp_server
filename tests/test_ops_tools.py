@@ -5,7 +5,6 @@ import pytest
 from agentops_mcp_server.ops_tools import (
     OpsTools,
     build_compact_context,
-    sanitize_args,
     summarize_result,
     truncate_text,
 )
@@ -18,14 +17,6 @@ class DummyGitRepo:
 
 def _build_ops_tools(repo_context, state_store, state_rebuilder):
     return OpsTools(repo_context, state_store, state_rebuilder, DummyGitRepo())
-
-
-def _journal_kinds(repo_context):
-    return [
-        json.loads(line)["kind"]
-        for line in repo_context.journal.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
 
 
 def _read_tx_events(repo_context):
@@ -49,14 +40,6 @@ def test_ops_compact_context_updates_snapshot_and_journal(
     assert result["ok"] is True
     assert isinstance(result["compact_context"], str)
 
-    loaded = state_store.snapshot_load()
-    assert loaded["ok"] is True
-    snapshot_state = loaded["snapshot"]["state"]
-    assert snapshot_state["compact_context"] == result["compact_context"]
-
-    kinds = _journal_kinds(repo_context)
-    assert "context.compact" in kinds
-
 
 def test_ops_handoff_export_writes_json(repo_context, state_store, state_rebuilder):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
@@ -69,33 +52,16 @@ def test_ops_handoff_export_writes_json(repo_context, state_store, state_rebuild
     handoff_payload = json.loads(repo_context.handoff.read_text(encoding="utf-8"))
     assert "compact_context" in handoff_payload
 
-    kinds = _journal_kinds(repo_context)
-    assert "session.handoff" in kinds
-
 
 def test_ops_task_summary_emits_journal(repo_context, state_store, state_rebuilder):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
 
-    state_store.snapshot_save(
-        state={"current_phase": "session"}, session_id="s1", last_applied_seq=0
-    )
-    state_store.journal_append(
-        kind="task.start",
-        payload={"title": "Build", "task_id": "t-1"},
-        session_id="s1",
-        event_id="evt-1",
-    )
-    state_store.checkpoint_update(
-        last_applied_seq=0, snapshot_path=repo_context.snapshot.name
-    )
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
 
     result = ops.ops_task_summary(session_id="s1", max_chars=40)
     assert result["ok"] is True
-    assert result["summary"]["task_title"] == "Build"
+    assert result["summary"]["task_id"] == "t-1"
     assert len(result["text"]) <= 40
-
-    kinds = _journal_kinds(repo_context)
-    assert "task.summary" in kinds
 
 
 def test_ops_observability_summary_includes_artifacts(
@@ -103,57 +69,31 @@ def test_ops_observability_summary_includes_artifacts(
 ):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
 
-    state_store.snapshot_save(
-        state={"current_phase": "session"}, session_id="s1", last_applied_seq=0
-    )
-    state_store.journal_append(
-        kind="task.blocked",
-        payload={"reason": "network down", "note": "blocked"},
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    ops.ops_update_task(
+        status="blocked",
+        note="waiting",
+        task_id="t-1",
         session_id="s1",
-        event_id="evt-1",
-    )
-    state_store.journal_append(
-        kind="file.edit",
-        payload={"action": "edit", "path": "src/app.py"},
-        session_id="s1",
-        event_id="evt-2",
-    )
-    state_store.journal_append(
-        kind="artifact.summary",
-        payload={"paths": ["out/log.txt"]},
-        session_id="s1",
-        event_id="evt-3",
-    )
-    state_store.checkpoint_update(
-        last_applied_seq=0, snapshot_path=repo_context.snapshot.name
     )
 
     result = ops.ops_observability_summary(session_id="s1", max_events=5, max_chars=200)
     assert result["ok"] is True
     summary = result["summary"]
-    assert summary["failure_reason"] == "network down"
-    assert "src/app.py" in summary["artifacts"]
-    assert "out/log.txt" in summary["artifacts"]
+    assert summary["recent_events"]
+    assert any(
+        event.get("event_type") == "tx.begin" for event in summary["recent_events"]
+    )
 
     assert repo_context.observability.exists()
     text_path = repo_context.observability.with_suffix(".txt")
     assert text_path.exists()
 
-    kinds = _journal_kinds(repo_context)
-    assert "observability.summary" in kinds
-
 
 def test_ops_resume_brief_is_bounded(repo_context, state_store, state_rebuilder):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
 
-    state_store.snapshot_save(
-        state={"session_id": "s1", "last_action": "working"},
-        session_id="s1",
-        last_applied_seq=0,
-    )
-    state_store.checkpoint_update(
-        last_applied_seq=0, snapshot_path=repo_context.snapshot.name
-    )
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
 
     result = ops.ops_resume_brief(max_chars=20)
     assert result["ok"] is True
@@ -171,10 +111,10 @@ def test_ops_task_lifecycle_records_events(repo_context, state_store, state_rebu
     assert update["ok"] is True
     assert end["ok"] is True
 
-    kinds = _journal_kinds(repo_context)
-    assert "task.start" in kinds
-    assert "task.update" in kinds
-    assert "task.end" in kinds
+    tx_events = _tx_event_types(repo_context)
+    assert "tx.begin" in tx_events
+    assert "tx.step.enter" in tx_events
+    assert "tx.end.done" in tx_events
 
 
 def test_ops_task_lifecycle_emits_tx_events_and_updates_state(
@@ -229,29 +169,15 @@ def test_ops_capture_state_updates_snapshot_and_checkpoint(
 ):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
 
-    state_store.snapshot_save(
-        state={"current_phase": "session"}, session_id="s1", last_applied_seq=0
-    )
-    state_store.checkpoint_update(
-        last_applied_seq=0, snapshot_path=repo_context.snapshot.name
-    )
-    state_store.journal_append(
-        kind="session.start",
-        payload={"note": "start"},
-        session_id="s1",
-        event_id="evt-1",
-    )
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
 
     result = ops.ops_capture_state(session_id="s1")
     assert result["ok"] is True
 
-    snapshot = state_store.snapshot_load()
-    checkpoint = state_store.checkpoint_read()
-    assert snapshot["ok"] is True
-    assert checkpoint["ok"] is True
-
-    kinds = _journal_kinds(repo_context)
-    assert "state.capture" in kinds
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    events = _read_tx_events(repo_context)
+    last_seq = max(event["seq"] for event in events)
+    assert tx_state["last_applied_seq"] == last_seq
 
 
 def test_truncate_text_variants():
@@ -266,12 +192,6 @@ def test_build_compact_context_includes_diff():
     summary = build_compact_context(state, "diff", 200)
     assert "diff_stat" in summary
     assert "done" in summary
-
-
-def test_sanitize_args_truncates_strings():
-    args = sanitize_args({"a": "x" * 3000, "b": 1})
-    assert args["b"] == 1
-    assert args["a"].endswith("...(truncated)")
 
 
 def test_summarize_result_truncates():

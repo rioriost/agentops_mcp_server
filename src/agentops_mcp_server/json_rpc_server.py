@@ -72,9 +72,7 @@ class JsonRpcServer:
                     req_id = req.get("id") if isinstance(req, dict) else None
                 except Exception:  # noqa: BLE001
                     req_id = None
-                self.state_store.journal_safe(
-                    "error", {"message": str(exc), "kind": "request"}
-                )
+
                 if req_id is not None:
                     _write_json(
                         {

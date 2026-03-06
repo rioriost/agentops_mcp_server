@@ -2,7 +2,7 @@
   "id": "p5-t1",
   "phase": 5,
   "title": "Remove legacy artifacts from canonical flow and tooling",
-  "status": "in-progress",
+  "status": "done",
   "summary": "Remove journal/snapshot/checkpoint from canonical resume path and tool exposure; keep handoff derived-only.",
   "inputs": [
     "docs/v0.4.0/plan.md",

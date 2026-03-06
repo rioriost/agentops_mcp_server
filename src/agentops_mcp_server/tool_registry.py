@@ -234,7 +234,7 @@ def build_tool_registry(
             "handler": ops_end_task,
         },
         "ops_capture_state": {
-            "description": "Snapshot and checkpoint state",
+            "description": "Capture transaction state",
             "input_schema": {
                 "type": "object",
                 "properties": {"session_id": {"type": ["string", "null"]}},

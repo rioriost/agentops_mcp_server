@@ -10,30 +10,10 @@ def test_main_wrapper_delegates(monkeypatch):
             return f"resolved:{value}"
 
     class DummyStore:
-        def journal_append(self, **kwargs):
-            calls["journal_append"] = kwargs
-            return {"journal": kwargs}
-
-        def snapshot_save(self, **kwargs):
-            calls["snapshot_save"] = kwargs
-            return {"snapshot_save": kwargs}
-
-        def snapshot_load(self):
-            return {"snapshot_load": True}
-
-        def checkpoint_update(self, **kwargs):
-            calls["checkpoint_update"] = kwargs
-            return {"checkpoint_update": kwargs}
-
-        def checkpoint_read(self):
-            return {"checkpoint_read": True}
+        pass
 
     class DummyRebuilder:
-        def roll_forward_replay(self, **kwargs):
-            return {"roll_forward_replay": kwargs}
-
-        def continue_state_rebuild(self, **kwargs):
-            return {"continue_state_rebuild": kwargs}
+        pass
 
     class DummyVerifyRunner:
         def run_verify(self, timeout_sec=None):
@@ -127,30 +107,6 @@ def test_main_wrapper_delegates(monkeypatch):
     assert main._resolve_workspace_root("root") == "resolved:root"
     assert calls["resolve_workspace_root"] == "root"
 
-    assert (
-        main.journal_append("kind", {"a": 1}, "s", "a", "e")["journal"]["kind"]
-        == "kind"
-    )
-    assert main.snapshot_save({"state": 1}, "s1", 1, "snap")["snapshot_save"][
-        "state"
-    ] == {"state": 1}
-    assert main.snapshot_load()["snapshot_load"] is True
-    assert (
-        main.checkpoint_update(1, "snap.json", "cp")["checkpoint_update"][
-            "last_applied_seq"
-        ]
-        == 1
-    )
-    assert main.checkpoint_read()["checkpoint_read"] is True
-    assert (
-        main.roll_forward_replay(start_seq=1)["roll_forward_replay"]["start_seq"] == 1
-    )
-    assert (
-        main.continue_state_rebuild(session_id="s1")["continue_state_rebuild"][
-            "session_id"
-        ]
-        == "s1"
-    )
     assert main.run_verify(timeout_sec=3)["verify"] == 3
     assert main.commit_if_verified("msg", timeout_sec=2)["commit_if_verified"] == "msg"
     assert main.repo_commit(message="m")["repo_commit"]["message"] == "m"

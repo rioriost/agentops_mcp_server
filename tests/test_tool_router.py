@@ -4,18 +4,25 @@ from agentops_mcp_server.tool_router import ToolRouter
 
 
 def _build_registry(calls):
-    def snapshot_load():
-        calls["snapshot_load"] = True
+    def ops_compact_context(max_chars=None, include_diff=None):
+        calls["ops_compact_context"] = (max_chars, include_diff)
         return {"ok": True}
 
     def echo(value=None):
         return {"value": value, "blob": "x" * 5000}
 
     return {
-        "snapshot_load": {
-            "description": "Load snapshot",
-            "input_schema": {"type": "object", "properties": {}, "required": []},
-            "handler": snapshot_load,
+        "ops_compact_context": {
+            "description": "Generate compact context",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "max_chars": {"type": ["integer", "null"]},
+                    "include_diff": {"type": ["boolean", "null"]},
+                },
+                "required": [],
+            },
+            "handler": ops_compact_context,
         },
         "echo": {
             "description": "Echo payload",
@@ -54,11 +61,11 @@ def test_tools_call_alias_and_workspace_root_restore(
     other_root.mkdir()
 
     payload = tool_router.tools_call(
-        "snapshot.load", {"workspace_root": str(other_root)}
+        "ops.compact_context", {"workspace_root": str(other_root)}
     )
     content = json.loads(payload["content"][0]["text"])
 
-    assert calls["snapshot_load"] is True
+    assert calls["ops_compact_context"] == (None, None)
     assert content["ok"] is True
     assert repo_context.get_repo_root() == original_root
 
