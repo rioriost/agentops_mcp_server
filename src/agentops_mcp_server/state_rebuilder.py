@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from .repo_context import RepoContext
-from .state_store import StateStore
+from .state_store import (
+    FILE_INTENT_OPERATIONS,
+    FILE_INTENT_STATE_ORDER,
+    TX_EVENT_TYPES,
+    StateStore,
+)
 
 
 class StateRebuilder:
@@ -165,8 +170,11 @@ class StateRebuilder:
             return False, "missing tx_id"
         if not isinstance(event.get("ticket_id"), str):
             return False, "missing ticket_id"
-        if not isinstance(event.get("event_type"), str):
+        event_type = event.get("event_type")
+        if not isinstance(event_type, str):
             return False, "missing event_type"
+        if event_type not in TX_EVENT_TYPES:
+            return False, "unknown event_type"
         if not isinstance(event.get("phase"), str):
             return False, "missing phase"
         if not isinstance(event.get("step_id"), str):
@@ -177,6 +185,174 @@ class StateRebuilder:
             return False, "missing session_id"
         if not isinstance(event.get("payload"), dict):
             return False, "missing payload"
+        return True, ""
+
+    def _intent_state_rank(self, state: Any) -> int:
+        if not isinstance(state, str):
+            return -1
+        return FILE_INTENT_STATE_ORDER.get(state, -1)
+
+    def _validate_tx_event_payload(
+        self, event_type: str, payload: Dict[str, Any], step_id: str
+    ) -> Tuple[bool, str]:
+        def _require_str(name: str) -> bool:
+            value = payload.get(name)
+            return isinstance(value, str) and value.strip() != ""
+
+        if event_type == "tx.begin":
+            return (_require_str("ticket_id"), "missing payload.ticket_id")
+        if event_type == "tx.step.enter":
+            if not _require_str("step_id"):
+                return False, "missing payload.step_id"
+            if payload.get("step_id") != step_id:
+                return False, "payload.step_id must match step_id"
+            return True, ""
+        if event_type == "tx.file_intent.add":
+            if not _require_str("path"):
+                return False, "missing payload.path"
+            if not _require_str("operation"):
+                return False, "missing payload.operation"
+            if payload.get("operation") not in FILE_INTENT_OPERATIONS:
+                return False, "payload.operation is invalid"
+            if not _require_str("purpose"):
+                return False, "missing payload.purpose"
+            if not _require_str("planned_step"):
+                return False, "missing payload.planned_step"
+            if payload.get("state") != "planned":
+                return False, "payload.state must be planned"
+            return True, ""
+        if event_type == "tx.file_intent.update":
+            if not _require_str("path"):
+                return False, "missing payload.path"
+            if payload.get("state") not in {"started", "applied", "verified"}:
+                return False, "payload.state must be started, applied, or verified"
+            return True, ""
+        if event_type == "tx.file_intent.complete":
+            if not _require_str("path"):
+                return False, "missing payload.path"
+            if payload.get("state") != "verified":
+                return False, "payload.state must be verified"
+            return True, ""
+        if event_type == "tx.verify.pass":
+            return (payload.get("ok") is True, "payload.ok must be true")
+        if event_type == "tx.verify.fail":
+            return (payload.get("ok") is False, "payload.ok must be false")
+        if event_type == "tx.commit.start":
+            if not _require_str("message"):
+                return False, "missing payload.message"
+            if not _require_str("branch"):
+                return False, "missing payload.branch"
+            if not _require_str("diff_summary"):
+                return False, "missing payload.diff_summary"
+            return True, ""
+        if event_type == "tx.commit.done":
+            if not _require_str("sha"):
+                return False, "missing payload.sha"
+            if not _require_str("branch"):
+                return False, "missing payload.branch"
+            if not _require_str("diff_summary"):
+                return False, "missing payload.diff_summary"
+            return True, ""
+        if event_type == "tx.commit.fail":
+            return (_require_str("error"), "missing payload.error")
+        if event_type == "tx.end.done":
+            return (_require_str("summary"), "missing payload.summary")
+        if event_type == "tx.end.blocked":
+            return (_require_str("reason"), "missing payload.reason")
+        if event_type == "tx.user_intent.set":
+            return (_require_str("user_intent"), "missing payload.user_intent")
+        return True, ""
+
+    def _init_tx_context(self) -> Dict[str, Any]:
+        return {
+            "seen_begin": False,
+            "terminal": False,
+            "steps": set(),
+            "intent_states": {},
+            "intent_steps": {},
+            "verify_started_steps": set(),
+            "verify_passed": False,
+            "commit_started": False,
+        }
+
+    def _validate_tx_event_invariants(
+        self, context: Dict[str, Any], event: Dict[str, Any]
+    ) -> Tuple[bool, str]:
+        event_type = event.get("event_type")
+        payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+        step_id = event.get("step_id") if isinstance(event.get("step_id"), str) else ""
+
+        if context.get("terminal"):
+            return False, "event after terminal"
+
+        if event_type == "tx.begin":
+            if context.get("seen_begin"):
+                return False, "duplicate tx.begin"
+            context["seen_begin"] = True
+        else:
+            if not context.get("seen_begin"):
+                return False, "tx.begin required"
+
+        if event_type == "tx.step.enter" and step_id:
+            context["steps"].add(step_id)
+
+        if event_type == "tx.file_intent.add":
+            path = payload.get("path")
+            planned_step = payload.get("planned_step")
+            if not isinstance(path, str) or not path.strip():
+                return False, "missing payload.path"
+            if (
+                not isinstance(planned_step, str)
+                or planned_step not in context["steps"]
+            ):
+                return False, "planned_step must reference a prior step"
+            if path in context["intent_states"]:
+                return False, "file intent already exists"
+            context["intent_states"][path] = payload.get("state")
+            context["intent_steps"][path] = planned_step
+
+        if event_type in {"tx.file_intent.update", "tx.file_intent.complete"}:
+            path = payload.get("path")
+            if not isinstance(path, str) or not path.strip():
+                return False, "missing payload.path"
+            if path not in context["intent_states"]:
+                return False, "file intent missing for path"
+            new_state = payload.get("state")
+            if self._intent_state_rank(new_state) < self._intent_state_rank(
+                context["intent_states"].get(path)
+            ):
+                return False, "file intent state must be monotonic"
+            if event_type == "tx.file_intent.complete" and new_state != "verified":
+                return False, "file intent complete requires verified"
+            context["intent_states"][path] = new_state
+
+        if event_type == "tx.verify.start":
+            required_rank = FILE_INTENT_STATE_ORDER["applied"]
+            for path, planned_step in context["intent_steps"].items():
+                if planned_step == step_id:
+                    state = context["intent_states"].get(path)
+                    if self._intent_state_rank(state) < required_rank:
+                        return False, "verify.start requires applied intents"
+            context["verify_started_steps"].add(step_id)
+
+        if event_type in {"tx.verify.pass", "tx.verify.fail"}:
+            if step_id not in context["verify_started_steps"]:
+                return False, "verify result requires verify.start"
+            if event_type == "tx.verify.pass":
+                context["verify_passed"] = True
+
+        if event_type == "tx.commit.start":
+            if not context.get("verify_passed"):
+                return False, "commit.start requires verify.pass"
+            context["commit_started"] = True
+
+        if event_type in {"tx.commit.done", "tx.commit.fail"}:
+            if not context.get("commit_started"):
+                return False, "commit result requires commit.start"
+
+        if isinstance(event_type, str) and event_type.startswith("tx.end."):
+            context["terminal"] = True
+
         return True, ""
 
     def _update_semantic_summary(
@@ -428,6 +604,7 @@ class StateRebuilder:
         state["integrity"]["rebuilt_from_seq"] = replay_start
 
         tx_states: Dict[str, Dict[str, Any]] = {}
+        tx_contexts: Dict[str, Dict[str, Any]] = {}
         applied_event_ids: set[str] = set()
         dropped_events = 0
         last_valid_seq = replay_start
@@ -460,19 +637,22 @@ class StateRebuilder:
             payload = (
                 event.get("payload") if isinstance(event.get("payload"), dict) else {}
             )
-            if event_type in {"tx.file_intent.update", "tx.file_intent.complete"}:
-                path = (
-                    payload.get("path") if isinstance(payload.get("path"), str) else ""
-                )
-                file_intents = active_tx.get("file_intents")
-                if not isinstance(file_intents, list):
-                    file_intents = []
-                has_intent = any(
-                    isinstance(intent, dict) and intent.get("path") == path
-                    for intent in file_intents
-                )
-                if not has_intent:
-                    break
+            step_value = (
+                event.get("step_id") if isinstance(event.get("step_id"), str) else ""
+            )
+            valid, _reason = self._validate_tx_event_payload(
+                event_type, payload, step_value
+            )
+            if not valid:
+                break
+            tx_context = tx_contexts.get(tx_id)
+            if tx_context is None:
+                tx_context = self._init_tx_context()
+                tx_contexts[tx_id] = tx_context
+            valid, _reason = self._validate_tx_event_invariants(tx_context, event)
+            if not valid:
+                break
+
             self._apply_tx_event_to_state(active_tx, event)
             if isinstance(event.get("seq"), int):
                 active_tx["_last_event_seq"] = event.get("seq")

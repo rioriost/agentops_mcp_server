@@ -92,8 +92,29 @@ class CommitManager:
             msg = msg[:77].rstrip() + "..."
         return msg
 
+    def _branch_name(self) -> str:
+        try:
+            branch = self.git_repo.git("rev-parse", "--abbrev-ref", "HEAD")
+        except Exception:  # noqa: BLE001
+            branch = "unknown"
+        branch = branch.strip() if isinstance(branch, str) else ""
+        return branch or "unknown"
+
+    def _diff_summary(self, cached: bool = False) -> str:
+        try:
+            summary = (
+                self.git_repo.diff_stat_cached()
+                if cached
+                else self.git_repo.diff_stat()
+            )
+        except Exception:  # noqa: BLE001
+            summary = ""
+        summary = summary.strip() if isinstance(summary, str) else ""
+        return summary or "no changes"
+
     def _run_git_commit(self, message: str) -> Tuple[str, str]:
-        summary = self.git_repo.diff_stat_cached()
+        summary = self._diff_summary(cached=True)
+        branch = self._branch_name()
         try:
             subprocess.run(
                 ["git", "commit", "-m", message],
@@ -110,7 +131,12 @@ class CommitManager:
             raise
         self._emit_tx_event(
             event_type="tx.commit.done",
-            payload={"sha": sha, "summary": summary},
+            payload={
+                "sha": sha,
+                "summary": summary,
+                "branch": branch,
+                "diff_summary": summary,
+            },
             phase_override="committed",
         )
         return sha, summary
@@ -146,14 +172,24 @@ class CommitManager:
             },
             phase_override="checking",
         )
+        commit_start_message = (
+            self._normalize_commit_message(message) or "chore: update"
+        )
+        branch = self._branch_name()
+        diff_summary = self._diff_summary()
         self._emit_tx_event(
             event_type="tx.commit.start",
-            payload={"message": message, "files": "auto"},
+            payload={
+                "message": commit_start_message,
+                "files": "auto",
+                "branch": branch,
+                "diff_summary": diff_summary,
+            },
             phase_override="verified",
         )
         self.git_repo.git("add", "-A")
 
-        msg = self._normalize_commit_message(message)
+        msg = commit_start_message
         sha, _summary = self._run_git_commit(msg)
         return {"sha": sha, "message": msg}
 
@@ -197,12 +233,23 @@ class CommitManager:
                 phase_override="checking",
             )
 
+        status_lines = self.git_repo.status_porcelain()
+        commit_start_message = (message or "").strip().replace("\n", " ")
+        if not commit_start_message:
+            commit_start_message = self._commit_message_from_status(status_lines)
+        commit_start_message = self._normalize_commit_message(commit_start_message)
+        branch = self._branch_name()
+        diff_summary = self._diff_summary()
         self._emit_tx_event(
             event_type="tx.commit.start",
-            payload={"message": message, "files": files},
+            payload={
+                "message": commit_start_message,
+                "files": files,
+                "branch": branch,
+                "diff_summary": diff_summary,
+            },
             phase_override="verified",
         )
-        status_lines = self.git_repo.status_porcelain()
         if not status_lines:
             self._emit_tx_event(
                 event_type="tx.commit.fail",
@@ -241,10 +288,7 @@ class CommitManager:
                 return {"ok": False, "reason": "no files specified"}
             self.git_repo.git("add", *paths)
 
-        msg = (message or "").strip().replace("\n", " ")
-        if not msg:
-            msg = self._commit_message_from_status(status_lines)
-        msg = self._normalize_commit_message(msg)
+        msg = commit_start_message
 
         sha, summary = self._run_git_commit(msg)
         return {"ok": True, "sha": sha, "message": msg, "summary": summary}

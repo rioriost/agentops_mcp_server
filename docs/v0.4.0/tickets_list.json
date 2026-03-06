@@ -186,7 +186,7 @@
       "id": "p5-t2",
       "phase": 5,
       "title": "Align event taxonomy and enforce lifecycle invariants",
-      "status": "planned",
+      "status": "done",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p5-t2.json"],
       "deps": ["p5-t1"]

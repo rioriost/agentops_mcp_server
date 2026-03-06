@@ -12,7 +12,7 @@ def _append_tx_event(state_store, **overrides):
         "step_id": "p4-t2-s1",
         "actor": {"agent_id": "a1"},
         "session_id": "s1",
-        "payload": {"note": "start"},
+        "payload": {"ticket_id": "p4-t2", "ticket_title": "p4-t2"},
     }
     base.update(overrides)
     return state_store.tx_event_append(**base)
@@ -25,7 +25,12 @@ def _append_raw_tx_event(repo_context, event):
 
 def test_read_tx_event_log_filters_seq(repo_context, state_store, state_rebuilder):
     _append_tx_event(state_store)
-    _append_tx_event(state_store, event_type="tx.step.enter", step_id="p4-t2-s2")
+    _append_tx_event(
+        state_store,
+        event_type="tx.step.enter",
+        step_id="p4-t2-s2",
+        payload={"step_id": "p4-t2-s2", "description": "step"},
+    )
 
     events = state_rebuilder.read_tx_event_log(start_seq=1)
     assert [event["seq"] for event in events["events"]] == [2]
@@ -56,8 +61,18 @@ def test_read_tx_event_log_handles_invalid_lines(repo_context, state_rebuilder):
 
 def test_read_recent_tx_events_returns_tail(repo_context, state_store, state_rebuilder):
     _append_tx_event(state_store)
-    _append_tx_event(state_store, event_type="tx.step.enter", step_id="p4-t2-s2")
-    _append_tx_event(state_store, event_type="tx.step.enter", step_id="p4-t2-s3")
+    _append_tx_event(
+        state_store,
+        event_type="tx.step.enter",
+        step_id="p4-t2-s2",
+        payload={"step_id": "p4-t2-s2", "description": "step"},
+    )
+    _append_tx_event(
+        state_store,
+        event_type="tx.step.enter",
+        step_id="p4-t2-s3",
+        payload={"step_id": "p4-t2-s3", "description": "step"},
+    )
 
     events = state_rebuilder.read_recent_tx_events(2)
     assert [event["seq"] for event in events] == [2, 3]
@@ -82,6 +97,12 @@ def test_rebuild_tx_state_reconstructs_file_intent_next_action(
     _append_tx_event(state_store)
     _append_tx_event(
         state_store,
+        event_type="tx.step.enter",
+        step_id="p4-t2-s1",
+        payload={"step_id": "p4-t2-s1", "description": "step"},
+    )
+    _append_tx_event(
+        state_store,
         event_type="tx.file_intent.add",
         payload={
             "path": "a.py",
@@ -104,15 +125,37 @@ def test_rebuild_tx_state_committed_next_action(
     _append_tx_event(state_store)
     _append_tx_event(
         state_store,
+        event_type="tx.verify.start",
+        phase="checking",
+        payload={"command": "verify"},
+    )
+    _append_tx_event(
+        state_store,
         event_type="tx.verify.pass",
         phase="verified",
         payload={"ok": True, "returncode": 0, "summary": "ok"},
     )
     _append_tx_event(
         state_store,
+        event_type="tx.commit.start",
+        phase="verified",
+        payload={
+            "message": "commit",
+            "files": "auto",
+            "branch": "main",
+            "diff_summary": "diff",
+        },
+    )
+    _append_tx_event(
+        state_store,
         event_type="tx.commit.done",
         phase="committed",
-        payload={"sha": "abc123", "summary": "done"},
+        payload={
+            "sha": "abc123",
+            "summary": "done",
+            "branch": "main",
+            "diff_summary": "diff",
+        },
     )
 
     rebuild = state_rebuilder.rebuild_tx_state()

@@ -8,6 +8,26 @@ from typing import Any, Dict, Optional
 
 from .repo_context import RepoContext
 
+TX_EVENT_TYPES = {
+    "tx.begin",
+    "tx.step.enter",
+    "tx.file_intent.add",
+    "tx.file_intent.update",
+    "tx.file_intent.complete",
+    "tx.verify.start",
+    "tx.verify.pass",
+    "tx.verify.fail",
+    "tx.commit.start",
+    "tx.commit.done",
+    "tx.commit.fail",
+    "tx.end.done",
+    "tx.end.blocked",
+    "tx.user_intent.set",
+}
+
+FILE_INTENT_OPERATIONS = {"create", "update", "delete", "move", "rename"}
+FILE_INTENT_STATE_ORDER = {"planned": 0, "started": 1, "applied": 2, "verified": 3}
+
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -50,6 +70,198 @@ class StateStore:
             raise ValueError(f"{name} is required")
         return value.strip()
 
+    def _require_payload_str(
+        self, payload: Dict[str, Any], name: str, allow_empty: bool = False
+    ) -> str:
+        value = payload.get(name)
+        if not isinstance(value, str):
+            raise ValueError(f"payload.{name} is required")
+        if not allow_empty and not value.strip():
+            raise ValueError(f"payload.{name} is required")
+        return value if allow_empty else value.strip()
+
+    def _validate_tx_event_type(self, event_type: str) -> None:
+        if event_type not in TX_EVENT_TYPES:
+            raise ValueError("event_type is not defined in taxonomy")
+
+    def _validate_tx_event_payload(
+        self, event_type: str, payload: Dict[str, Any], step_id: str
+    ) -> None:
+        if event_type == "tx.begin":
+            self._require_payload_str(payload, "ticket_id")
+            return
+        if event_type == "tx.step.enter":
+            step_value = self._require_payload_str(payload, "step_id")
+            if step_value != step_id:
+                raise ValueError("payload.step_id must match step_id")
+            return
+        if event_type == "tx.file_intent.add":
+            self._require_payload_str(payload, "path")
+            operation = self._require_payload_str(payload, "operation")
+            if operation not in FILE_INTENT_OPERATIONS:
+                raise ValueError("payload.operation is invalid")
+            self._require_payload_str(payload, "purpose")
+            self._require_payload_str(payload, "planned_step")
+            state = self._require_payload_str(payload, "state")
+            if state != "planned":
+                raise ValueError("payload.state must be planned")
+            return
+        if event_type == "tx.file_intent.update":
+            self._require_payload_str(payload, "path")
+            state = self._require_payload_str(payload, "state")
+            if state not in {"started", "applied", "verified"}:
+                raise ValueError("payload.state must be started, applied, or verified")
+            return
+        if event_type == "tx.file_intent.complete":
+            self._require_payload_str(payload, "path")
+            state = self._require_payload_str(payload, "state")
+            if state != "verified":
+                raise ValueError("payload.state must be verified")
+            return
+        if event_type == "tx.verify.start":
+            return
+        if event_type == "tx.verify.pass":
+            if payload.get("ok") is not True:
+                raise ValueError("payload.ok must be true")
+            return
+        if event_type == "tx.verify.fail":
+            if payload.get("ok") is not False:
+                raise ValueError("payload.ok must be false")
+            return
+        if event_type == "tx.commit.start":
+            self._require_payload_str(payload, "message")
+            self._require_payload_str(payload, "branch")
+            self._require_payload_str(payload, "diff_summary")
+            return
+        if event_type == "tx.commit.done":
+            self._require_payload_str(payload, "sha")
+            self._require_payload_str(payload, "branch")
+            self._require_payload_str(payload, "diff_summary")
+            return
+        if event_type == "tx.commit.fail":
+            self._require_payload_str(payload, "error")
+            return
+        if event_type == "tx.end.done":
+            self._require_payload_str(payload, "summary")
+            return
+        if event_type == "tx.end.blocked":
+            self._require_payload_str(payload, "reason")
+            return
+        if event_type == "tx.user_intent.set":
+            self._require_payload_str(payload, "user_intent")
+            return
+
+    def _intent_state_rank(self, state: Any) -> int:
+        if not isinstance(state, str):
+            return -1
+        return FILE_INTENT_STATE_ORDER.get(state, -1)
+
+    def _load_active_tx(self) -> Optional[Dict[str, Any]]:
+        state = self.read_json_file(self.repo_context.tx_state)
+        if isinstance(state, dict):
+            active_tx = state.get("active_tx")
+            if isinstance(active_tx, dict):
+                return active_tx
+        return None
+
+    def _validate_tx_event_invariants(
+        self, event_type: str, payload: Dict[str, Any], step_id: str, tx_id: str
+    ) -> None:
+        active_tx = self._load_active_tx()
+        if not active_tx:
+            return
+        active_tx_id = active_tx.get("tx_id")
+        if isinstance(active_tx_id, str) and active_tx_id.strip():
+            if event_type != "tx.begin" and active_tx_id != tx_id:
+                raise ValueError("tx_id does not match active transaction")
+
+        if event_type == "tx.begin":
+            status = active_tx.get("status")
+            if (
+                isinstance(active_tx_id, str)
+                and active_tx_id.strip()
+                and status not in {"done", "blocked"}
+            ):
+                raise ValueError("active transaction already in progress")
+            return
+
+        file_intents = active_tx.get("file_intents")
+        if not isinstance(file_intents, list):
+            file_intents = []
+
+        def _find_intent(path: str) -> Optional[Dict[str, Any]]:
+            for intent in file_intents:
+                if isinstance(intent, dict) and intent.get("path") == path:
+                    return intent
+            return None
+
+        if event_type == "tx.file_intent.add":
+            planned_step = payload.get("planned_step")
+            current_step = active_tx.get("current_step")
+            if (
+                isinstance(current_step, str)
+                and current_step.strip()
+                and planned_step != current_step
+            ):
+                raise ValueError("planned_step must match current_step")
+            path = payload.get("path") if isinstance(payload.get("path"), str) else ""
+            if path and _find_intent(path) is not None:
+                raise ValueError("file intent already exists for path")
+            return
+
+        if event_type in {"tx.file_intent.update", "tx.file_intent.complete"}:
+            path = payload.get("path") if isinstance(payload.get("path"), str) else ""
+            intent = _find_intent(path)
+            if intent is None:
+                raise ValueError("file intent missing for path")
+            new_state = payload.get("state")
+            current_state = intent.get("state")
+            if self._intent_state_rank(new_state) < self._intent_state_rank(
+                current_state
+            ):
+                raise ValueError("file intent state must be monotonic")
+            return
+
+        if event_type == "tx.verify.start":
+            for intent in file_intents:
+                if (
+                    isinstance(intent, dict)
+                    and intent.get("planned_step") == step_id
+                    and intent.get("state") in {"planned", "started"}
+                ):
+                    raise ValueError("verify.start requires applied intents")
+            return
+
+        if event_type in {"tx.verify.pass", "tx.verify.fail"}:
+            verify_state = (
+                active_tx.get("verify_state")
+                if isinstance(active_tx.get("verify_state"), dict)
+                else {}
+            )
+            if verify_state.get("status") != "running":
+                raise ValueError("verify result requires verify.start")
+            return
+
+        if event_type == "tx.commit.start":
+            verify_state = (
+                active_tx.get("verify_state")
+                if isinstance(active_tx.get("verify_state"), dict)
+                else {}
+            )
+            if verify_state.get("status") != "passed":
+                raise ValueError("commit.start requires verify.pass")
+            return
+
+        if event_type in {"tx.commit.done", "tx.commit.fail"}:
+            commit_state = (
+                active_tx.get("commit_state")
+                if isinstance(active_tx.get("commit_state"), dict)
+                else {}
+            )
+            if commit_state.get("status") != "running":
+                raise ValueError("commit result requires commit.start")
+            return
+
     def next_tx_event_seq(self) -> int:
         last = self.read_last_json_line(self.repo_context.tx_event_log)
         if isinstance(last, dict):
@@ -81,6 +293,12 @@ class StateStore:
             raise ValueError("actor is required")
         if not isinstance(payload, dict):
             raise ValueError("payload is required")
+
+        self._validate_tx_event_type(resolved_event_type)
+        self._validate_tx_event_payload(resolved_event_type, payload, resolved_step_id)
+        self._validate_tx_event_invariants(
+            resolved_event_type, payload, resolved_step_id, resolved_tx_id
+        )
 
         seq = self.next_tx_event_seq()
         resolved_event_id = event_id or str(uuid.uuid4())

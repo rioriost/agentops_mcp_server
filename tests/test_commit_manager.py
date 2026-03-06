@@ -17,12 +17,17 @@ class DummyGitRepo:
 
     def git(self, *args):
         self.calls.append(args)
+        if args == ("rev-parse", "--abbrev-ref", "HEAD"):
+            return "main"
         if args == ("rev-parse", "HEAD"):
             return "abc123"
         return ""
 
     def status_porcelain(self):
         return self._status_lines
+
+    def diff_stat(self):
+        return "diff"
 
     def diff_stat_cached(self):
         return "diff"
@@ -178,8 +183,12 @@ def test_commit_if_verified_emits_tx_commit_events(tmp_path, monkeypatch):
     assert verify_pass["payload"]["ok"] is True
     assert commit_start["phase"] == "verified"
     assert commit_start["payload"]["message"] == "message"
+    assert commit_start["payload"]["branch"] == "main"
+    assert commit_start["payload"]["diff_summary"] == "diff"
     assert commit_done["phase"] == "committed"
     assert commit_done["payload"]["sha"] == "abc123"
+    assert commit_done["payload"]["branch"] == "main"
+    assert commit_done["payload"]["diff_summary"] == "diff"
 
     last_seq = max(event["seq"] for event in events)
     tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))

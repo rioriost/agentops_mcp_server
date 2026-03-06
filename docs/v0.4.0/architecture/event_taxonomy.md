@@ -111,11 +111,15 @@ Intent `planned_step` MUST reference a `tx.step.enter` step_id, and intent state
   - Required payload:
     - `message` (string)
     - `files` (string or list, optional)
+    - `branch` (string)
+    - `diff_summary` (string)
 
 - **`tx.commit.done`**
   - Purpose: Commit finished.
   - Required payload:
-    - `sha` (string, optional)
+    - `sha` (string)
+    - `branch` (string)
+    - `diff_summary` (string)
     - `summary` (string, optional)
 
 - **`tx.commit.fail`**
@@ -123,6 +127,13 @@ Intent `planned_step` MUST reference a `tx.step.enter` step_id, and intent state
   - Required payload:
     - `error` (string)
     - `summary` (string, optional)
+
+### 2.5 Semantic Intent Events
+
+- **`tx.user_intent.set`**
+  - Purpose: Persist explicit user resume intent (e.g., "continue").
+  - Required payload:
+    - `user_intent` (string)
 
 ## 3) Ordering Notes (Summary)
 

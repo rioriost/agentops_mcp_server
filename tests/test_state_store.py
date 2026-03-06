@@ -34,7 +34,7 @@ def _base_tx_event_args():
         "step_id": "p4-t1-s1",
         "actor": {"agent_id": "a1"},
         "session_id": "s1",
-        "payload": {"note": "start"},
+        "payload": {"ticket_id": "p4-t1", "ticket_title": "p4-t1"},
     }
 
 
