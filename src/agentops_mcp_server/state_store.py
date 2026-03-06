@@ -27,6 +27,17 @@ TX_EVENT_TYPES = {
 
 FILE_INTENT_OPERATIONS = {"create", "update", "delete", "move", "rename"}
 FILE_INTENT_STATE_ORDER = {"planned": 0, "started": 1, "applied": 2, "verified": 3}
+TX_STATUS_VALUES = {
+    "planned",
+    "in-progress",
+    "checking",
+    "verified",
+    "committed",
+    "done",
+    "blocked",
+}
+VERIFY_STATUS_VALUES = {"not_started", "running", "passed", "failed"}
+COMMIT_STATUS_VALUES = {"not_started", "running", "passed", "failed"}
 
 
 def now_iso() -> str:
@@ -322,14 +333,38 @@ class StateStore:
         return {"ok": True, "seq": seq, "event_id": resolved_event_id}
 
     def _validate_tx_state(self, state: Dict[str, Any]) -> None:
-        if not isinstance(state.get("schema_version"), str):
-            raise ValueError("schema_version is required")
+        schema_version = state.get("schema_version")
+        if schema_version != "0.4.0":
+            raise ValueError("schema_version must be 0.4.0")
         if not isinstance(state.get("last_applied_seq"), int):
             raise ValueError("last_applied_seq is required")
+        if not isinstance(state.get("updated_at"), str):
+            raise ValueError("updated_at is required")
 
         active_tx = state.get("active_tx")
         if not isinstance(active_tx, dict):
             raise ValueError("active_tx is required")
+
+        tx_id = active_tx.get("tx_id")
+        if not isinstance(tx_id, str) or not tx_id.strip():
+            raise ValueError("active_tx.tx_id is required")
+        ticket_id = active_tx.get("ticket_id")
+        if not isinstance(ticket_id, str) or not ticket_id.strip():
+            raise ValueError("active_tx.ticket_id is required")
+        status = active_tx.get("status")
+        if not isinstance(status, str) or status not in TX_STATUS_VALUES:
+            raise ValueError("active_tx.status is invalid")
+        phase = active_tx.get("phase")
+        if not isinstance(phase, str) or phase not in TX_STATUS_VALUES:
+            raise ValueError("active_tx.phase is invalid")
+        if status != phase:
+            raise ValueError("active_tx.phase must match status")
+        current_step = active_tx.get("current_step")
+        if not isinstance(current_step, str) or not current_step.strip():
+            raise ValueError("active_tx.current_step is required")
+        next_action = active_tx.get("next_action")
+        if not isinstance(next_action, str) or not next_action.strip():
+            raise ValueError("active_tx.next_action is required")
         if not isinstance(active_tx.get("file_intents"), list):
             raise ValueError("active_tx.file_intents is required")
 
@@ -342,6 +377,26 @@ class StateStore:
         user_intent = active_tx.get("user_intent")
         if user_intent is not None and not isinstance(user_intent, str):
             raise ValueError("active_tx.user_intent must be string or null")
+
+        verify_state = active_tx.get("verify_state")
+        if not isinstance(verify_state, dict):
+            raise ValueError("active_tx.verify_state is required")
+        verify_status = verify_state.get("status")
+        if (
+            not isinstance(verify_status, str)
+            or verify_status not in VERIFY_STATUS_VALUES
+        ):
+            raise ValueError("active_tx.verify_state.status is invalid")
+
+        commit_state = active_tx.get("commit_state")
+        if not isinstance(commit_state, dict):
+            raise ValueError("active_tx.commit_state is required")
+        commit_status = commit_state.get("status")
+        if (
+            not isinstance(commit_status, str)
+            or commit_status not in COMMIT_STATUS_VALUES
+        ):
+            raise ValueError("active_tx.commit_state.status is invalid")
 
         integrity = state.get("integrity")
         if not isinstance(integrity, dict):

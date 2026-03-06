@@ -2,7 +2,7 @@
   "id": "p5-t3",
   "phase": 5,
   "title": "Tighten rebuild/resume logic and tx_state validation",
-  "status": "planned",
+  "status": "done",
   "summary": "Strengthen rebuild prerequisites, schema validation, and next_action derivation to match 0.4.0 resume specs.",
   "inputs": [
     "docs/v0.4.0/plan.md",

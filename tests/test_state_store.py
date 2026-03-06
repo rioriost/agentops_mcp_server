@@ -180,3 +180,58 @@ def test_write_text_creates_parent(state_store, tmp_path):
     target = tmp_path / "nested" / "file.txt"
     state_store.write_text(target, "ok")
     assert target.read_text(encoding="utf-8") == "ok"
+
+
+def test_tx_state_save_requires_schema_version_value(state_store):
+    state = _valid_tx_state()
+    state["schema_version"] = "0.3.0"
+    with pytest.raises(ValueError, match="schema_version must be 0.4.0"):
+        state_store.tx_state_save(state)
+
+
+@pytest.mark.parametrize(
+    "mutator, match",
+    [
+        (
+            lambda state: state["active_tx"].update({"tx_id": ""}),
+            "active_tx.tx_id is required",
+        ),
+        (
+            lambda state: state["active_tx"].update({"ticket_id": ""}),
+            "active_tx.ticket_id is required",
+        ),
+        (
+            lambda state: state["active_tx"].update({"status": "bogus"}),
+            "active_tx.status is invalid",
+        ),
+        (
+            lambda state: state["active_tx"].update({"phase": "checking"}),
+            "active_tx.phase must match status",
+        ),
+        (
+            lambda state: state["active_tx"].update({"current_step": ""}),
+            "active_tx.current_step is required",
+        ),
+        (
+            lambda state: state["active_tx"].update({"next_action": ""}),
+            "active_tx.next_action is required",
+        ),
+        (
+            lambda state: state["active_tx"]["verify_state"].update(
+                {"status": "bogus"}
+            ),
+            "active_tx.verify_state.status is invalid",
+        ),
+        (
+            lambda state: state["active_tx"]["commit_state"].update(
+                {"status": "bogus"}
+            ),
+            "active_tx.commit_state.status is invalid",
+        ),
+    ],
+)
+def test_tx_state_save_requires_active_tx_core_fields(state_store, mutator, match):
+    state = _valid_tx_state()
+    mutator(state)
+    with pytest.raises(ValueError, match=match):
+        state_store.tx_state_save(state)

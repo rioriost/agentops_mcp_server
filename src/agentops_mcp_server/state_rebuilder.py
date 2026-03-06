@@ -123,8 +123,8 @@ class StateRebuilder:
         self, tx_id: str, ticket_id: str, phase: str, step_id: str
     ) -> Dict[str, Any]:
         return {
-            "tx_id": tx_id,
-            "ticket_id": ticket_id,
+            "tx_id": tx_id or "none",
+            "ticket_id": ticket_id or "none",
             "status": phase,
             "phase": phase,
             "current_step": step_id,
@@ -487,6 +487,20 @@ class StateRebuilder:
     def _derive_next_action(self, active_tx: Dict[str, Any]) -> str:
         status = active_tx.get("status")
         file_intents = active_tx.get("file_intents")
+        semantic_summary = (
+            active_tx.get("semantic_summary")
+            if isinstance(active_tx.get("semantic_summary"), str)
+            else ""
+        )
+        user_intent = (
+            active_tx.get("user_intent")
+            if isinstance(active_tx.get("user_intent"), str)
+            else ""
+        )
+        intent_value = user_intent.strip().lower()
+        intent_continue = intent_value in {"continue", "resume", "proceed"}
+        summary_lower = semantic_summary.lower()
+
         verify_state = (
             active_tx.get("verify_state")
             if isinstance(active_tx.get("verify_state"), dict)
@@ -501,7 +515,7 @@ class StateRebuilder:
         if status == "planned":
             return "tx.begin"
         if status == "in-progress":
-            if isinstance(file_intents, list):
+            if isinstance(file_intents, list) and file_intents:
                 if any(
                     intent.get("state") in {"planned", "started"}
                     for intent in file_intents
@@ -514,6 +528,10 @@ class StateRebuilder:
                     if isinstance(intent, dict)
                 ):
                     return "tx.verify.start"
+            if intent_continue:
+                return "continue file intents"
+            if "verify" in summary_lower:
+                return "tx.verify.start"
             return "tx.verify.start"
         if status == "checking":
             if verify_state.get("status") == "not_started":
@@ -566,6 +584,13 @@ class StateRebuilder:
             else self.repo_context.tx_event_log
         )
 
+        if not resolved_event_log.exists():
+            return {
+                "ok": False,
+                "reason": "tx_event_log missing",
+                "path": str(resolved_event_log),
+            }
+
         event_log = self.read_tx_event_log(
             start_seq=0, end_seq=end_seq, event_log_path=resolved_event_log
         )
@@ -578,6 +603,13 @@ class StateRebuilder:
         if isinstance(existing_state, dict) and self._tx_state_integrity_ok(
             existing_state, last_seq
         ):
+            active_tx = existing_state.get("active_tx")
+            if isinstance(active_tx, dict):
+                active_tx["next_action"] = self._derive_next_action(active_tx)
+            integrity = existing_state.get("integrity")
+            if isinstance(integrity, dict):
+                existing_state["updated_at"] = datetime.now(timezone.utc).isoformat()
+                integrity["state_hash"] = self._compute_state_hash(existing_state)
             return {
                 "ok": True,
                 "state": existing_state,

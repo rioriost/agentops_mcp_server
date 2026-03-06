@@ -23,6 +23,12 @@ def _append_raw_tx_event(repo_context, event):
         handle.write(json.dumps(event) + "\n")
 
 
+def test_rebuild_tx_state_requires_event_log(repo_context, state_rebuilder):
+    result = state_rebuilder.rebuild_tx_state()
+    assert result["ok"] is False
+    assert result["reason"] == "tx_event_log missing"
+
+
 def test_read_tx_event_log_filters_seq(repo_context, state_store, state_rebuilder):
     _append_tx_event(state_store)
     _append_tx_event(
