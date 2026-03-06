@@ -244,6 +244,24 @@
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["tests/test_state_store.py"],
       "deps": ["p6-t2"]
+    },
+    {
+      "id": "p7-t2",
+      "phase": 7,
+      "title": "Raise coverage for repo_context/tool_router/commit_manager",
+      "status": "verified",
+      "inputs": [
+        "docs/v0.4.0/plan.md",
+        "src/agentops_mcp_server/repo_context.py",
+        "src/agentops_mcp_server/tool_router.py",
+        "src/agentops_mcp_server/commit_manager.py"
+      ],
+      "outputs": [
+        "tests/test_repo_context.py",
+        "tests/test_tool_router.py",
+        "tests/test_commit_manager.py"
+      ],
+      "deps": ["p7-t1"]
     }
   ]
 }

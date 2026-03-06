@@ -68,21 +68,30 @@ def _build_manager(status_lines=None, verify_result=None):
     return manager, git_repo, verify_runner, state_store
 
 
-def _write_tx_state(state_store, tx_id="tx-1", ticket_id="p4-t3"):
+def _write_tx_state(
+    state_store,
+    tx_id="tx-1",
+    ticket_id="p4-t3",
+    status="in-progress",
+    phase=None,
+    verify_state_status="not_started",
+    commit_state_status="not_started",
+):
+    resolved_phase = phase or status
     state = {
         "schema_version": "0.4.0",
         "active_tx": {
             "tx_id": tx_id,
             "ticket_id": ticket_id,
-            "status": "in-progress",
-            "phase": "in-progress",
+            "status": status,
+            "phase": resolved_phase,
             "current_step": "commit",
             "last_completed_step": "",
             "next_action": "tx.commit.start",
             "semantic_summary": "Ready to commit",
             "user_intent": None,
-            "verify_state": {"status": "not_started", "last_result": None},
-            "commit_state": {"status": "not_started", "last_result": None},
+            "verify_state": {"status": verify_state_status, "last_result": None},
+            "commit_state": {"status": commit_state_status, "last_result": None},
             "file_intents": [],
         },
         "last_applied_seq": 1,
@@ -256,3 +265,132 @@ def test_repo_commit_with_files_empty_returns_reason():
 
     assert result["ok"] is False
     assert result["reason"] == "no files specified"
+
+
+def test_load_tx_context_missing_state_returns_none():
+    manager, *_ = _build_manager()
+    assert manager._load_tx_context() is None
+
+
+def test_commit_message_from_status_counts_files():
+    manager, *_ = _build_manager()
+    assert (
+        manager._commit_message_from_status([" M a.txt", "A b.txt"])
+        == "chore: update 2 file(s)"
+    )
+
+
+def test_branch_name_falls_back_to_unknown():
+    class FailingGitRepo(DummyGitRepo):
+        def git(self, *args):
+            raise RuntimeError("boom")
+
+    manager = CommitManager(
+        FailingGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        DummyStateStore(),
+        DummyStateRebuilder(),
+    )
+    assert manager._branch_name() == "unknown"
+
+
+def test_repo_commit_with_files_none_adds_all(monkeypatch):
+    manager, git_repo, *_ = _build_manager(status_lines=[" M file.txt"])
+    monkeypatch.setattr(manager, "_run_git_commit", lambda msg: ("sha", "summary"))
+
+    result = manager.repo_commit(files=None)
+
+    assert result["ok"] is True
+    assert ("add", "-A") in git_repo.calls
+
+
+def test_commit_if_verified_verify_failure_emits_event(tmp_path):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    _write_tx_state(state_store)
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner({"ok": False, "returncode": 2, "stderr": "nope"}),
+        state_store,
+        state_rebuilder,
+    )
+
+    with pytest.raises(RuntimeError, match="verify failed"):
+        manager.commit_if_verified("message", timeout_sec=1)
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    event_types = [event["event_type"] for event in events]
+
+    assert "tx.verify.start" in event_types
+    assert "tx.verify.fail" in event_types
+
+
+def test_diff_summary_handles_exception():
+    class FailingDiffGitRepo(DummyGitRepo):
+        def diff_stat(self):
+            raise RuntimeError("boom")
+
+        def diff_stat_cached(self):
+            raise RuntimeError("boom")
+
+    manager = CommitManager(
+        FailingDiffGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        DummyStateStore(),
+        DummyStateRebuilder(),
+    )
+
+    assert manager._diff_summary() == "no changes"
+    assert manager._diff_summary(cached=True) == "no changes"
+
+
+def test_event_log_empty_true_when_missing(tmp_path):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        state_store,
+        state_rebuilder,
+    )
+
+    assert manager._event_log_empty() is True
+
+
+def test_run_git_commit_failure_emits_event(tmp_path, monkeypatch):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    _write_tx_state(state_store, commit_state_status="running")
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner({"ok": True}),
+        state_store,
+        state_rebuilder,
+    )
+
+    def fail_run(*args, **kwargs):
+        raise RuntimeError("commit failed")
+
+    monkeypatch.setattr(subprocess, "run", fail_run)
+
+    with pytest.raises(RuntimeError, match="commit failed"):
+        manager._run_git_commit("message")
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    event_types = [event["event_type"] for event in events]
+
+    assert "tx.commit.fail" in event_types

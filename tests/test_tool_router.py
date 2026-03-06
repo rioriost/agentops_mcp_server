@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from agentops_mcp_server.tool_router import ToolRouter
 
 
@@ -8,7 +10,7 @@ def _build_registry(calls):
         calls["ops_compact_context"] = (max_chars, include_diff)
         return {"ok": True}
 
-    def echo(value=None):
+    def echo(value=None, workspace_root=None):
         return {"value": value, "blob": "x" * 5000}
 
     return {
@@ -88,5 +90,76 @@ def test_tools_call_missing_workspace_root_adds_warning(repo_context, state_stor
     payload = tool_router.tools_call("echo", {"value": "ok"})
     content = json.loads(payload["content"][0]["text"])
 
+    warnings = content.get("warnings") or []
+    assert any(warning.get("code") == "workspace_root.missing" for warning in warnings)
+
+
+def test_tools_call_unknown_tool_raises(repo_context, state_store):
+    tool_router = ToolRouter(_build_registry({}), repo_context, state_store)
+
+    with pytest.raises(ValueError, match="Unknown tool"):
+        tool_router.tools_call("missing.tool", {})
+
+
+def test_tools_call_missing_required_arguments(repo_context, state_store):
+    registry = {
+        "needs_value": {
+            "description": "Needs value",
+            "input_schema": {
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+                "required": ["value"],
+            },
+            "handler": lambda value: {"value": value},
+        }
+    }
+    tool_router = ToolRouter(registry, repo_context, state_store)
+
+    with pytest.raises(ValueError, match="Missing required argument"):
+        tool_router.tools_call("needs_value", {})
+
+
+def test_tools_call_missing_required_field_in_arguments(repo_context, state_store):
+    registry = {
+        "needs_value": {
+            "description": "Needs value",
+            "input_schema": {
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+                "required": ["value"],
+            },
+            "handler": lambda value: {"value": value},
+        }
+    }
+    tool_router = ToolRouter(registry, repo_context, state_store)
+
+    with pytest.raises(ValueError, match="Missing required argument"):
+        tool_router.tools_call("needs_value", {"value": None})
+
+
+def test_tools_call_blank_workspace_root_adds_warning(repo_context, state_store):
+    tool_router = ToolRouter(_build_registry({}), repo_context, state_store)
+
+    payload = tool_router.tools_call("echo", {"value": "ok", "workspace_root": "   "})
+    content = json.loads(payload["content"][0]["text"])
+
+    warnings = content.get("warnings") or []
+    assert any(warning.get("code") == "workspace_root.missing" for warning in warnings)
+
+
+def test_tools_call_non_dict_result_adds_warning(repo_context, state_store):
+    registry = {
+        "list_result": {
+            "description": "List result",
+            "input_schema": {"type": "object", "properties": {}, "required": []},
+            "handler": lambda: ["ok"],
+        }
+    }
+    tool_router = ToolRouter(registry, repo_context, state_store)
+
+    payload = tool_router.tools_call("list_result", {})
+    content = json.loads(payload["content"][0]["text"])
+
+    assert content["result"] == ["ok"]
     warnings = content.get("warnings") or []
     assert any(warning.get("code") == "workspace_root.missing" for warning in warnings)

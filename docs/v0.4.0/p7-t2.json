@@ -1,0 +1,46 @@
+{
+  "id": "p7-t2",
+  "phase": 7,
+  "title": "Raise coverage for repo_context/tool_router/commit_manager",
+  "status": "verified",
+  "summary": "Add focused unit tests to increase coverage for repo_context.py, tool_router.py, and commit_manager.py while asserting key behaviors and edge cases.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "src/agentops_mcp_server/repo_context.py",
+    "src/agentops_mcp_server/tool_router.py",
+    "src/agentops_mcp_server/commit_manager.py"
+  ],
+  "outputs": [
+    "tests/test_repo_context.py",
+    "tests/test_tool_router.py",
+    "tests/test_commit_manager.py"
+  ],
+  "acceptance_criteria": [
+    "Coverage for repo_context.py increases with new tests for core behaviors and error paths.",
+    "Coverage for tool_router.py increases with new tests for routing decisions and failure handling.",
+    "Coverage for commit_manager.py increases with new tests for commit flow decisions and error handling."
+  ],
+  "deps": ["p7-t1"],
+  "steps": [
+    {
+      "id": "p7-t2-s1",
+      "description": "Identify untested branches in repo_context.py and add minimal, deterministic unit tests."
+    },
+    {
+      "id": "p7-t2-s2",
+      "description": "Add routing and error-handling tests for tool_router.py covering key branches."
+    },
+    {
+      "id": "p7-t2-s3",
+      "description": "Add commit flow tests for commit_manager.py covering success and failure scenarios."
+    },
+    {
+      "id": "p7-t2-s4",
+      "description": "Run coverage to confirm target files show improved coverage."
+    }
+  ],
+  "notes": [
+    "Prefer minimal, deterministic tests with clear assertions.",
+    "Use existing fixtures and avoid network or filesystem dependencies where possible."
+  ]
+}
