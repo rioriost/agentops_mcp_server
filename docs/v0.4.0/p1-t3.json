@@ -1,0 +1,39 @@
+{
+  "id": "p1-t3",
+  "title": "Define recovery algorithm & torn-state policy",
+  "phase": 1,
+  "status": "done",
+  "summary": "Finalize deterministic recovery logic and torn-state resolution rules for 0.4.0.",
+  "inputs": ["docs/v0.4.0/plan.md"],
+  "outputs": ["docs/v0.4.0/architecture/recovery-algorithm.md"],
+  "acceptance_criteria": [
+    "Recovery algorithm steps are enumerated and deterministic.",
+    "Torn-state detection and resolution rules are explicit.",
+    "Rules cover invalid/stale materialized state vs event log precedence.",
+    "Terminal vs non-terminal transaction selection is defined.",
+    "Next-action derivation rules are specified."
+  ],
+  "deps": ["p1-t1", "p1-t2"],
+  "steps": [
+    {
+      "id": "p1-t3-s1",
+      "description": "Enumerate recovery algorithm steps from load → validate → rebuild → select → resume."
+    },
+    {
+      "id": "p1-t3-s2",
+      "description": "Define torn-state detection rules and precedence between event log and materialized state."
+    },
+    {
+      "id": "p1-t3-s3",
+      "description": "Specify next_action derivation rules and resume event emission."
+    },
+    {
+      "id": "p1-t3-s4",
+      "description": "Write the recovery algorithm specification document."
+    }
+  ],
+  "notes": [
+    "Align with Sections 6 and 7 of plan.md.",
+    "Ensure compatibility with transaction lifecycle invariants."
+  ]
+}
