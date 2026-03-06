@@ -2,7 +2,7 @@
   "id": "p1-t2",
   "phase": 1,
   "title": "Define canonical materialized transaction state schema",
-  "status": "verified",
+  "status": "done",
   "summary": "Specify the 0.4.0 canonical materialized transaction state schema, including semantic memory fields, invariants, and integrity model.",
   "inputs": ["docs/v0.4.0/plan.md"],
   "outputs": ["docs/v0.4.0/schema/materialized_state.md"],
