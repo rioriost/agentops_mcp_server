@@ -1,0 +1,36 @@
+{
+  "id": "p3-t7",
+  "phase": 3,
+  "title": "Update documentation for semantic resume workflow",
+  "status": "planned",
+  "summary": "Update README docs to describe canonical artifacts, semantic memory, and deterministic resume behavior.",
+  "inputs": ["docs/v0.4.0/plan.md"],
+  "outputs": [
+    "Updated README.md describing semantic resume workflow",
+    "Updated README-jp.md with equivalent semantic memory guidance"
+  ],
+  "acceptance_criteria": [
+    "README.md explains semantic_summary and user_intent fields and how they support “continue”.",
+    "README-jp.md mirrors semantic resume guidance.",
+    "Docs state that event log + materialized state are canonical sources of truth.",
+    "Legacy artifact compatibility is not implied."
+  ],
+  "deps": ["p3-t6"],
+  "steps": [
+    {
+      "id": "p3-t7-s1",
+      "description": "Update README.md with canonical artifacts and semantic resume overview."
+    },
+    {
+      "id": "p3-t7-s2",
+      "description": "Update README-jp.md with equivalent semantic memory guidance."
+    },
+    {
+      "id": "p3-t7-s3",
+      "description": "Add notes on resume precedence and derived handoff behavior."
+    }
+  ],
+  "notes": [
+    "Keep documentation concise and aligned with semantic memory rationale in plan.md."
+  ]
+}

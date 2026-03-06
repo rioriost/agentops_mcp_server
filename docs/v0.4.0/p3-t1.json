@@ -1,0 +1,45 @@
+{
+  "id": "p3-t1",
+  "phase": 3,
+  "title": "Implement tx event schema and materialized state persistence",
+  "status": "planned",
+  "summary": "Implement transaction-aware event persistence and materialized state storage, including semantic memory fields.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "docs/v0.4.0/p2-t1.json",
+    "docs/v0.4.0/p2-t4.json"
+  ],
+  "outputs": [
+    "Transaction event log schema persisted with tx_id, ticket_id, event_type, phase, step_id, actor, session_id",
+    "Materialized state persisted with semantic_summary and user_intent fields"
+  ],
+  "acceptance_criteria": [
+    "Event records include tx_id, ticket_id, event_type, phase, step_id, actor, and session_id.",
+    "Materialized state persists schema_version, active_tx, file_intents, integrity, last_applied_seq, semantic_summary, and user_intent.",
+    "Write ordering follows event append → state update → cursor persist.",
+    "Validation guards reject missing required transaction fields."
+  ],
+  "deps": ["p2-t4"],
+  "steps": [
+    {
+      "id": "p3-t1-s1",
+      "description": "Update event persistence to include required tx fields and actor/session metadata."
+    },
+    {
+      "id": "p3-t1-s2",
+      "description": "Persist materialized state schema with semantic_summary and user_intent."
+    },
+    {
+      "id": "p3-t1-s3",
+      "description": "Ensure write ordering matches the writer pipeline specification."
+    },
+    {
+      "id": "p3-t1-s4",
+      "description": "Add validation guards for required tx fields and intent metadata."
+    }
+  ],
+  "notes": [
+    "Breaking redesign: no legacy schema compatibility.",
+    "Semantic memory must be deterministic and derived from canonical artifacts."
+  ]
+}

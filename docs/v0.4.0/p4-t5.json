@@ -1,0 +1,49 @@
+{
+  "id": "p4-t5",
+  "phase": 4,
+  "title": "Interruption matrix tests with semantic resume assertions",
+  "status": "planned",
+  "summary": "Implement interruption matrix tests and validate semantic resume intent handling with coverage gate >= 90%.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "docs/v0.4.0/p4-t1.json",
+    "docs/v0.4.0/p4-t2.json",
+    "docs/v0.4.0/p4-t3.json",
+    "docs/v0.4.0/p4-t4.json"
+  ],
+  "outputs": [
+    "Interruption matrix test cases covering all cut points",
+    "Deterministic resume assertions for next_action and semantic intent",
+    "Coverage gate configuration or verification updates"
+  ],
+  "acceptance_criteria": [
+    "Tests cover all six interruption cut points defined in the plan.",
+    "Each cut point asserts deterministic next_action outcomes.",
+    "Semantic resume intent (e.g., \"continue\") is interpreted deterministically from persisted semantic memory.",
+    "Torn-state recovery paths are exercised in tests.",
+    "Coverage gate >= 90% is enforced by verification."
+  ],
+  "deps": ["p4-t1", "p4-t2", "p4-t3", "p4-t4"],
+  "steps": [
+    {
+      "id": "matrix-cases",
+      "description": "Create fixtures for each interruption cut point with semantic memory state."
+    },
+    {
+      "id": "semantic-resume-assertions",
+      "description": "Assert deterministic next_action and semantic intent handling for each case."
+    },
+    {
+      "id": "coverage-gate",
+      "description": "Ensure coverage threshold >= 90% is enforced."
+    }
+  ],
+  "verify": {
+    "command": "${VERIFY_REL}",
+    "expectation": "All tests pass and coverage >= 90%."
+  },
+  "notes": [
+    "Focus on canonical event log + materialized state rebuild with semantic memory.",
+    "Avoid legacy artifact assumptions in new tests."
+  ]
+}

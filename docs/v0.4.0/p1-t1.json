@@ -2,8 +2,7 @@
   "id": "p1-t1",
   "phase": 1,
   "title": "Finalize event taxonomy and lifecycle invariants",
-  "status": "done",
-  "type": "ticket",
+  "status": "verified",
   "summary": "Define the full transaction event taxonomy and lifecycle invariants for 0.4.0, aligning with deterministic resume and transaction boundaries.",
   "inputs": ["docs/v0.4.0/plan.md"],
   "outputs": [
@@ -20,7 +19,7 @@
   "steps": [
     {
       "id": "p1-t1-s1",
-      "description": "Extract required events from plan and enumerate full taxonomy (tx.begin, tx.step.enter, tx.file_intent.*, tx.verify.*, tx.commit.*, tx.end.*)."
+      "description": "Enumerate full taxonomy (tx.begin, tx.step.enter, tx.file_intent.*, tx.verify.*, tx.commit.*, tx.end.*)."
     },
     {
       "id": "p1-t1-s2",

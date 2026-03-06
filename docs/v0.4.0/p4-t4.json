@@ -1,0 +1,37 @@
+{
+  "id": "p4-t4",
+  "phase": 4,
+  "title": "Update tests for repo context and scaffold changes",
+  "status": "planned",
+  "summary": "Adjust tests to cover canonical artifact paths, scaffolded files, and semantic resume rule updates.",
+  "inputs": ["docs/v0.4.0/plan.md", "docs/v0.4.0/p3-t6.json"],
+  "outputs": [
+    "Updated tests/test_repo_context.py for canonical artifact paths",
+    "Updated tests/test_init.py for scaffolded artifacts and .rules content"
+  ],
+  "acceptance_criteria": [
+    "RepoContext tests validate canonical artifact filenames and .agent paths.",
+    "Init script tests validate new artifact creation and legacy removal behavior.",
+    "Rules template tests validate semantic memory and canonical resume precedence requirements.",
+    "All updated tests pass with the new schema/paths."
+  ],
+  "deps": ["p3-t6"],
+  "steps": [
+    {
+      "id": "p4-t4-s1",
+      "description": "Update repo context tests to assert canonical artifact filenames and paths."
+    },
+    {
+      "id": "p4-t4-s2",
+      "description": "Update init tests to assert scaffolded artifacts and .rules content."
+    },
+    {
+      "id": "p4-t4-s3",
+      "description": "Run targeted tests to confirm updated expectations."
+    }
+  ],
+  "notes": [
+    "Align expected filenames with Phase 3 artifact decisions.",
+    "Focus on deterministic path resolution under CWD/.agent."
+  ]
+}

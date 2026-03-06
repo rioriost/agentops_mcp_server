@@ -1,0 +1,40 @@
+{
+  "id": "p3-t4",
+  "phase": 3,
+  "title": "Add registry/router support for semantic memory tools",
+  "status": "planned",
+  "summary": "Wire semantic memory and resume-intent tools into the registry/router and enforce required parameters.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "docs/v0.4.0/p2-t1.json",
+    "docs/v0.4.0/p2-t3.json"
+  ],
+  "outputs": [
+    "Updated tool registry and router supporting semantic memory APIs",
+    "Updated main entry wiring for semantic memory tools"
+  ],
+  "acceptance_criteria": [
+    "Tool registry exposes semantic memory/update tools required by 0.4.0 flow.",
+    "Router validates required parameters and returns deterministic errors for missing fields.",
+    "Main wiring includes new tool handlers without regressions."
+  ],
+  "deps": ["p3-t3"],
+  "steps": [
+    {
+      "id": "p3-t4-s1",
+      "description": "Add semantic memory tool definitions with required schema fields."
+    },
+    {
+      "id": "p3-t4-s2",
+      "description": "Update router validation to enforce required parameters."
+    },
+    {
+      "id": "p3-t4-s3",
+      "description": "Wire new tool handlers into the main entry point."
+    }
+  ],
+  "notes": [
+    "Align with Phase 2 semantic memory rules.",
+    "Keep errors short and deterministic for resume safety."
+  ]
+}

@@ -9,6 +9,7 @@
 - Make interrupted-session resume deterministic and robust.
 - Treat each ticket as a first-class transaction with explicit lifecycle boundaries.
 - Persist fine-grained intent: which files are changed, for what purpose, and in what sequence.
+- Persist semantic memory needed to interpret resume intent (e.g., “continue”).
 - Replace fragmented resumability semantics with a coherent, transaction-centric model.
 - Reach and maintain test coverage >= 90%.
 
@@ -36,6 +37,7 @@ Current system weaknesses:
 3. Resume sources are split across multiple artifacts with overlapping concerns.
 4. Divergence/torn-state handling is under-specified under abrupt interruption.
 5. Ticket lifecycle is not modeled as a transaction, making deterministic continuation harder.
+6. Semantic intent for resume prompts (e.g., “continue”) is not preserved, so the system lacks context reconstruction.
 
 Consequence:
 - After interruption, resumed session can know “something happened,” but not always “exactly what to do next.”
@@ -61,6 +63,9 @@ Consequence:
 
 6. **Operational clarity**
    - Keep structures compact but semantically complete.
+
+7. **Semantic continuity**
+   - Persist concise semantic memory so prompts like “continue” can be interpreted deterministically.
 
 ---
 
@@ -89,6 +94,13 @@ The canonical two-layer model is based on well-established distributed systems a
    - Convenience view: human-readable handoff, always regenerable from canonical sources.
 
 These principles are not tied to a specific product implementation; they are design references used to justify why the 0.4.0 model prioritizes deterministic recovery over backward compatibility.
+
+---
+
+## 2.2) Semantic Memory Rationale
+
+Unlike database transactions, agent sessions must interpret **semantic resume intent** (e.g., “continue”).  
+To do this deterministically, the system must persist a compact semantic summary of the last active transaction and the latest user intent. This enables context reconstruction from canonical artifacts alone, without relying on transient chat context.
 
 ---
 
@@ -172,6 +184,8 @@ Each ticket transaction includes explicit boundaries:
   - `current_step`
   - `last_completed_step`
   - `next_action`
+  - `semantic_summary` (concise summary of intent and progress)
+  - `user_intent` (latest user resume intent, e.g., “continue”)
   - `verify_state`
   - `commit_state`
   - `file_intents[]`
@@ -226,6 +240,7 @@ At session start:
    - step markers
    - file-intent states
    - verify/commit states
+   - semantic summary + latest user intent
 6. Resume from deterministic boundary and emit `tx.step.enter` continuation event.
 
 Failure modes:
@@ -249,7 +264,7 @@ Rules must explicitly require:
 
 ## 9) Phased Execution Plan
 
-## Phase 1: Architecture freeze
+## Phase 1: Architecture freeze (docs only)
 Goals:
 - Finalize transaction model and canonical schema.
 Tasks:
@@ -259,31 +274,43 @@ Tasks:
 Outputs:
 - Architecture spec and schema spec docs.
 
-## Phase 2: Runtime redesign specification
+## Phase 2: Runtime redesign specification (docs only)
 Goals:
 - Define implementation blueprint.
 Tasks:
 - Define writer pipeline (event append -> state update -> cursor persist).
+- Define semantic memory capture/update rules (when to update summary + user intent).
 - Define rebuild engine from event log.
-- Define transaction selection/resume logic.
+- Define transaction selection/resume logic (including semantic intent interpretation).
 - Define removal/replacement of legacy artifact paths.
 Outputs:
 - Component change checklist and dataflow spec.
 
-## Phase 3: Test strategy and verification gates
+## Phase 3: Implementation (code changes)
 Goals:
-- Prove deterministic interruption recovery.
+- Implement transaction-aware persistence, semantic memory, and deterministic resume.
 Tasks:
-- Build interruption matrix:
-  - before first file mutation
-  - between intent registration and mutation
-  - after mutation before state persist
-  - after state persist before verify
-  - after verify before commit
-  - after commit before terminal event
-- Add replay/rebuild determinism tests.
-- Add integrity mismatch recovery tests.
-- Run verification and ensure coverage >= 90%.
+- Update `state_store.py` to emit the transaction event schema and persist materialized transaction state (including `semantic_summary` and `user_intent`).
+- Update `state_rebuilder.py` to rebuild materialized transaction state from the event log, validate integrity, and resolve torn-state precedence deterministically.
+- Update `ops_tools.py` to emit tx boundary events and update semantic summary/user intent on resume-related prompts.
+- Update `commit_manager.py` to emit tx.commit events and persist the new cursor/state ordering after commits.
+- Update `repo_context.py` to reflect canonical artifact filenames/paths and any new state file(s).
+- Update `tool_registry.py` / `tool_router.py` / `main.py` to add any new transaction or semantic memory tools and enforce required parameters.
+- Update `zed-agentops-init.sh` and `.rules` template to align with new artifacts and resume precedence.
+- Update README docs to describe the new canonical artifacts, semantic memory, and resume workflow.
+Outputs:
+- Updated runtime implementation for transaction-aware persistence and semantic resume.
+
+## Phase 4: Tests and verification gates
+Goals:
+- Prove deterministic interruption recovery and reach coverage >= 90%.
+Tasks:
+- Add/adjust tests in `tests/test_state_store.py` for new event log and materialized state schemas (including semantic fields).
+- Add/adjust tests in `tests/test_state_rebuilder.py` for rebuild determinism, torn-state recovery, and semantic reconstruction.
+- Add/adjust tests in `tests/test_ops_tools.py` and `tests/test_commit_manager.py` for tx boundary events, semantic memory updates, and post-commit persistence.
+- Add/adjust tests in `tests/test_repo_context.py` and `tests/test_init.py` for artifact paths and scaffold changes.
+- Add interruption matrix tests covering all six cut points and validate next_action outcomes and semantic intent handling.
+- Enforce coverage gate >= 90% in verification.
 Outputs:
 - Resilience test suite + coverage report.
 
@@ -294,7 +321,8 @@ Outputs:
 2. Every mutated file in `in-progress` is associated with durable purpose/intent metadata.
 3. Rebuild from event log yields equivalent materialized state for the same sequence boundary.
 4. Torn-state situations resolve deterministically via defined recovery policy.
-5. Coverage >= 90%.
+5. Resume intent like “continue” can be interpreted deterministically from persisted semantic memory.
+6. Coverage >= 90%.
 
 ---
 

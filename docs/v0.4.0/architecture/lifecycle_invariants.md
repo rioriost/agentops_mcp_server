@@ -27,9 +27,10 @@ This document defines the transaction lifecycle invariants for deterministic res
 ### 4) File intent before mutation
 - A `tx.file_intent.add` event **must** exist **before** any mutation event for that file.
 - All mutation-related events must reference an existing intent entry.
+- Intent `planned_step` must reference a valid `tx.step.enter` step_id, and intent transitions must align to that step.
 - Intent state transitions must be monotonic:
   - `planned → started → applied → verified`
-- An intent cannot be marked `verified` before `verify.pass`.
+- An intent cannot be marked `verified` before `tx.verify.pass` for the owning step.
 
 ### 5) Verification and commit ordering
 - `tx.verify.start` must occur **after** all mutation events for the step.

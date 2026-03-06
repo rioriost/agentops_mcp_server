@@ -1,0 +1,39 @@
+{
+  "id": "p2-t2",
+  "phase": 2,
+  "title": "Define rebuild engine from event log",
+  "status": "planned",
+  "summary": "Specify deterministic rebuild of materialized transaction state from the event log, including semantic memory reconstruction.",
+  "inputs": ["docs/v0.4.0/plan.md"],
+  "outputs": ["docs/v0.4.0/specs/rebuild-engine.md"],
+  "acceptance_criteria": [
+    "Spec defines replay ordering and cursor handling (last_applied_seq).",
+    "Spec defines integrity checks and mismatch handling.",
+    "Spec defines truncation policy for corrupted tail events.",
+    "Spec defines how semantic_summary and user_intent are reconstructed during replay.",
+    "Spec defines how derived handoff is regenerated from canonical state."
+  ],
+  "deps": ["p2-t1"],
+  "steps": [
+    {
+      "id": "p2-t2-s1",
+      "description": "Define replay ordering and last_applied_seq calculation."
+    },
+    {
+      "id": "p2-t2-s2",
+      "description": "Specify integrity validation and torn-state precedence rules."
+    },
+    {
+      "id": "p2-t2-s3",
+      "description": "Define semantic memory reconstruction rules during replay."
+    },
+    {
+      "id": "p2-t2-s4",
+      "description": "Document handoff regeneration from canonical state."
+    }
+  ],
+  "notes": [
+    "Align with Phase 1 lifecycle invariants and semantic memory rationale.",
+    "Ensure determinism for identical event sequences."
+  ]
+}

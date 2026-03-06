@@ -1,0 +1,35 @@
+{
+  "id": "p2-t3",
+  "phase": 2,
+  "title": "Define resume logic with semantic intent",
+  "status": "planned",
+  "summary": "Specify deterministic resume logic that interprets semantic intent (e.g., \"continue\") using persisted semantic memory.",
+  "inputs": ["docs/v0.4.0/plan.md"],
+  "outputs": ["docs/v0.4.0/specs/resume_logic.md"],
+  "acceptance_criteria": [
+    "Defines deterministic selection of latest non-terminal transaction.",
+    "Specifies next_action derivation using status, steps, file intents, verify/commit states, and semantic memory.",
+    "Defines how user intent (e.g., \"continue\") is interpreted from persisted semantic fields.",
+    "Includes precedence rules for materialized state vs event log rebuild.",
+    "Covers edge cases: no active transaction, corrupted tail events, integrity mismatch."
+  ],
+  "deps": ["p2-t1", "p2-t2"],
+  "steps": [
+    {
+      "id": "p2-t3-s1",
+      "description": "Define transaction selection rules and tie-breakers for non-terminal transactions."
+    },
+    {
+      "id": "p2-t3-s2",
+      "description": "Specify next_action mapping using semantic_summary and user_intent."
+    },
+    {
+      "id": "p2-t3-s3",
+      "description": "Document rebuild triggers, truncation rules, and resume event emission."
+    }
+  ],
+  "notes": [
+    "Spec-only ticket; no runtime changes.",
+    "Align with semantic memory rationale in plan.md."
+  ]
+}

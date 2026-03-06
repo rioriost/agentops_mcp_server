@@ -6,7 +6,7 @@
       "id": "p1-t1",
       "phase": 1,
       "title": "Finalize event taxonomy and lifecycle invariants",
-      "status": "done",
+      "status": "verified",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p1-t1.json"],
       "deps": []
@@ -14,8 +14,8 @@
     {
       "id": "p1-t2",
       "phase": 1,
-      "title": "Finalize canonical state schema and integrity model",
-      "status": "done",
+      "title": "Finalize materialized state schema with semantic memory",
+      "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p1-t2.json"],
       "deps": ["p1-t1"]
@@ -23,8 +23,8 @@
     {
       "id": "p1-t3",
       "phase": 1,
-      "title": "Finalize resume algorithm and torn-state policy",
-      "status": "done",
+      "title": "Finalize recovery algorithm and torn-state policy",
+      "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p1-t3.json"],
       "deps": ["p1-t1", "p1-t2"]
@@ -32,7 +32,7 @@
     {
       "id": "p2-t1",
       "phase": 2,
-      "title": "Define writer pipeline (event append → state update → cursor persist)",
+      "title": "Define writer pipeline and semantic memory update rules",
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p2-t1.json"],
@@ -45,12 +45,12 @@
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p2-t2.json"],
-      "deps": ["p1-t3"]
+      "deps": ["p2-t1"]
     },
     {
       "id": "p2-t3",
       "phase": 2,
-      "title": "Define transaction selection/resume logic",
+      "title": "Define resume logic with semantic intent interpretation",
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p2-t3.json"],
@@ -68,7 +68,7 @@
     {
       "id": "p3-t1",
       "phase": 3,
-      "title": "Implement transaction event schema and materialized state storage",
+      "title": "Implement tx event schema and materialized state persistence",
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p3-t1.json"],
@@ -86,7 +86,7 @@
     {
       "id": "p3-t3",
       "phase": 3,
-      "title": "Implement tx boundary events and file intent enforcement",
+      "title": "Implement tx boundary events and semantic memory updates",
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p3-t3.json"],
@@ -95,7 +95,7 @@
     {
       "id": "p3-t4",
       "phase": 3,
-      "title": "Wire commit flow to tx.commit events and new cursor ordering",
+      "title": "Add registry/router support for semantic memory tools",
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p3-t4.json"],
@@ -104,43 +104,34 @@
     {
       "id": "p3-t5",
       "phase": 3,
-      "title": "Update repo context and artifact paths for canonical storage",
+      "title": "Wire commit flow to tx.commit events and cursor ordering",
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p3-t5.json"],
-      "deps": ["p3-t1"]
+      "deps": ["p3-t3"]
     },
     {
       "id": "p3-t6",
       "phase": 3,
-      "title": "Add registry/router support for new transaction tools",
+      "title": "Update repo context and scaffold/rules for new artifacts",
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p3-t6.json"],
-      "deps": ["p3-t3"]
+      "deps": ["p3-t1"]
     },
     {
       "id": "p3-t7",
       "phase": 3,
-      "title": "Update scaffold and rules for transaction-aware workflow",
+      "title": "Update documentation for semantic resume workflow",
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p3-t7.json"],
-      "deps": ["p3-t5"]
-    },
-    {
-      "id": "p3-t8",
-      "phase": 3,
-      "title": "Update documentation for new canonical artifacts",
-      "status": "planned",
-      "inputs": ["docs/v0.4.0/plan.md"],
-      "outputs": ["docs/v0.4.0/p3-t8.json"],
-      "deps": ["p3-t7"]
+      "deps": ["p3-t6"]
     },
     {
       "id": "p4-t1",
       "phase": 4,
-      "title": "Update tests for state store schema changes",
+      "title": "Update tests for state store schema (semantic fields)",
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p4-t1.json"],
@@ -149,7 +140,7 @@
     {
       "id": "p4-t2",
       "phase": 4,
-      "title": "Update tests for state rebuilder determinism",
+      "title": "Update tests for state rebuilder determinism and semantics",
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p4-t2.json"],
@@ -158,11 +149,11 @@
     {
       "id": "p4-t3",
       "phase": 4,
-      "title": "Update tests for ops tools and commit flow",
+      "title": "Update tests for ops tools and commit flow semantics",
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p4-t3.json"],
-      "deps": ["p3-t3", "p3-t4"]
+      "deps": ["p3-t3", "p3-t5"]
     },
     {
       "id": "p4-t4",
@@ -171,12 +162,12 @@
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p4-t4.json"],
-      "deps": ["p3-t5", "p3-t7"]
+      "deps": ["p3-t6"]
     },
     {
       "id": "p4-t5",
       "phase": 4,
-      "title": "Interruption matrix tests and coverage gate",
+      "title": "Interruption matrix tests with semantic resume assertions",
       "status": "planned",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p4-t5.json"],

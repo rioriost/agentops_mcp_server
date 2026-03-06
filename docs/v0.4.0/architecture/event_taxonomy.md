@@ -12,7 +12,7 @@ Every event record MUST include:
 - `ticket_id`: ticket identifier (string)
 - `event_type`: string event name (see taxonomy below)
 - `phase`: lifecycle phase (`planned|in-progress|checking|verified|committed|done|blocked`)
-- `step_id`: step identifier (string; `tx.step.enter` MUST set)
+- `step_id`: step identifier (string; required for `tx.step.enter` and step-scoped events; use a sentinel like `none` for boundary-only events such as `tx.begin` and `tx.end.*`)
 - `actor`: object describing the source of the event
 - `session_id`: session identifier (string)
 - `payload`: event-specific object (see definitions)
@@ -31,7 +31,7 @@ Every event record MUST include:
   - Required payload:
     - `ticket_id` (string)
     - `ticket_title` (string, optional but recommended)
-  - Notes: Must occur before any file intent or mutation events.
+  - Notes: Must occur before any file intent or mutation events. Use `step_id: "none"` for boundary-only events like `tx.begin`.
 
 - **`tx.step.enter`**
   - Purpose: Mark entry to a logical step.
@@ -55,6 +55,8 @@ Every event record MUST include:
 ### 2.2 File Intent Events
 
 All mutation-related work MUST be preceded by file intent registration.
+Intent `planned_step` MUST reference a `tx.step.enter` step_id, and intent state must advance monotonically (`planned → started → applied → verified`).
+`verified` state is only valid after `tx.verify.pass` for the owning step.
 
 - **`tx.file_intent.add`**
   - Purpose: Register intent before first mutation.

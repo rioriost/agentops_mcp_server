@@ -1,0 +1,33 @@
+{
+  "id": "p4-t1",
+  "phase": 4,
+  "title": "Update tests for state store schema (semantic fields)",
+  "status": "planned",
+  "summary": "Update state store tests to validate the 0.4.0 transaction event log and materialized state schema, including semantic memory fields.",
+  "inputs": ["docs/v0.4.0/plan.md", "docs/v0.4.0/p3-t1.json"],
+  "outputs": ["tests/test_state_store.py"],
+  "acceptance_criteria": [
+    "Tests validate journal events include tx_id, ticket_id, event_type, phase, step_id, actor, session_id.",
+    "Tests validate materialized state includes schema_version, active_tx, file_intents, integrity, last_applied_seq, semantic_summary, and user_intent.",
+    "Tests cover missing/invalid required fields and expected validation errors."
+  ],
+  "deps": ["p3-t1"],
+  "steps": [
+    {
+      "id": "p4-t1-s1",
+      "description": "Update event log tests for the new transaction event schema."
+    },
+    {
+      "id": "p4-t1-s2",
+      "description": "Update materialized state tests for semantic memory fields and integrity metadata."
+    },
+    {
+      "id": "p4-t1-s3",
+      "description": "Add validation/error-path tests for missing or malformed fields."
+    }
+  ],
+  "notes": [
+    "Tests should align with the Phase 2 schema spec.",
+    "No backward compatibility assertions."
+  ]
+}

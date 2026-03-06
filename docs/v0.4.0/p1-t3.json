@@ -1,9 +1,9 @@
 {
   "id": "p1-t3",
-  "title": "Define recovery algorithm & torn-state policy",
   "phase": 1,
-  "status": "done",
-  "summary": "Finalize deterministic recovery logic and torn-state resolution rules for 0.4.0.",
+  "title": "Define recovery algorithm & torn-state policy",
+  "status": "planned",
+  "summary": "Finalize deterministic recovery logic and torn-state resolution rules for 0.4.0, including semantic resume intent handling.",
   "inputs": ["docs/v0.4.0/plan.md"],
   "outputs": ["docs/v0.4.0/architecture/recovery-algorithm.md"],
   "acceptance_criteria": [
@@ -11,7 +11,7 @@
     "Torn-state detection and resolution rules are explicit.",
     "Rules cover invalid/stale materialized state vs event log precedence.",
     "Terminal vs non-terminal transaction selection is defined.",
-    "Next-action derivation rules are specified."
+    "Next-action derivation rules include semantic intent handling."
   ],
   "deps": ["p1-t1", "p1-t2"],
   "steps": [
@@ -25,7 +25,7 @@
     },
     {
       "id": "p1-t3-s3",
-      "description": "Specify next_action derivation rules and resume event emission."
+      "description": "Specify next_action derivation rules including semantic intent handling."
     },
     {
       "id": "p1-t3-s4",

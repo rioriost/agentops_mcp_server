@@ -1,0 +1,37 @@
+{
+  "id": "p2-t1",
+  "phase": 2,
+  "title": "Define writer pipeline and semantic memory rules",
+  "status": "planned",
+  "summary": "Specify event→state→cursor ordering and semantic memory capture/update rules for 0.4.0.",
+  "inputs": ["docs/v0.4.0/plan.md"],
+  "outputs": [
+    "docs/v0.4.0/specs/writer-pipeline.md",
+    "docs/v0.4.0/specs/semantic-memory-rules.md"
+  ],
+  "acceptance_criteria": [
+    "Defines write ordering: event append → state update → cursor persist.",
+    "Specifies when and how semantic_summary and user_intent are updated.",
+    "Clarifies validation/failure handling for torn-state scenarios.",
+    "Aligns with 0.4.0 schema and recovery algorithm."
+  ],
+  "deps": ["p1-t3"],
+  "steps": [
+    {
+      "id": "p2-t1-s1",
+      "description": "Document the canonical writer pipeline and ordering guarantees."
+    },
+    {
+      "id": "p2-t1-s2",
+      "description": "Define semantic memory update triggers and payload requirements."
+    },
+    {
+      "id": "p2-t1-s3",
+      "description": "Specify failure handling and rebuild triggers for torn-state cases."
+    }
+  ],
+  "notes": [
+    "Spec-only ticket; no runtime changes.",
+    "Semantic memory must be derived deterministically from canonical artifacts."
+  ]
+}

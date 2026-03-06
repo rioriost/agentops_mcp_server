@@ -1,0 +1,45 @@
+{
+  "id": "p4-t2",
+  "phase": 4,
+  "title": "Update tests for state rebuilder determinism and semantics",
+  "status": "planned",
+  "summary": "Add deterministic rebuild, torn-state recovery, and semantic reconstruction tests for the transaction-aware state rebuilder.",
+  "inputs": ["docs/v0.4.0/plan.md", "docs/v0.4.0/p3-t2.json"],
+  "outputs": [
+    "Updated tests in tests/test_state_rebuilder.py",
+    "New determinism, torn-state recovery, and semantic reconstruction cases"
+  ],
+  "acceptance_criteria": [
+    "Rebuild determinism is validated for identical event sequences.",
+    "Torn-state recovery paths are covered with corrupted tail events.",
+    "Integrity mismatch triggers rebuild from event log.",
+    "semantic_summary and user_intent reconstruction are validated under replay.",
+    "Tests assert correct next_action derivation with semantic intent handling."
+  ],
+  "deps": ["p3-t2"],
+  "steps": [
+    {
+      "id": "p4-t2-s1",
+      "description": "Add replay determinism tests comparing materialized state across runs."
+    },
+    {
+      "id": "p4-t2-s2",
+      "description": "Add torn-state recovery tests with invalid/corrupted tail events."
+    },
+    {
+      "id": "p4-t2-s3",
+      "description": "Validate semantic_summary and user_intent reconstruction under replay."
+    },
+    {
+      "id": "p4-t2-s4",
+      "description": "Assert next_action derivation with semantic intent present."
+    }
+  ],
+  "verify": {
+    "command": "${VERIFY_REL}",
+    "expectation": "All tests pass and coverage >= 90%."
+  },
+  "notes": [
+    "Align expectations with 0.4.0 recovery algorithm and semantic memory rules."
+  ]
+}

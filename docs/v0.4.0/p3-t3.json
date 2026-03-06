@@ -1,0 +1,41 @@
+{
+  "id": "p3-t3",
+  "phase": 3,
+  "title": "Implement tx boundary events and semantic memory updates",
+  "status": "planned",
+  "summary": "Emit transaction boundary events and persist semantic_summary/user_intent updates for deterministic resume intent handling.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "docs/v0.4.0/p2-t1.json",
+    "docs/v0.4.0/p2-t3.json"
+  ],
+  "outputs": [
+    "Updated tx boundary event emission in ops tools",
+    "Semantic memory update flow for semantic_summary and user_intent"
+  ],
+  "acceptance_criteria": [
+    "tx.begin, tx.step.enter, tx.verify.*, tx.commit.*, tx.end.* events are emitted in correct order.",
+    "semantic_summary and user_intent updates are emitted deterministically from canonical inputs.",
+    "File intent registration is enforced before mutation events.",
+    "Failure paths emit tx.*.fail events with concise error context."
+  ],
+  "deps": ["p3-t1", "p3-t2"],
+  "steps": [
+    {
+      "id": "p3-t3-s1",
+      "description": "Implement tx boundary event emission in ops tool flows."
+    },
+    {
+      "id": "p3-t3-s2",
+      "description": "Add semantic memory update emission for summary and user intent."
+    },
+    {
+      "id": "p3-t3-s3",
+      "description": "Enforce intent-before-mutation and emit tx.*.fail on errors."
+    }
+  ],
+  "notes": [
+    "Coordinate event payload fields with the new schema from p3-t1.",
+    "Semantic memory must be derived deterministically from persisted inputs."
+  ]
+}

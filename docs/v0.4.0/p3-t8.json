@@ -1,0 +1,39 @@
+{
+  "id": "p3-t8",
+  "phase": 3,
+  "title": "Update documentation for new canonical artifacts",
+  "status": "planned",
+  "summary": "Refresh README documentation to describe the 0.4.0 canonical artifacts and transaction-aware resume workflow.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "docs/v0.4.0/p2-t4.json"
+  ],
+  "outputs": [
+    "Updated README.md and README-jp.md reflecting new canonical artifacts",
+    "Documentation notes for transaction-aware resume flow"
+  ],
+  "acceptance_criteria": [
+    "README.md lists the new canonical artifacts and their roles.",
+    "README-jp.md mirrors the canonical artifact updates.",
+    "Docs describe resume precedence: event log + materialized state only.",
+    "Legacy artifact compatibility is not implied."
+  ],
+  "deps": ["p3-t7"],
+  "steps": [
+    {
+      "id": "p3-t8-s1",
+      "description": "Update README.md to reflect the new canonical artifacts and resume behavior."
+    },
+    {
+      "id": "p3-t8-s2",
+      "description": "Update README-jp.md with equivalent canonical artifact descriptions."
+    },
+    {
+      "id": "p3-t8-s3",
+      "description": "Add notes about transaction-aware resume and handoff as derived-only view."
+    }
+  ],
+  "notes": [
+    "Keep documentation concise and aligned with Phase 2 artifact policy."
+  ]
+}

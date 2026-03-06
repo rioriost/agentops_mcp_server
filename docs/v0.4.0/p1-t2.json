@@ -1,14 +1,14 @@
 {
-  "ticket_id": "p1-t2",
-  "title": "Phase 1: Define canonical materialized transaction state schema",
-  "phase": "phase-1-architecture-freeze",
-  "status": "done",
-  "summary": "Specify the 0.4.0 canonical materialized transaction state schema, including fields, types, invariants, and integrity model.",
+  "id": "p1-t2",
+  "phase": 1,
+  "title": "Define canonical materialized transaction state schema",
+  "status": "planned",
+  "summary": "Specify the 0.4.0 canonical materialized transaction state schema, including semantic memory fields, invariants, and integrity model.",
   "inputs": ["docs/v0.4.0/plan.md"],
   "outputs": ["docs/v0.4.0/schema/materialized_state.md"],
   "acceptance_criteria": [
     "Schema includes top-level fields: schema_version, active_tx, last_applied_seq, integrity, updated_at.",
-    "active_tx includes tx_id, ticket_id, status, phase, current_step, last_completed_step, next_action, verify_state, commit_state, file_intents.",
+    "active_tx includes tx_id, ticket_id, status, phase, current_step, last_completed_step, next_action, semantic_summary, user_intent, verify_state, commit_state, file_intents.",
     "file_intents items include path, operation, purpose, state, last_event_seq, and planned_step reference.",
     "Integrity model specifies state_hash and rebuilt_from_seq semantics.",
     "Document lists invariants and validation rules tied to the schema.",
@@ -26,10 +26,14 @@
     },
     {
       "id": "p1-t2-s3",
-      "description": "Specify integrity checks and hash/cursor semantics."
+      "description": "Specify semantic memory fields (semantic_summary, user_intent) and their update semantics."
     },
     {
       "id": "p1-t2-s4",
+      "description": "Specify integrity checks and hash/cursor semantics."
+    },
+    {
+      "id": "p1-t2-s5",
       "description": "List validation rules and invariants."
     }
   ],

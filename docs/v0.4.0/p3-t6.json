@@ -1,0 +1,38 @@
+{
+  "id": "p3-t6",
+  "phase": 3,
+  "title": "Update repo context and scaffold/rules for new artifacts",
+  "status": "planned",
+  "summary": "Align RepoContext, scaffold script, and .rules template with canonical artifacts and semantic memory requirements.",
+  "inputs": ["docs/v0.4.0/plan.md", "docs/v0.4.0/p2-t4.json"],
+  "outputs": [
+    "Updated canonical artifact path mapping in repo_context.py",
+    "Updated zed-agentops-init.sh scaffold for new artifacts",
+    "Updated .rules template reflecting semantic resume and canonical precedence"
+  ],
+  "acceptance_criteria": [
+    "RepoContext defines canonical artifact filenames/paths under CWD/.agent.",
+    "Scaffold script creates/updates canonical artifacts for 0.4.0 schema.",
+    "Rules require semantic memory capture and canonical resume precedence.",
+    "Legacy artifact references are removed or explicitly marked derived-only."
+  ],
+  "deps": ["p3-t1"],
+  "steps": [
+    {
+      "id": "p3-t6-s1",
+      "description": "Update RepoContext artifact mapping to reflect canonical artifacts."
+    },
+    {
+      "id": "p3-t6-s2",
+      "description": "Update zed-agentops-init.sh to scaffold new artifacts and remove legacy references."
+    },
+    {
+      "id": "p3-t6-s3",
+      "description": "Revise .rules template to require semantic memory capture and canonical resume precedence."
+    }
+  ],
+  "notes": [
+    "Keep artifacts under CWD/.agent.",
+    "No backward compatibility guarantees."
+  ]
+}

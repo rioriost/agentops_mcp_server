@@ -1,0 +1,43 @@
+{
+  "id": "p3-t5",
+  "phase": 3,
+  "title": "Wire commit flow to tx.commit events and cursor ordering",
+  "status": "planned",
+  "summary": "Update the commit pipeline to emit tx.commit events and persist the transaction-aware cursor/state ordering.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "docs/v0.4.0/p2-t1.json",
+    "docs/v0.4.0/p2-t2.json",
+    "docs/v0.4.0/p2-t3.json"
+  ],
+  "outputs": [
+    "Commit pipeline emits tx.commit.start|done|fail events",
+    "Post-commit state/cursor update aligned to writer pipeline",
+    "Commit flow notes updated for semantic resume context"
+  ],
+  "acceptance_criteria": [
+    "Commit flow emits tx.commit.start before git commit execution.",
+    "Commit flow emits tx.commit.done or tx.commit.fail with deterministic payloads.",
+    "Post-commit persistence updates materialized state and cursor in the defined order.",
+    "Commit events are consistent with transaction lifecycle invariants."
+  ],
+  "deps": ["p3-t3"],
+  "steps": [
+    {
+      "id": "p3-t5-s1",
+      "description": "Emit tx.commit.start before commit execution with required fields."
+    },
+    {
+      "id": "p3-t5-s2",
+      "description": "Emit tx.commit.done or tx.commit.fail with commit metadata and errors."
+    },
+    {
+      "id": "p3-t5-s3",
+      "description": "Persist materialized transaction state and cursor after commit in the writer pipeline order."
+    }
+  ],
+  "notes": [
+    "Target commit_manager.py as the primary implementation surface.",
+    "Keep event payloads concise and deterministic."
+  ]
+}

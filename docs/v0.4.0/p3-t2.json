@@ -1,0 +1,47 @@
+{
+  "id": "p3-t2",
+  "phase": 3,
+  "title": "Implement rebuild engine for transaction state",
+  "status": "planned",
+  "summary": "Implement deterministic rebuild of materialized transaction state from the transaction event log, including semantic memory reconstruction.",
+  "inputs": ["docs/v0.4.0/plan.md", "docs/v0.4.0/p2-t2.json"],
+  "outputs": [
+    "Updated state rebuild logic for transaction-aware state",
+    "Deterministic rebuild behavior with integrity validation",
+    "Semantic memory reconstruction from event log"
+  ],
+  "acceptance_criteria": [
+    "Rebuild logic replays transaction events into the 0.4.0 materialized state schema.",
+    "Integrity checks detect mismatches and trigger deterministic rebuild precedence.",
+    "Torn-state recovery behavior is deterministic and documented in code comments.",
+    "Rebuild output includes last_applied_seq and next_action derivation.",
+    "semantic_summary and user_intent are reconstructed deterministically from events."
+  ],
+  "deps": ["p3-t1"],
+  "steps": [
+    {
+      "id": "p3-t2-s1",
+      "description": "Update replay pipeline to apply tx events into materialized transaction state."
+    },
+    {
+      "id": "p3-t2-s2",
+      "description": "Implement integrity validation and torn-state precedence during rebuild."
+    },
+    {
+      "id": "p3-t2-s3",
+      "description": "Derive next_action deterministically from status, steps, file intents, and semantic memory."
+    },
+    {
+      "id": "p3-t2-s4",
+      "description": "Reconstruct semantic_summary and user_intent from event log during replay."
+    },
+    {
+      "id": "p3-t2-s5",
+      "description": "Add rebuild metadata outputs (last_applied_seq, rebuilt_from_seq)."
+    }
+  ],
+  "notes": [
+    "Align with Phase 2 rebuild-engine specification and semantic memory rationale.",
+    "Keep behavior deterministic for identical event sequences."
+  ]
+}

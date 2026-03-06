@@ -1,0 +1,42 @@
+{
+  "id": "p4-t3",
+  "phase": 4,
+  "title": "Update tests for ops tools and commit flow semantics",
+  "status": "planned",
+  "summary": "Update tests to cover tx boundary events, semantic memory updates, and post-commit persistence flow.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "docs/v0.4.0/p3-t3.json",
+    "docs/v0.4.0/p3-t5.json"
+  ],
+  "outputs": ["tests/test_ops_tools.py", "tests/test_commit_manager.py"],
+  "acceptance_criteria": [
+    "Ops tools tests validate tx.begin/tx.step.enter/tx.verify/tx.commit/tx.end events.",
+    "Tests verify semantic_summary and user_intent updates are recorded deterministically.",
+    "Commit flow tests validate tx.commit events and cursor/state persistence ordering.",
+    "All updated tests pass in verification."
+  ],
+  "deps": ["p3-t3", "p3-t5"],
+  "steps": [
+    {
+      "id": "p4-t3-s1",
+      "description": "Update ops tools tests to assert tx boundary events and semantic memory updates."
+    },
+    {
+      "id": "p4-t3-s2",
+      "description": "Update commit manager tests to assert tx.commit events and post-commit persistence ordering."
+    },
+    {
+      "id": "p4-t3-s3",
+      "description": "Run verification to confirm tests pass and coverage remains >= 90%."
+    }
+  ],
+  "verify": {
+    "command": "${VERIFY_REL}",
+    "expectation": "All tests pass and coverage >= 90%."
+  },
+  "notes": [
+    "Align expected event payloads with Phase 3 implementation decisions.",
+    "Avoid legacy checkpoint semantics in test expectations."
+  ]
+}

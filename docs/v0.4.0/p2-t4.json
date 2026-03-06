@@ -1,0 +1,38 @@
+{
+  "id": "p2-t4",
+  "phase": 2,
+  "title": "Define removal/replacement of legacy artifact paths",
+  "status": "planned",
+  "summary": "Specify how legacy snapshot/handoff/checkpoint artifacts are removed or replaced in the 0.4.0 redesign (no backward compatibility).",
+  "inputs": ["docs/v0.4.0/plan.md"],
+  "outputs": ["docs/v0.4.0/specs/legacy-artifact-policy.md"],
+  "acceptance_criteria": [
+    "Legacy artifact handling is explicitly defined for journal/checkpoint/snapshot/handoff.",
+    "Canonical artifacts are the only sources of truth in 0.4.0.",
+    "Path policy reuse under CWD/.agent/ is documented.",
+    "No backward compatibility promises are stated."
+  ],
+  "deps": ["p2-t1", "p2-t2", "p2-t3"],
+  "steps": [
+    {
+      "id": "p2-t4-s1",
+      "description": "Enumerate legacy artifacts and their current roles."
+    },
+    {
+      "id": "p2-t4-s2",
+      "description": "Map each legacy role to new canonical artifacts or mark as removed."
+    },
+    {
+      "id": "p2-t4-s3",
+      "description": "Document output path policy reuse under CWD/.agent/."
+    },
+    {
+      "id": "p2-t4-s4",
+      "description": "Specify that handoff is a derived-only view."
+    }
+  ],
+  "notes": [
+    "Align with Phase 2 writer pipeline and resume specs.",
+    "Keep policy compatible with semantic memory requirements."
+  ]
+}
