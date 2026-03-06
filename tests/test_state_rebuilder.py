@@ -465,6 +465,146 @@ def test_rebuild_tx_state_next_action_with_file_intents(
     assert rebuild["state"]["active_tx"]["next_action"] == "continue file intents"
 
 
+@pytest.mark.parametrize(
+    "label, events, expected_action, expected_intent",
+    [
+        (
+            "begin_only",
+            [
+                {},
+            ],
+            "tx.verify.start",
+            None,
+        ),
+        (
+            "intent_planned",
+            [
+                {},
+                {
+                    "event_type": "tx.file_intent.add",
+                    "payload": {
+                        "path": "alpha.py",
+                        "operation": "update",
+                        "purpose": "matrix test",
+                        "planned_step": "p4-t5-s1",
+                        "state": "planned",
+                    },
+                },
+            ],
+            "continue file intents",
+            None,
+        ),
+        (
+            "intent_applied",
+            [
+                {},
+                {
+                    "event_type": "tx.file_intent.add",
+                    "payload": {
+                        "path": "beta.py",
+                        "operation": "update",
+                        "purpose": "matrix test",
+                        "planned_step": "p4-t5-s2",
+                        "state": "applied",
+                    },
+                },
+            ],
+            "tx.verify.start",
+            None,
+        ),
+        (
+            "verify_failed_continue",
+            [
+                {},
+                {
+                    "event_type": "tx.user_intent.set",
+                    "phase": "checking",
+                    "payload": {"user_intent": "continue"},
+                },
+                {
+                    "event_type": "tx.verify.fail",
+                    "phase": "checking",
+                    "payload": {"ok": False, "returncode": 1, "error": "nope"},
+                },
+            ],
+            "fix and re-verify",
+            "continue",
+        ),
+        (
+            "verified_ready_to_commit",
+            [
+                {},
+                {
+                    "event_type": "tx.verify.pass",
+                    "phase": "verified",
+                    "payload": {"ok": True, "returncode": 0, "summary": "ok"},
+                },
+            ],
+            "tx.commit.start",
+            None,
+        ),
+        (
+            "committed_done",
+            [
+                {},
+                {
+                    "event_type": "tx.commit.done",
+                    "phase": "committed",
+                    "payload": {"sha": "abc123", "summary": "done"},
+                },
+            ],
+            "tx.end.done",
+            None,
+        ),
+    ],
+)
+def test_rebuild_tx_state_interruption_matrix_next_action(
+    state_rebuilder,
+    state_store,
+    repo_context,
+    label,
+    events,
+    expected_action,
+    expected_intent,
+):
+    if repo_context.tx_event_log.exists():
+        repo_context.tx_event_log.write_text("", encoding="utf-8")
+    if repo_context.tx_state.exists():
+        repo_context.tx_state.unlink()
+
+    for overrides in events:
+        _append_tx_event(
+            state_store,
+            step_id="p4-t5-s1",
+            phase=overrides.get("phase", "in-progress"),
+            **{k: v for k, v in overrides.items() if k != "phase"},
+        )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    active_tx = rebuild["state"]["active_tx"]
+    assert active_tx["next_action"] == expected_action
+    if expected_intent is not None:
+        assert active_tx["user_intent"] == expected_intent
+
+
+def test_rebuild_tx_state_missing_file_intent_truncates(
+    state_rebuilder, state_store, repo_context
+):
+    _append_tx_event(state_store)
+    _append_tx_event(
+        state_store,
+        event_type="tx.file_intent.update",
+        payload={"path": "missing.py", "state": "started"},
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 1
+
+
 def test_append_applied_event_id_trims(state_rebuilder):
     state = {"applied_event_ids": ["evt-1", "evt-2"]}
     state_rebuilder.append_applied_event_id(state, "evt-3", max_size=2)
