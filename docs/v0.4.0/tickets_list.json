@@ -6,7 +6,7 @@
       "id": "p1-t1",
       "phase": 1,
       "title": "Finalize event taxonomy and lifecycle invariants",
-      "status": "verified",
+      "status": "done",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p1-t1.json"],
       "deps": []
