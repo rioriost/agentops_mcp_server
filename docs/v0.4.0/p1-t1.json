@@ -1,0 +1,42 @@
+{
+  "id": "p1-t1",
+  "phase": 1,
+  "title": "Finalize event taxonomy and lifecycle invariants",
+  "status": "done",
+  "type": "ticket",
+  "summary": "Define the full transaction event taxonomy and lifecycle invariants for 0.4.0, aligning with deterministic resume and transaction boundaries.",
+  "inputs": ["docs/v0.4.0/plan.md"],
+  "outputs": [
+    "docs/v0.4.0/architecture/event_taxonomy.md",
+    "docs/v0.4.0/architecture/lifecycle_invariants.md"
+  ],
+  "acceptance_criteria": [
+    "Event taxonomy lists all required tx events with definitions and required fields.",
+    "Lifecycle invariants cover ordering constraints and terminal/non-terminal rules.",
+    "Invariants align with deterministic resume and file intent rules.",
+    "Artifacts are consistent with the 0.4.0 canonical schema."
+  ],
+  "deps": [],
+  "steps": [
+    {
+      "id": "p1-t1-s1",
+      "description": "Extract required events from plan and enumerate full taxonomy (tx.begin, tx.step.enter, tx.file_intent.*, tx.verify.*, tx.commit.*, tx.end.*)."
+    },
+    {
+      "id": "p1-t1-s2",
+      "description": "Define each event’s purpose, required fields, and expected ordering."
+    },
+    {
+      "id": "p1-t1-s3",
+      "description": "Specify lifecycle invariants, including single active tx, intent-before-mutation, and terminal event constraints."
+    },
+    {
+      "id": "p1-t1-s4",
+      "description": "Write event taxonomy and invariants docs."
+    }
+  ],
+  "notes": [
+    "This ticket is schema-spec only; no runtime changes.",
+    "Keep taxonomy concise but complete to support deterministic resume."
+  ]
+}

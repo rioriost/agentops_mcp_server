@@ -1,27 +1,186 @@
 {
   "version": "0.4.0",
-  "source": "draft.md",
+  "title": "Transaction-Aware Task Managing (Breaking Redesign)",
   "tickets": [
     {
-      "id": "p1-t01",
-      "priority": "P1",
-      "title": "Finalize 0.4.0 architecture and schema specs",
+      "id": "p1-t1",
+      "phase": 1,
+      "title": "Finalize event taxonomy and lifecycle invariants",
       "status": "done",
-      "file": "v0.4.0/ticket-p1-t01.json"
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p1-t1.json"],
+      "deps": []
     },
     {
-      "id": "p2-t01",
-      "priority": "P1",
-      "title": "Define runtime redesign specification and dataflow",
-      "status": "done",
-      "file": "v0.4.0/ticket-p2-t01.json"
+      "id": "p1-t2",
+      "phase": 1,
+      "title": "Finalize canonical state schema and integrity model",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p1-t2.json"],
+      "deps": ["p1-t1"]
     },
     {
-      "id": "p3-t01",
-      "priority": "P1",
-      "title": "Build deterministic recovery test strategy and gates",
-      "status": "done",
-      "file": "v0.4.0/ticket-p3-t01.json"
+      "id": "p1-t3",
+      "phase": 1,
+      "title": "Finalize resume algorithm and torn-state policy",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p1-t3.json"],
+      "deps": ["p1-t1", "p1-t2"]
+    },
+    {
+      "id": "p2-t1",
+      "phase": 2,
+      "title": "Define writer pipeline (event append → state update → cursor persist)",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p2-t1.json"],
+      "deps": ["p1-t3"]
+    },
+    {
+      "id": "p2-t2",
+      "phase": 2,
+      "title": "Define rebuild engine from event log",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p2-t2.json"],
+      "deps": ["p1-t3"]
+    },
+    {
+      "id": "p2-t3",
+      "phase": 2,
+      "title": "Define transaction selection/resume logic",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p2-t3.json"],
+      "deps": ["p2-t1", "p2-t2"]
+    },
+    {
+      "id": "p2-t4",
+      "phase": 2,
+      "title": "Define removal/replacement of legacy artifact paths",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p2-t4.json"],
+      "deps": ["p2-t1", "p2-t2", "p2-t3"]
+    },
+    {
+      "id": "p3-t1",
+      "phase": 3,
+      "title": "Implement transaction event schema and materialized state storage",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p3-t1.json"],
+      "deps": ["p2-t4"]
+    },
+    {
+      "id": "p3-t2",
+      "phase": 3,
+      "title": "Implement rebuild engine for transaction state",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p3-t2.json"],
+      "deps": ["p3-t1"]
+    },
+    {
+      "id": "p3-t3",
+      "phase": 3,
+      "title": "Implement tx boundary events and file intent enforcement",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p3-t3.json"],
+      "deps": ["p3-t1", "p3-t2"]
+    },
+    {
+      "id": "p3-t4",
+      "phase": 3,
+      "title": "Wire commit flow to tx.commit events and new cursor ordering",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p3-t4.json"],
+      "deps": ["p3-t3"]
+    },
+    {
+      "id": "p3-t5",
+      "phase": 3,
+      "title": "Update repo context and artifact paths for canonical storage",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p3-t5.json"],
+      "deps": ["p3-t1"]
+    },
+    {
+      "id": "p3-t6",
+      "phase": 3,
+      "title": "Add registry/router support for new transaction tools",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p3-t6.json"],
+      "deps": ["p3-t3"]
+    },
+    {
+      "id": "p3-t7",
+      "phase": 3,
+      "title": "Update scaffold and rules for transaction-aware workflow",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p3-t7.json"],
+      "deps": ["p3-t5"]
+    },
+    {
+      "id": "p3-t8",
+      "phase": 3,
+      "title": "Update documentation for new canonical artifacts",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p3-t8.json"],
+      "deps": ["p3-t7"]
+    },
+    {
+      "id": "p4-t1",
+      "phase": 4,
+      "title": "Update tests for state store schema changes",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p4-t1.json"],
+      "deps": ["p3-t1"]
+    },
+    {
+      "id": "p4-t2",
+      "phase": 4,
+      "title": "Update tests for state rebuilder determinism",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p4-t2.json"],
+      "deps": ["p3-t2"]
+    },
+    {
+      "id": "p4-t3",
+      "phase": 4,
+      "title": "Update tests for ops tools and commit flow",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p4-t3.json"],
+      "deps": ["p3-t3", "p3-t4"]
+    },
+    {
+      "id": "p4-t4",
+      "phase": 4,
+      "title": "Update tests for repo context and scaffold changes",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p4-t4.json"],
+      "deps": ["p3-t5", "p3-t7"]
+    },
+    {
+      "id": "p4-t5",
+      "phase": 4,
+      "title": "Interruption matrix tests and coverage gate",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p4-t5.json"],
+      "deps": ["p4-t1", "p4-t2", "p4-t3", "p4-t4"]
     }
   ]
 }
