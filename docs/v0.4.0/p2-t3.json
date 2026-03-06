@@ -2,7 +2,7 @@
   "id": "p2-t3",
   "phase": 2,
   "title": "Define resume logic with semantic intent",
-  "status": "planned",
+  "status": "done",
   "summary": "Specify deterministic resume logic that interprets semantic intent (e.g., \"continue\") using persisted semantic memory.",
   "inputs": ["docs/v0.4.0/plan.md"],
   "outputs": ["docs/v0.4.0/specs/resume_logic.md"],
