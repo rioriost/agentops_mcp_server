@@ -53,3 +53,20 @@ def test_main_execv(monkeypatch, tmp_path):
 
     assert called["path"] == "/usr/bin/env"
     assert called["args"] == ["env", "bash", str(script), "--flag"]
+
+
+def test_init_script_contains_canonical_artifacts_and_rules():
+    script_path = init_mod.resources.files("agentops_mcp_server").joinpath(
+        "zed-agentops-init.sh"
+    )
+    content = script_path.read_text(encoding="utf-8")
+
+    assert ".agent/tx_event_log.jsonl" in content
+    assert ".agent/tx_state.json" in content
+    assert ".agent/handoff.json" in content
+    assert ".agent/observability_summary.json" in content
+    assert "handoff.md" in content
+    assert "snapshot-log.jsonl" in content
+    assert "work-in-progress.md" in content
+    assert "Treat `.agent/handoff.json` as derived-only" in content
+    assert "workspace_root" in content
