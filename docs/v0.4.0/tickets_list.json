@@ -13,7 +13,7 @@
       "id": "p2-t01",
       "priority": "P1",
       "title": "Define runtime redesign specification and dataflow",
-      "status": "planned",
+      "status": "done",
       "file": "v0.4.0/ticket-p2-t01.json"
     },
     {

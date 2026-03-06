@@ -2,7 +2,7 @@
   "id": "p2-t01",
   "title": "Define runtime redesign blueprint (event log + state pipeline)",
   "priority": "P1",
-  "status": "planned",
+  "status": "done",
   "summary": "Specify the runtime writer/rebuild pipeline and resume selection logic for 0.4.0.",
   "inputs": ["docs/v0.4.0/plan.md"],
   "outputs": [
