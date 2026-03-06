@@ -2,7 +2,7 @@
   "id": "p3-t4",
   "phase": 3,
   "title": "Add registry/router support for semantic memory tools",
-  "status": "planned",
+  "status": "done",
   "summary": "Wire semantic memory and resume-intent tools into the registry/router and enforce required parameters.",
   "inputs": [
     "docs/v0.4.0/plan.md",

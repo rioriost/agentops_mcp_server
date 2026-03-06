@@ -27,6 +27,9 @@ class ToolRouter:
             "checkpoint.read": "checkpoint_read",
             "roll_forward.replay": "roll_forward_replay",
             "continue.state_rebuild": "continue_state_rebuild",
+            "tx.event_append": "tx_event_append",
+            "tx.state_save": "tx_state_save",
+            "tx.state_rebuild": "tx_state_rebuild",
             "session.capture_context": "session_capture_context",
             "repo.verify": "repo_verify",
             "repo.commit": "repo_commit",
@@ -71,6 +74,22 @@ class ToolRouter:
         if resolved_name not in self.tool_registry:
             raise ValueError(f"Unknown tool: {name}")
 
+        tool_spec = self.tool_registry[resolved_name]
+        input_schema = tool_spec.get("input_schema") or {}
+        required_fields = list(input_schema.get("required") or [])
+        if required_fields:
+            if not arguments:
+                missing_list = ", ".join(required_fields)
+                raise ValueError(f"Missing required argument(s): {missing_list}")
+            missing = [
+                field
+                for field in required_fields
+                if field not in arguments or arguments.get(field) is None
+            ]
+            if missing:
+                missing_list = ", ".join(missing)
+                raise ValueError(f"Missing required argument(s): {missing_list}")
+
         previous_root = self.repo_context.get_repo_root()
         workspace_root = arguments.get("workspace_root") if arguments else None
         if isinstance(workspace_root, str) and workspace_root.strip():
@@ -87,7 +106,7 @@ class ToolRouter:
                 truncate_limit = raw_limit
             arguments = {k: v for k, v in arguments.items() if k != "truncate_limit"}
 
-        handler = self.tool_registry[resolved_name]["handler"]
+        handler = tool_spec["handler"]
         call_id = str(uuid.uuid4())
         self.state_store.journal_safe(
             "tool.call",

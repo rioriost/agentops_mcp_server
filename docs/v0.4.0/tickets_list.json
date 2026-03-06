@@ -96,7 +96,7 @@
       "id": "p3-t4",
       "phase": 3,
       "title": "Add registry/router support for semantic memory tools",
-      "status": "planned",
+      "status": "done",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p3-t4.json"],
       "deps": ["p3-t3"]

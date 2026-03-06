@@ -19,6 +19,9 @@ Tools (snake_case):
 - checkpoint_read() -> read checkpoint
 - roll_forward_replay(checkpoint_path?, snapshot_path?, start_seq?, end_seq?) -> replay journal
 - continue_state_rebuild(checkpoint_path?, snapshot_path?, start_seq?, end_seq?, session_id?) -> rebuild state
+- tx_event_append(tx_id, ticket_id, event_type, phase, step_id, actor, session_id, payload, event_id?) -> append tx event
+- tx_state_save(state) -> save transaction state
+- tx_state_rebuild(start_seq?, end_seq?, tx_state_path?, event_log_path?) -> rebuild transaction state
 - repo_verify(timeout_sec?) -> run verify script
 - repo_commit(message?, files="auto") -> commit changes
 - repo_status_summary() -> summarize repo status and diff
@@ -30,7 +33,7 @@ Tools (snake_case):
 - ops_handoff_export() -> export handoff JSON
 - ops_resume_brief(max_chars?) -> generate resume brief
 - ops_start_task(title, task_id?, session_id?, agent_id?, status?) -> record task start
-- ops_update_task(status?, note?, task_id?, session_id?, agent_id?) -> record task update
+- ops_update_task(status?, note?, task_id?, session_id?, agent_id?, user_intent?) -> record task update
 - ops_end_task(summary, next_action?, status?, task_id?, session_id?, agent_id?) -> record task end
 - ops_capture_state(session_id?) -> snapshot and checkpoint state
 - ops_task_summary(session_id?, max_chars?) -> summarize task state
@@ -76,6 +79,9 @@ TOOL_REGISTRY = build_tool_registry(
     checkpoint_read=_STATE_STORE.checkpoint_read,
     roll_forward_replay=_STATE_REBUILDER.roll_forward_replay,
     continue_state_rebuild=_STATE_REBUILDER.continue_state_rebuild,
+    tx_event_append=_STATE_STORE.tx_event_append,
+    tx_state_save=_STATE_STORE.tx_state_save,
+    tx_state_rebuild=_STATE_REBUILDER.rebuild_tx_state,
     repo_verify=_REPO_TOOLS.repo_verify,
     repo_commit=_COMMIT_MANAGER.repo_commit,
     repo_status_summary=_REPO_TOOLS.repo_status_summary,
@@ -182,6 +188,48 @@ def continue_state_rebuild(
     )
 
 
+def tx_event_append(
+    tx_id: str,
+    ticket_id: str,
+    event_type: str,
+    phase: str,
+    step_id: str,
+    actor: Dict[str, Any],
+    session_id: str,
+    payload: Dict[str, Any],
+    event_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    return _STATE_STORE.tx_event_append(
+        tx_id=tx_id,
+        ticket_id=ticket_id,
+        event_type=event_type,
+        phase=phase,
+        step_id=step_id,
+        actor=actor,
+        session_id=session_id,
+        payload=payload,
+        event_id=event_id,
+    )
+
+
+def tx_state_save(state: Dict[str, Any]) -> Dict[str, Any]:
+    return _STATE_STORE.tx_state_save(state)
+
+
+def tx_state_rebuild(
+    start_seq: Optional[int] = None,
+    end_seq: Optional[int] = None,
+    tx_state_path: Optional[str] = None,
+    event_log_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    return _STATE_REBUILDER.rebuild_tx_state(
+        start_seq=start_seq,
+        end_seq=end_seq,
+        tx_state_path=tx_state_path,
+        event_log_path=event_log_path,
+    )
+
+
 def run_verify(timeout_sec: Optional[int] = None) -> Dict[str, Any]:
     return _VERIFY_RUNNER.run_verify(timeout_sec=timeout_sec)
 
@@ -272,6 +320,7 @@ def ops_update_task(
     task_id: Optional[str] = None,
     session_id: Optional[str] = None,
     agent_id: Optional[str] = None,
+    user_intent: Optional[str] = None,
 ) -> Dict[str, Any]:
     return _OPS_TOOLS.ops_update_task(
         status=status,
@@ -279,6 +328,7 @@ def ops_update_task(
         task_id=task_id,
         session_id=session_id,
         agent_id=agent_id,
+        user_intent=user_intent,
     )
 
 
