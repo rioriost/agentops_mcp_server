@@ -1,0 +1,27 @@
+{
+  "version": "0.4.0",
+  "source": "draft.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P1",
+      "title": "Finalize 0.4.0 architecture and schema specs",
+      "status": "planned",
+      "file": "v0.4.0/ticket-p1-t01.json"
+    },
+    {
+      "id": "p2-t01",
+      "priority": "P1",
+      "title": "Define runtime redesign specification and dataflow",
+      "status": "planned",
+      "file": "v0.4.0/ticket-p2-t01.json"
+    },
+    {
+      "id": "p3-t01",
+      "priority": "P1",
+      "title": "Build deterministic recovery test strategy and gates",
+      "status": "planned",
+      "file": "v0.4.0/ticket-p3-t01.json"
+    }
+  ]
+}

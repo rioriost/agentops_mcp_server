@@ -1,0 +1,29 @@
+{
+  "id": "p1-t01",
+  "title": "Architecture freeze: finalize event taxonomy and lifecycle invariants",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Freeze the transaction event taxonomy and lifecycle invariants for 0.4.0 before implementation.",
+  "inputs": [
+    "docs/v0.4.0/plan.md"
+  ],
+  "outputs": [
+    "docs/v0.4.0/p1-t01-event-taxonomy.md",
+    "docs/v0.4.0/p1-t01-lifecycle-invariants.md"
+  ],
+  "acceptance_criteria": [
+    "Event taxonomy covers all lifecycle boundaries listed in plan.md with explicit event_type names.",
+    "Lifecycle invariants are enumerated and align with the 0.4.0 transaction model.",
+    "Outputs are concise and unambiguous enough to drive implementation without additional clarification."
+  ],
+  "tasks": [
+    "Derive a complete event taxonomy from plan.md sections 4 and 5.",
+    "Document lifecycle invariants and terminal conditions for transactions.",
+    "Cross-check taxonomy and invariants against recovery requirements."
+  ],
+  "dependencies": [],
+  "notes": [
+    "Breaking redesign: backward compatibility is out of scope.",
+    "Keep taxonomy compact; prefer canonical names over aliases."
+  ]
+}
