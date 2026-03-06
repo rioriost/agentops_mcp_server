@@ -2,7 +2,7 @@
   "id": "p3-t1",
   "phase": 3,
   "title": "Implement tx event schema and materialized state persistence",
-  "status": "planned",
+  "status": "done",
   "summary": "Implement transaction-aware event persistence and materialized state storage, including semantic memory fields.",
   "inputs": [
     "docs/v0.4.0/plan.md",

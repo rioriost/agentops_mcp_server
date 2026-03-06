@@ -9,6 +9,8 @@ STATE_ARTIFACT_FILES = {
     "checkpoint": "checkpoint.json",
     "handoff": "handoff.json",
     "observability": "observability_summary.json",
+    "tx_event_log": "tx_event_log.jsonl",
+    "tx_state": "tx_state.json",
 }
 
 
@@ -40,6 +42,8 @@ class RepoContext:
         self.checkpoint = self.state_artifact_path("checkpoint", root)
         self.handoff = self.state_artifact_path("handoff", root)
         self.observability = self.state_artifact_path("observability", root)
+        self.tx_event_log = self.state_artifact_path("tx_event_log", root)
+        self.tx_state = self.state_artifact_path("tx_state", root)
         self.verify = self.repo_root / ".zed" / "scripts" / "verify"
 
     def get_repo_root(self) -> Path:
