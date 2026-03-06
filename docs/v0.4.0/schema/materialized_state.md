@@ -55,6 +55,8 @@ The materialized state is a projection of the transaction event log. It is optim
   "current_step": "p3-t1-s2",
   "last_completed_step": "p3-t1-s1",
   "next_action": "apply changes to state_store",
+  "semantic_summary": "Added tx schema docs and invariants",
+  "user_intent": "continue",
   "verify_state": {
     "status": "not_started",
     "last_result": null
@@ -93,6 +95,10 @@ The materialized state is a projection of the transaction event log. It is optim
   - Last successfully completed step.
 - `next_action` (string, required)  
   - Deterministic next action for resume.
+- `semantic_summary` (string, required)  
+  - Concise semantic summary of current progress and intent.
+- `user_intent` (string, optional)  
+  - Latest user resume intent (e.g., “continue”).
 - `verify_state` (object, required)
   - `status`: `not_started | running | passed | failed`
   - `last_result`: optional structured result (command, returncode, summary)
@@ -103,6 +109,18 @@ The materialized state is a projection of the transaction event log. It is optim
   - See Section 4.
 
 ---
+
+## 3.1) Semantic Memory Update Semantics
+
+- `semantic_summary` is updated on:
+  - `tx.step.enter`
+  - `tx.file_intent.add|update|complete`
+  - `tx.verify.pass|fail`
+  - `tx.commit.done|fail`
+  - `tx.end.*`
+- `user_intent` is updated only when a user provides explicit resume intent (e.g., “continue”).
+- `user_intent` persists until replaced by a newer explicit intent.
+- Both fields must be persisted before any resume decision is derived.
 
 ## 4) `file_intents[]` Schema
 
@@ -153,7 +171,9 @@ The materialized state is a projection of the transaction event log. It is optim
 3. **Monotonic steps**: `last_completed_step` must not regress.
 4. **Monotonic intent states**: `planned → started → applied → verified` only.
 5. **Status/phase consistency**: `phase` must align with `status`.
-6. **Cursor coherence**: `last_applied_seq` must be ≥ `rebuilt_from_seq`.
+6. **Semantic memory required**: `semantic_summary` must be non-empty for any non-terminal status.
+7. **User intent provenance**: if `user_intent` is present, it must reflect the latest explicit user resume intent.
+8. **Cursor coherence**: `last_applied_seq` must be ≥ `rebuilt_from_seq`.
 
 ---
 
@@ -164,6 +184,7 @@ The materialized state is a projection of the transaction event log. It is optim
 - `current_step` / `last_completed_step`
 - `verify_state` / `commit_state`
 - `file_intents` states
+- `semantic_summary` / `user_intent` (for interpreting resume prompts)
 
 The same event log sequence must always yield the same `next_action`.
 

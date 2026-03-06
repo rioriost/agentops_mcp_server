@@ -15,7 +15,7 @@
       "id": "p1-t2",
       "phase": 1,
       "title": "Finalize materialized state schema with semantic memory",
-      "status": "planned",
+      "status": "verified",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p1-t2.json"],
       "deps": ["p1-t1"]
