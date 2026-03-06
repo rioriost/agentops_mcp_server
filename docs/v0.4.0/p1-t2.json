@@ -1,0 +1,40 @@
+{
+  "ticket_id": "p1-t2",
+  "title": "Phase 1: Define canonical materialized transaction state schema",
+  "phase": "phase-1-architecture-freeze",
+  "status": "done",
+  "summary": "Specify the 0.4.0 canonical materialized transaction state schema, including fields, types, invariants, and integrity model.",
+  "inputs": ["docs/v0.4.0/plan.md"],
+  "outputs": ["docs/v0.4.0/schema/materialized_state.md"],
+  "acceptance_criteria": [
+    "Schema includes top-level fields: schema_version, active_tx, last_applied_seq, integrity, updated_at.",
+    "active_tx includes tx_id, ticket_id, status, phase, current_step, last_completed_step, next_action, verify_state, commit_state, file_intents.",
+    "file_intents items include path, operation, purpose, state, last_event_seq, and planned_step reference.",
+    "Integrity model specifies state_hash and rebuilt_from_seq semantics.",
+    "Document lists invariants and validation rules tied to the schema.",
+    "Output is suitable to be referenced by implementation and tests."
+  ],
+  "deps": ["p1-t1"],
+  "steps": [
+    {
+      "id": "p1-t2-s1",
+      "description": "Define schema fields and types for materialized transaction state."
+    },
+    {
+      "id": "p1-t2-s2",
+      "description": "Document file intent structure and lifecycle states."
+    },
+    {
+      "id": "p1-t2-s3",
+      "description": "Specify integrity checks and hash/cursor semantics."
+    },
+    {
+      "id": "p1-t2-s4",
+      "description": "List validation rules and invariants."
+    }
+  ],
+  "notes": [
+    "Keep schema compact but complete; align with 0.4.0 breaking redesign.",
+    "This ticket is schema-spec only; no runtime changes."
+  ]
+}
