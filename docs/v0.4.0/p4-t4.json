@@ -2,7 +2,7 @@
   "id": "p4-t4",
   "phase": 4,
   "title": "Update tests for repo context and scaffold changes",
-  "status": "planned",
+  "status": "done",
   "summary": "Adjust tests to cover canonical artifact paths, scaffolded files, and semantic resume rule updates.",
   "inputs": ["docs/v0.4.0/plan.md", "docs/v0.4.0/p3-t6.json"],
   "outputs": [
