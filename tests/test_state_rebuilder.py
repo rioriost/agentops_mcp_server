@@ -1,6 +1,28 @@
 import json
 from datetime import datetime, timezone
 
+import pytest
+
+
+def _append_tx_event(state_store, **overrides):
+    base = {
+        "tx_id": "tx-1",
+        "ticket_id": "p4-t2",
+        "event_type": "tx.begin",
+        "phase": "in-progress",
+        "step_id": "p4-t2-s1",
+        "actor": {"agent_id": "a1"},
+        "session_id": "s1",
+        "payload": {"note": "start"},
+    }
+    base.update(overrides)
+    return state_store.tx_event_append(**base)
+
+
+def _append_invalid_tx_event(repo_context, event):
+    with repo_context.tx_event_log.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(event) + "\n")
+
 
 def test_init_replay_state_defaults(state_rebuilder):
     state = state_rebuilder.init_replay_state(None)
@@ -318,6 +340,129 @@ def test_apply_event_to_state_additional_branches(state_rebuilder):
         state, {"kind": "error", "payload": {"message": "bad"}}
     )
     assert state["last_error"] == "bad"
+
+
+def test_rebuild_tx_state_deterministic_hash(
+    state_rebuilder, state_store, repo_context
+):
+    _append_tx_event(state_store)
+    _append_tx_event(
+        state_store, event_type="tx.step.enter", step_id="p4-t2-s2", payload={}
+    )
+    _append_tx_event(
+        state_store,
+        event_type="tx.file_intent.add",
+        payload={
+            "path": "a.py",
+            "operation": "update",
+            "purpose": "update tests",
+            "planned_step": "p4-t2-s2",
+            "state": "planned",
+        },
+    )
+
+    rebuild1 = state_rebuilder.rebuild_tx_state()
+    rebuild2 = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild1["ok"] is True
+    assert rebuild2["ok"] is True
+    assert (
+        rebuild1["state"]["integrity"]["state_hash"]
+        == rebuild2["state"]["integrity"]["state_hash"]
+    )
+    assert rebuild1["last_applied_seq"] == rebuild2["last_applied_seq"]
+
+
+def test_rebuild_tx_state_torn_event_truncates(
+    state_rebuilder, state_store, repo_context
+):
+    _append_tx_event(state_store)
+    _append_invalid_tx_event(
+        repo_context, {"seq": 2, "event_id": "evt-bad", "tx_id": "tx-1"}
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 1
+
+
+def test_rebuild_tx_state_integrity_mismatch_rebuilds(
+    state_rebuilder, state_store, repo_context
+):
+    _append_tx_event(state_store)
+
+    bad_state = {
+        "schema_version": "0.4.0",
+        "active_tx": {
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "status": "in-progress",
+            "phase": "in-progress",
+            "current_step": "p4-t2-s1",
+            "last_completed_step": "",
+            "next_action": "",
+            "semantic_summary": "Saved state",
+            "user_intent": None,
+            "verify_state": {"status": "not_started", "last_result": None},
+            "commit_state": {"status": "not_started", "last_result": None},
+            "file_intents": [],
+        },
+        "last_applied_seq": 1,
+        "integrity": {"state_hash": "bad-hash", "rebuilt_from_seq": 1},
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    state_store.tx_state_save(bad_state)
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["source"] == "rebuild"
+    assert rebuild["state"]["integrity"]["state_hash"] != "bad-hash"
+
+
+def test_rebuild_tx_state_reconstructs_semantics_and_intent(
+    state_rebuilder, state_store, repo_context
+):
+    _append_tx_event(state_store)
+    _append_tx_event(
+        state_store,
+        event_type="tx.user_intent.set",
+        payload={"user_intent": "continue"},
+    )
+    _append_tx_event(
+        state_store, event_type="tx.step.enter", step_id="p4-t2-s3", payload={}
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    active_tx = rebuild["state"]["active_tx"]
+    assert active_tx["user_intent"] == "continue"
+    assert active_tx["semantic_summary"] == "Entered step p4-t2-s3"
+    assert active_tx["next_action"] == "tx.verify.start"
+
+
+def test_rebuild_tx_state_next_action_with_file_intents(
+    state_rebuilder, state_store, repo_context
+):
+    _append_tx_event(state_store)
+    _append_tx_event(
+        state_store,
+        event_type="tx.file_intent.add",
+        payload={
+            "path": "b.py",
+            "operation": "update",
+            "purpose": "update tests",
+            "planned_step": "p4-t2-s4",
+            "state": "planned",
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["state"]["active_tx"]["next_action"] == "continue file intents"
 
 
 def test_append_applied_event_id_trims(state_rebuilder):
