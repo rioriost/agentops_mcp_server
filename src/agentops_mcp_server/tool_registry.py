@@ -6,13 +6,6 @@ from typing import Any, Callable, Dict
 def build_tool_registry(
     *,
     commit_if_verified: Callable[..., Any],
-    journal_append: Callable[..., Any],
-    snapshot_save: Callable[..., Any],
-    snapshot_load: Callable[..., Any],
-    checkpoint_update: Callable[..., Any],
-    checkpoint_read: Callable[..., Any],
-    roll_forward_replay: Callable[..., Any],
-    continue_state_rebuild: Callable[..., Any],
     tx_event_append: Callable[..., Any],
     tx_state_save: Callable[..., Any],
     tx_state_rebuild: Callable[..., Any],
@@ -45,87 +38,6 @@ def build_tool_registry(
                 "required": ["message"],
             },
             "handler": commit_if_verified,
-        },
-        "journal_append": {
-            "description": "Append journal event",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "kind": {"type": "string"},
-                    "payload": {"type": "object"},
-                    "session_id": {"type": ["string", "null"]},
-                    "agent_id": {"type": ["string", "null"]},
-                    "event_id": {"type": ["string", "null"]},
-                },
-                "required": ["kind", "payload"],
-            },
-            "handler": journal_append,
-        },
-        "snapshot_save": {
-            "description": "Save snapshot",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "state": {"type": "object"},
-                    "session_id": {"type": ["string", "null"]},
-                    "last_applied_seq": {"type": ["integer", "null"]},
-                    "snapshot_id": {"type": ["string", "null"]},
-                },
-                "required": ["state"],
-            },
-            "handler": snapshot_save,
-        },
-        "snapshot_load": {
-            "description": "Load snapshot",
-            "input_schema": {"type": "object", "properties": {}, "required": []},
-            "handler": snapshot_load,
-        },
-        "checkpoint_update": {
-            "description": "Update checkpoint",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "last_applied_seq": {"type": "integer"},
-                    "snapshot_path": {"type": ["string", "null"]},
-                    "checkpoint_id": {"type": ["string", "null"]},
-                },
-                "required": ["last_applied_seq"],
-            },
-            "handler": checkpoint_update,
-        },
-        "checkpoint_read": {
-            "description": "Read checkpoint",
-            "input_schema": {"type": "object", "properties": {}, "required": []},
-            "handler": checkpoint_read,
-        },
-        "roll_forward_replay": {
-            "description": "Replay journal",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "checkpoint_path": {"type": ["string", "null"]},
-                    "snapshot_path": {"type": ["string", "null"]},
-                    "start_seq": {"type": ["integer", "null"]},
-                    "end_seq": {"type": ["integer", "null"]},
-                },
-                "required": [],
-            },
-            "handler": roll_forward_replay,
-        },
-        "continue_state_rebuild": {
-            "description": "Rebuild state",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "checkpoint_path": {"type": ["string", "null"]},
-                    "snapshot_path": {"type": ["string", "null"]},
-                    "start_seq": {"type": ["integer", "null"]},
-                    "end_seq": {"type": ["integer", "null"]},
-                    "session_id": {"type": ["string", "null"]},
-                },
-                "required": [],
-            },
-            "handler": continue_state_rebuild,
         },
         "tx_event_append": {
             "description": "Append tx event",

@@ -1,0 +1,43 @@
+{
+  "id": "p5-t4",
+  "phase": 5,
+  "title": "Add spec compliance tests for 0.4.0 runtime",
+  "status": "planned",
+  "summary": "Add tests that assert 0.4.0 spec compliance for taxonomy, invariants, legacy artifacts, and resume logic.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "docs/v0.4.0/architecture/event_taxonomy.md",
+    "docs/v0.4.0/architecture/lifecycle_invariants.md",
+    "docs/v0.4.0/specs/legacy-artifact-policy.md",
+    "docs/v0.4.0/specs/resume_logic.md"
+  ],
+  "outputs": [
+    "Tests covering taxonomy alignment and invariant enforcement",
+    "Tests asserting legacy artifacts are ignored in canonical flow",
+    "Tests for semantic memory-driven next_action derivation"
+  ],
+  "acceptance_criteria": [
+    "Tests fail if non-taxonomy tx event types are emitted.",
+    "Tests fail if intent-before-mutation or ordering invariants are violated.",
+    "Tests fail if resume logic uses legacy artifacts or ignores semantic memory."
+  ],
+  "deps": ["p5-t3"],
+  "steps": [
+    {
+      "id": "p5-t4-s1",
+      "description": "Add tests for event taxonomy alignment and invariant enforcement."
+    },
+    {
+      "id": "p5-t4-s2",
+      "description": "Add tests asserting legacy artifacts are ignored in canonical resume."
+    },
+    {
+      "id": "p5-t4-s3",
+      "description": "Add tests for semantic memory and next_action derivation."
+    }
+  ],
+  "notes": [
+    "Keep tests deterministic and aligned with v0.4.0 specs.",
+    "Prefer narrow unit tests that isolate each invariant."
+  ]
+}

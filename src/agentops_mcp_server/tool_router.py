@@ -20,13 +20,6 @@ class ToolRouter:
         self.repo_context = repo_context
         self.state_store = state_store
         self.alias_map = {
-            "journal.append": "journal_append",
-            "snapshot.save": "snapshot_save",
-            "snapshot.load": "snapshot_load",
-            "checkpoint.update": "checkpoint_update",
-            "checkpoint.read": "checkpoint_read",
-            "roll_forward.replay": "roll_forward_replay",
-            "continue.state_rebuild": "continue_state_rebuild",
             "tx.event_append": "tx_event_append",
             "tx.state_save": "tx_state_save",
             "tx.state_rebuild": "tx_state_rebuild",

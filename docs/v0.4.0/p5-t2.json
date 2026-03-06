@@ -1,0 +1,48 @@
+{
+  "id": "p5-t2",
+  "phase": 5,
+  "title": "Align event taxonomy and enforce lifecycle invariants",
+  "status": "planned",
+  "summary": "Bring event types and invariant enforcement in line with 0.4.0 taxonomy and lifecycle rules.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "docs/v0.4.0/architecture/event_taxonomy.md",
+    "docs/v0.4.0/architecture/lifecycle_invariants.md",
+    "docs/v0.4.0/specs/writer-pipeline.md"
+  ],
+  "outputs": [
+    "Event taxonomy aligned with implementation event types",
+    "Invariant enforcement for intent-before-mutation and ordering rules",
+    "Validation errors surfaced for invalid sequences",
+    "Commit boundary metadata defined for tx.commit.start/done payloads"
+  ],
+  "acceptance_criteria": [
+    "All emitted tx event types are defined in the taxonomy.",
+    "Intent state transitions are monotonic and validated.",
+    "Verify/commit ordering violations are rejected during replay or write-time validation.",
+    "Commit boundary payloads include branch/commit hash/diff summary fields."
+  ],
+  "deps": ["p5-t1"],
+  "steps": [
+    {
+      "id": "p5-t2-s1",
+      "description": "Resolve taxonomy gaps (e.g., user intent event naming) and update emitters accordingly."
+    },
+    {
+      "id": "p5-t2-s2",
+      "description": "Add lifecycle invariant validation in state rebuild and write-time checks."
+    },
+    {
+      "id": "p5-t2-s3",
+      "description": "Ensure intent-before-mutation and planned_step linkage are enforced."
+    },
+    {
+      "id": "p5-t2-s4",
+      "description": "Define tx.commit.start/done payload fields for branch, commit hash, and diff summary."
+    }
+  ],
+  "notes": [
+    "Prefer rejecting invalid sequences early rather than silently repairing.",
+    "Ensure validation aligns with lifecycle_invariants.md ordering rules."
+  ]
+}

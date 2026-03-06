@@ -314,6 +314,18 @@ Tasks:
 Outputs:
 - Resilience test suite + coverage report.
 
+## Phase 5: Spec compliance remediation (post-implementation gaps)
+Goals:
+- Align implementation with `docs/v0.4.0` architecture/schema/specs.
+Tasks:
+- Remove legacy artifacts (`journal/snapshot/checkpoint`) from canonical flow and tool exposure; keep handoff derived-only.
+- Align event taxonomy with implementation (resolve `tx.user_intent.set` vs taxonomy-defined events).
+- Enforce lifecycle invariants during validation/rebuild: intent-before-mutation, `planned_step` linkage, monotonic intent states, verify/commit ordering.
+- Require transaction event log presence for resume and tighten `tx_state` validation (`schema_version`, required fields).
+- Update `next_action` derivation to incorporate `semantic_summary` and `user_intent` deterministically.
+Outputs:
+- Spec-compliant runtime behavior with deterministic resume decisions.
+
 ---
 
 ## 10) Acceptance Criteria Mapping

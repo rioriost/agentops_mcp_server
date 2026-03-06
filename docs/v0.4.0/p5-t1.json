@@ -1,0 +1,41 @@
+{
+  "id": "p5-t1",
+  "phase": 5,
+  "title": "Remove legacy artifacts from canonical flow and tooling",
+  "status": "in-progress",
+  "summary": "Remove journal/snapshot/checkpoint from canonical resume path and tool exposure; keep handoff derived-only.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "docs/v0.4.0/p4-t5.json",
+    "docs/v0.4.0/specs/legacy-artifact-policy.md"
+  ],
+  "outputs": [
+    "Canonical flow uses tx_event_log + tx_state only",
+    "Tool registry removes legacy artifact tools or marks them derived-only",
+    "RepoContext separates canonical vs derived artifact paths"
+  ],
+  "acceptance_criteria": [
+    "Resume logic ignores legacy journal/snapshot/checkpoint artifacts when canonical artifacts exist.",
+    "Tooling no longer exposes legacy artifact operations as canonical behavior.",
+    "Derived handoff is regenerated only after canonical state persistence."
+  ],
+  "deps": ["p4-t5"],
+  "steps": [
+    {
+      "id": "p5-t1-s1",
+      "description": "Audit resume/rebuild paths and remove reliance on legacy artifacts."
+    },
+    {
+      "id": "p5-t1-s2",
+      "description": "Update tool registry/router to avoid exposing legacy artifact tools as canonical."
+    },
+    {
+      "id": "p5-t1-s3",
+      "description": "Align repo context to treat tx_event_log/tx_state as canonical artifacts."
+    }
+  ],
+  "notes": [
+    "Legacy files may remain on disk but must be ignored by canonical logic.",
+    "Handoff remains derived-only and regenerated from canonical state."
+  ]
+}

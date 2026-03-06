@@ -12,13 +12,6 @@ Supported methods:
 
 Tools (snake_case):
 - commit_if_verified(message, timeout_sec?) -> run verify and commit changes
-- journal_append(kind, payload, session_id?, agent_id?, event_id?) -> append event
-- snapshot_save(state, session_id?, last_applied_seq?, snapshot_id?) -> save snapshot
-- snapshot_load() -> load snapshot
-- checkpoint_update(last_applied_seq, snapshot_path?, checkpoint_id?) -> update checkpoint
-- checkpoint_read() -> read checkpoint
-- roll_forward_replay(checkpoint_path?, snapshot_path?, start_seq?, end_seq?) -> replay journal
-- continue_state_rebuild(checkpoint_path?, snapshot_path?, start_seq?, end_seq?, session_id?) -> rebuild state
 - tx_event_append(tx_id, ticket_id, event_type, phase, step_id, actor, session_id, payload, event_id?) -> append tx event
 - tx_state_save(state) -> save transaction state
 - tx_state_rebuild(start_seq?, end_seq?, tx_state_path?, event_log_path?) -> rebuild transaction state
@@ -72,13 +65,6 @@ _OPS_TOOLS = OpsTools(_REPO_CONTEXT, _STATE_STORE, _STATE_REBUILDER, _GIT_REPO)
 
 TOOL_REGISTRY = build_tool_registry(
     commit_if_verified=_COMMIT_MANAGER.commit_if_verified,
-    journal_append=_STATE_STORE.journal_append,
-    snapshot_save=_STATE_STORE.snapshot_save,
-    snapshot_load=_STATE_STORE.snapshot_load,
-    checkpoint_update=_STATE_STORE.checkpoint_update,
-    checkpoint_read=_STATE_STORE.checkpoint_read,
-    roll_forward_replay=_STATE_REBUILDER.roll_forward_replay,
-    continue_state_rebuild=_STATE_REBUILDER.continue_state_rebuild,
     tx_event_append=_STATE_STORE.tx_event_append,
     tx_state_save=_STATE_STORE.tx_state_save,
     tx_state_rebuild=_STATE_REBUILDER.rebuild_tx_state,
@@ -106,86 +92,6 @@ _RPC_SERVER = JsonRpcServer(_TOOL_ROUTER, _STATE_STORE)
 
 def _resolve_workspace_root(value: str) -> Path:
     return _REPO_CONTEXT.resolve_workspace_root(value)
-
-
-def journal_append(
-    kind: str,
-    payload: Dict[str, Any],
-    session_id: Optional[str] = None,
-    agent_id: Optional[str] = None,
-    event_id: Optional[str] = None,
-) -> Dict[str, Any]:
-    return _STATE_STORE.journal_append(
-        kind=kind,
-        payload=payload,
-        session_id=session_id,
-        agent_id=agent_id,
-        event_id=event_id,
-    )
-
-
-def snapshot_save(
-    state: Dict[str, Any],
-    session_id: Optional[str] = None,
-    last_applied_seq: Optional[int] = None,
-    snapshot_id: Optional[str] = None,
-) -> Dict[str, Any]:
-    return _STATE_STORE.snapshot_save(
-        state=state,
-        session_id=session_id,
-        last_applied_seq=last_applied_seq,
-        snapshot_id=snapshot_id,
-    )
-
-
-def snapshot_load() -> Dict[str, Any]:
-    return _STATE_STORE.snapshot_load()
-
-
-def checkpoint_update(
-    last_applied_seq: int,
-    snapshot_path: Optional[str] = None,
-    checkpoint_id: Optional[str] = None,
-) -> Dict[str, Any]:
-    return _STATE_STORE.checkpoint_update(
-        last_applied_seq=last_applied_seq,
-        snapshot_path=snapshot_path,
-        checkpoint_id=checkpoint_id,
-    )
-
-
-def checkpoint_read() -> Dict[str, Any]:
-    return _STATE_STORE.checkpoint_read()
-
-
-def roll_forward_replay(
-    checkpoint_path: Optional[str] = None,
-    snapshot_path: Optional[str] = None,
-    start_seq: Optional[int] = None,
-    end_seq: Optional[int] = None,
-) -> Dict[str, Any]:
-    return _STATE_REBUILDER.roll_forward_replay(
-        checkpoint_path=checkpoint_path,
-        snapshot_path=snapshot_path,
-        start_seq=start_seq,
-        end_seq=end_seq,
-    )
-
-
-def continue_state_rebuild(
-    checkpoint_path: Optional[str] = None,
-    snapshot_path: Optional[str] = None,
-    start_seq: Optional[int] = None,
-    end_seq: Optional[int] = None,
-    session_id: Optional[str] = None,
-) -> Dict[str, Any]:
-    return _STATE_REBUILDER.continue_state_rebuild(
-        checkpoint_path=checkpoint_path,
-        snapshot_path=snapshot_path,
-        start_seq=start_seq,
-        end_seq=end_seq,
-        session_id=session_id,
-    )
 
 
 def tx_event_append(

@@ -1,0 +1,52 @@
+{
+  "id": "p5-t3",
+  "phase": 5,
+  "title": "Tighten rebuild/resume logic and tx_state validation",
+  "status": "planned",
+  "summary": "Strengthen rebuild prerequisites, schema validation, and next_action derivation to match 0.4.0 resume specs.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "docs/v0.4.0/architecture/recovery-algorithm.md",
+    "docs/v0.4.0/schema/materialized_state.md",
+    "docs/v0.4.0/specs/rebuild-engine.md",
+    "docs/v0.4.0/specs/resume_logic.md",
+    "docs/v0.4.0/specs/semantic-memory-rules.md"
+  ],
+  "outputs": [
+    "Rebuild requires tx_event_log presence per recovery algorithm",
+    "tx_state validation enforces schema_version and required fields",
+    "next_action derivation incorporates semantic_summary and user_intent",
+    "Resume always re-derives next_action from canonical state",
+    "Commit boundary metadata persisted in materialized state"
+  ],
+  "acceptance_criteria": [
+    "Rebuild fails or blocks when the transaction event log is missing.",
+    "tx_state_save rejects states missing schema_version, active_tx core fields, or integrity metadata.",
+    "next_action derivation uses semantic memory deterministically and aligns with resume_logic.md.",
+    "Resume logic re-derives next_action from canonical artifacts even when a prior session is selected.",
+    "Commit boundary metadata (branch/commit hash/diff summary) is persisted around tx.commit.start/done."
+  ],
+  "deps": ["p5-t2"],
+  "steps": [
+    {
+      "id": "p5-t3-s1",
+      "description": "Tighten tx_state validation to require schema_version and required active_tx fields."
+    },
+    {
+      "id": "p5-t3-s2",
+      "description": "Require tx_event_log presence for rebuild and handle missing log as blocked state."
+    },
+    {
+      "id": "p5-t3-s3",
+      "description": "Update next_action derivation to incorporate semantic_summary and user_intent guidance."
+    },
+    {
+      "id": "p5-t3-s4",
+      "description": "Persist commit boundary metadata in tx_state and ensure resume always re-derives next_action from canonical state."
+    }
+  ],
+  "notes": [
+    "Keep deterministic behavior: same log yields same state and next_action.",
+    "Ensure changes align with resume_logic.md and semantic-memory-rules.md."
+  ]
+}

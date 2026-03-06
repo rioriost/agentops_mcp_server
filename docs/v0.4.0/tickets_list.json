@@ -172,6 +172,42 @@
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p4-t5.json"],
       "deps": ["p4-t1", "p4-t2", "p4-t3", "p4-t4"]
+    },
+    {
+      "id": "p5-t1",
+      "phase": 5,
+      "title": "Remove legacy artifacts from canonical flow and tooling",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p5-t1.json"],
+      "deps": ["p4-t5"]
+    },
+    {
+      "id": "p5-t2",
+      "phase": 5,
+      "title": "Align event taxonomy and enforce lifecycle invariants",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p5-t2.json"],
+      "deps": ["p5-t1"]
+    },
+    {
+      "id": "p5-t3",
+      "phase": 5,
+      "title": "Tighten rebuild/resume logic and tx_state validation",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p5-t3.json"],
+      "deps": ["p5-t2"]
+    },
+    {
+      "id": "p5-t4",
+      "phase": 5,
+      "title": "Add spec compliance tests for 0.4.0 runtime",
+      "status": "planned",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p5-t4.json"],
+      "deps": ["p5-t3"]
     }
   ]
 }
