@@ -28,3 +28,5 @@ def test_set_repo_root_updates_artifacts(tmp_path):
     context.set_repo_root(new_root)
     assert context.get_repo_root() == new_root
     assert context.journal == new_root / ".agent" / "journal.jsonl"
+    assert context.tx_event_log == new_root / ".agent" / "tx_event_log.jsonl"
+    assert context.tx_state == new_root / ".agent" / "tx_state.json"

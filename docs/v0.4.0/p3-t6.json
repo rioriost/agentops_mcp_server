@@ -2,7 +2,7 @@
   "id": "p3-t6",
   "phase": 3,
   "title": "Update repo context and scaffold/rules for new artifacts",
-  "status": "planned",
+  "status": "done",
   "summary": "Align RepoContext, scaffold script, and .rules template with canonical artifacts and semantic memory requirements.",
   "inputs": ["docs/v0.4.0/plan.md", "docs/v0.4.0/p2-t4.json"],
   "outputs": [

@@ -3,10 +3,10 @@
 
 ## Start (mandatory)
 - Read/restore in this order:
-  1) handoff
-  2) snapshot
-  3) checkpoint
-  4) journal (replay)
+  1) tx_state (materialized transaction state)
+  2) tx_event_log (transaction event log replay if needed)
+  3) handoff (derived-only, never canonical)
+- Resume decisions must use canonical tx_state + tx_event_log only; handoff is derived.
 - If resume state is incomplete:
   - run ops_resume_brief (or equivalent) and emit a short brief
 - Identify active ticket (status != done) and resume it.
@@ -22,20 +22,23 @@
 ## Work loop (mandatory)
 - Tickets are the only unit of work.
 - For any code change:
-  1) Set status -> in-progress
-  2) Implement smallest safe change
-  3) Run "${VERIFY_REL}"
-     - If fails: fix and repeat
-  4) Set status -> checking
+  1) Set status -> in-progress (emit tx.begin if new)
+  2) Register file intents before mutation
+  3) Implement smallest safe change
+  4) Update semantic_summary (required) and user_intent only on explicit user resume intent; persist tx_state after mutation
+  5) Run "${VERIFY_REL}"
+     - If fails: fix and repeat (update semantic summary)
+  6) Set status -> checking
      - Compare acceptance_criteria AND plan.md to avoid omissions
-  5) Set status -> verified
-  6) Commit changes
-  7) Set status -> committed
-  8) Update snapshot/checkpoint
-  9) Set status -> done
+  7) Set status -> verified
+  8) Commit changes (emit tx.commit.start/done|fail)
+  9) Set status -> committed
+  10) Set status -> done (emit tx.end.done|blocked)
 
 ## Persistence & logging (mandatory)
 - Always record events for plan/task/progress/verify/commit.
+- Canonical write ordering: event append → tx_state update → cursor persist.
+- semantic_summary is required for non-terminal tx; user_intent is only set on explicit user resume intent.
 - Keep log outputs short (summaries over full diffs).
 - Prefer diff stats over full diffs.
 
@@ -49,6 +52,9 @@
 - Prefer MCP tools if available.
 - Use:
   - journal_append
+  - tx_event_append
+  - tx_state_save
+  - tx_state_rebuild
   - snapshot_save
   - checkpoint_update
   - roll_forward_replay / continue_state_rebuild (if needed)

@@ -2,7 +2,7 @@
   "id": "p3-t5",
   "phase": 3,
   "title": "Wire commit flow to tx.commit events and cursor ordering",
-  "status": "planned",
+  "status": "done",
   "summary": "Update the commit pipeline to emit tx.commit events and persist the transaction-aware cursor/state ordering.",
   "inputs": [
     "docs/v0.4.0/plan.md",

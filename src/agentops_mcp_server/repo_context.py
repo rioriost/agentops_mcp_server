@@ -3,14 +3,26 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-STATE_ARTIFACT_FILES = {
+CANONICAL_ARTIFACT_FILES = {
+    "tx_event_log": "tx_event_log.jsonl",
+    "tx_state": "tx_state.json",
+}
+
+DERIVED_ARTIFACT_FILES = {
+    "handoff": "handoff.json",
+    "observability": "observability_summary.json",
+}
+
+LEGACY_ARTIFACT_FILES = {
     "journal": "journal.jsonl",
     "snapshot": "snapshot.json",
     "checkpoint": "checkpoint.json",
-    "handoff": "handoff.json",
-    "observability": "observability_summary.json",
-    "tx_event_log": "tx_event_log.jsonl",
-    "tx_state": "tx_state.json",
+}
+
+STATE_ARTIFACT_FILES = {
+    **CANONICAL_ARTIFACT_FILES,
+    **DERIVED_ARTIFACT_FILES,
+    **LEGACY_ARTIFACT_FILES,
 }
 
 

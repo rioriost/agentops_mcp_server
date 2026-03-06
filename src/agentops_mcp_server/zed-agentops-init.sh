@@ -94,6 +94,10 @@ AGENT_DIR="$root/.agent"
 GITIGNORE_FILE="$root/.gitignore"
 VERIFY_REL=".zed/scripts/verify"
 
+CANONICAL_EVENT_LOG_REL=".agent/tx_event_log.jsonl"
+CANONICAL_STATE_REL=".agent/tx_state.json"
+DERIVED_HANDOFF_REL=".agent/handoff.json"
+DERIVED_OBSERVABILITY_REL=".agent/observability_summary.json"
 JOURNAL_REL=".agent/journal.jsonl"
 SNAPSHOT_REL=".agent/snapshot.json"
 CHECKPOINT_REL=".agent/checkpoint.json"
@@ -149,19 +153,23 @@ fi
 {
   printf '%s\n' \
     '# AgentOps (project rules)' \
-    '# Goal: Max automation for (1) journal/snapshot/checkpoint persistence, (2) verify->commit loop, (3) test generation.' \
+    '# Goal: Max automation for (1) tx_event_log/tx_state persistence, (2) verify->commit loop, (3) test generation.' \
     '' \
     '## Always do this at the start' \
-    '- Review `.agent/snapshot.json` and `.agent/checkpoint.json` for current state and last applied seq.' \
-    '- Inspect `.agent/journal.jsonl` for recent events if needed.' \
+    '- Review `.agent/tx_state.json` for current state and last applied seq.' \
+    '- Inspect `.agent/tx_event_log.jsonl` for recent events if needed.' \
+    '- Treat `.agent/handoff.json` as derived-only.' \
     '' \
     '## Work loop (mandatory)' \
     '- For any code change:' \
-    '  1) Implement smallest safe change' \
-    '  2) Run "${VERIFY_REL}"' \
-    '  3) If it fails: fix and repeat' \
-    '  4) If it passes: commit changes' \
-    '  5) Update snapshot/checkpoint as needed' \
+    '  1) Emit tx.begin for the ticket if new' \
+    '  2) Register file intents before mutation' \
+    '  3) Implement smallest safe change' \
+    '  4) Update semantic summary (required) and user_intent only on explicit user resume intent; persist tx_state after mutation' \
+    '  5) Run "${VERIFY_REL}"' \
+    '  6) If it fails: fix and repeat (update semantic summary)' \
+    '  7) If it passes: commit changes (emit tx.commit.start/done|fail)' \
+    '  8) Emit tx.end.done|blocked' \
     '' \
     '## Handoff checklist' \
     '- Before ending a session or when context is tight:' \
@@ -175,14 +183,14 @@ fi
     '- Prefer summaries and diff stats over full diffs' \
     '- Keep outputs short and avoid repeating large logs' \
     '' \
-    '## State persistence (v0.1.0)' \
-    '- Use `.agent/journal.jsonl` for append-only events.' \
-    '- Use `.agent/snapshot.json` for state snapshots.' \
-    '- Use `.agent/checkpoint.json` for roll-forward start.' \
+    '## State persistence (v0.4.0)' \
+    '- Use `.agent/tx_event_log.jsonl` for append-only transaction events.' \
+    '- Use `.agent/tx_state.json` for materialized transaction state.' \
+    '- Treat `.agent/handoff.json` as derived-only (never canonical).' \
     '' \
     '## Roll-forward recovery' \
-    '- Rebuild state by replaying journal from checkpoint/snapshot when resuming.' \
-    '- Use continue-ready state reconstruction if provided.' \
+    '- Rebuild tx_state by replaying tx_event_log when resuming.' \
+    '- Use tx_state_rebuild or continue-ready reconstruction if provided.' \
     '' \
     '## Commit message' \
     '- ~80 chars, semantic summary (not strict conventional commits)' \
@@ -190,9 +198,9 @@ fi
     '' \
     '## Prefer MCP tools if available' \
     '- If MCP tools exist:' \
-    '  - use mcp:agentops:journal_append for events' \
-    '  - use mcp:agentops:snapshot_save to persist state' \
-    '  - use mcp:agentops:checkpoint_update to advance replay' \
+    '  - use mcp:agentops:tx_event_append for tx events' \
+    '  - use mcp:agentops:tx_state_save for materialized state' \
+    '  - use mcp:agentops:tx_state_rebuild for rebuilds' \
     '  - use mcp:agentops:roll_forward_replay for recovery' \
     '  - use mcp:agentops:continue_state_rebuild for continue-ready state' \
     '  - use mcp:agentops:ops_compact_context for compact context' \
@@ -231,7 +239,41 @@ fi
 
 
 
-# --- journal/snapshot/checkpoint ---
+# --- canonical tx artifacts ---
+if [ -f "$AGENT_DIR/tx_event_log.jsonl" ]; then
+  echo "Skipping .agent/tx_event_log.jsonl (already exists)."
+else
+  touch "$AGENT_DIR/tx_event_log.jsonl"
+fi
+
+if [ -f "$AGENT_DIR/tx_state.json" ]; then
+  echo "Skipping .agent/tx_state.json (already exists)."
+else
+  tx_state_ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  printf '%s\n' \
+    '{' \
+    '  "schema_version": "0.4.0",' \
+    "  \"updated_at\": \"$tx_state_ts\"," \
+    '  "active_tx": {' \
+    '    "tx_id": "",' \
+    '    "ticket_id": "",' \
+    '    "status": "planned",' \
+    '    "phase": "planned",' \
+    '    "current_step": "none",' \
+    '    "last_completed_step": "",' \
+    '    "next_action": "",' \
+    '    "semantic_summary": "Initialized transaction state",' \
+    '    "user_intent": null,' \
+    '    "verify_state": {"status": "not_started", "last_result": null},' \
+    '    "commit_state": {"status": "not_started", "last_result": null},' \
+    '    "file_intents": []' \
+    '  },' \
+    '  "last_applied_seq": 0,' \
+    '  "integrity": {"state_hash": "", "rebuilt_from_seq": 0}' \
+    '}' > "$AGENT_DIR/tx_state.json"
+fi
+
+# --- legacy artifacts (derived-only) ---
 if [ -f "$AGENT_DIR/journal.jsonl" ]; then
   echo "Skipping .agent/journal.jsonl (already exists)."
 else
