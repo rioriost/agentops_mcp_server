@@ -226,6 +226,24 @@
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p6-t1.json"],
       "deps": ["p5-t5"]
+    },
+    {
+      "id": "p6-t2",
+      "phase": 6,
+      "title": "Expand coverage for state rebuilder",
+      "status": "done",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p6-t2.json"],
+      "deps": ["p6-t1"]
+    },
+    {
+      "id": "p7-t1",
+      "phase": 7,
+      "title": "Increase state_store coverage",
+      "status": "done",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["tests/test_state_store.py"],
+      "deps": ["p6-t2"]
     }
   ]
 }

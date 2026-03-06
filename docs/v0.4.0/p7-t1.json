@@ -1,0 +1,30 @@
+{
+  "id": "p7-t1",
+  "phase": 7,
+  "title": "Increase state_store coverage",
+  "status": "done",
+  "summary": "Add targeted tests to lift state_store.py coverage to >=95%, covering remaining validation branches and helper behavior.",
+  "inputs": ["docs/v0.4.0/plan.md", "src/agentops_mcp_server/state_store.py"],
+  "outputs": ["tests/test_state_store.py"],
+  "acceptance_criteria": [
+    "state_store.py coverage is >= 95%.",
+    "New tests cover missing branches in tx event payload validation.",
+    "New tests cover tx event invariant checks and helper utilities."
+  ],
+  "deps": ["p6-t2"],
+  "steps": [
+    {
+      "id": "p7-t1-s1",
+      "description": "Identify untested branches and add focused unit tests."
+    },
+    {
+      "id": "p7-t1-s2",
+      "description": "Add event invariant and payload validation tests to hit edge cases."
+    },
+    {
+      "id": "p7-t1-s3",
+      "description": "Run coverage and confirm the threshold is met."
+    }
+  ],
+  "notes": ["Prefer minimal, deterministic tests with clear error assertions."]
+}

@@ -333,3 +333,530 @@ def test_tx_event_append_requires_verify_pass_for_verified_intent(state_store):
     args["payload"] = {"path": "a.py", "state": "verified"}
     with pytest.raises(ValueError, match="file intent verified requires verify.pass"):
         state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_step_enter_requires_matching_step_id(state_store):
+    state = _valid_tx_state()
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.step.enter"
+    args["payload"] = {"step_id": "different-step"}
+    with pytest.raises(ValueError, match="payload.step_id must match step_id"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_rejects_tx_begin_when_active_tx_in_progress_and_log_not_empty(
+    state_store, repo_context
+):
+    state = _valid_tx_state()
+    state_store.tx_state_save(state)
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_event_log.write_text(
+        json.dumps({"seq": 1}) + "\n", encoding="utf-8"
+    )
+
+    args = _base_tx_event_args()
+    with pytest.raises(ValueError, match="active transaction already in progress"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_rejects_mismatched_tx_id(state_store):
+    state = _valid_tx_state()
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["tx_id"] = "tx-2"
+    args["event_type"] = "tx.step.enter"
+    args["payload"] = {"step_id": "p4-t1-s1"}
+    with pytest.raises(ValueError, match="tx_id does not match active transaction"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_file_intent_add_rejects_invalid_operation(state_store):
+    state = _valid_tx_state()
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.file_intent.add"
+    args["payload"] = {
+        "path": "a.py",
+        "operation": "invalid",
+        "purpose": "update tests",
+        "planned_step": "p4-t1-s1",
+        "state": "planned",
+    }
+    with pytest.raises(ValueError, match="payload.operation is invalid"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_file_intent_add_requires_planned_state(state_store):
+    state = _valid_tx_state()
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.file_intent.add"
+    args["payload"] = {
+        "path": "a.py",
+        "operation": "update",
+        "purpose": "update tests",
+        "planned_step": "p4-t1-s1",
+        "state": "started",
+    }
+    with pytest.raises(ValueError, match="payload.state must be planned"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_file_intent_update_requires_valid_state(state_store):
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.file_intent.update"
+    args["payload"] = {"path": "a.py", "state": "bogus"}
+    with pytest.raises(
+        ValueError, match="payload.state must be started, applied, or verified"
+    ):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_file_intent_complete_requires_verified_state(state_store):
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.file_intent.complete"
+    args["payload"] = {"path": "a.py", "state": "applied"}
+    with pytest.raises(ValueError, match="payload.state must be verified"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_file_intent_update_requires_monotonic_state(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["file_intents"] = [
+        {
+            "path": "a.py",
+            "operation": "update",
+            "purpose": "update tests",
+            "planned_step": "p4-t1-s1",
+            "state": "applied",
+            "last_event_seq": 0,
+        }
+    ]
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.file_intent.update"
+    args["payload"] = {"path": "a.py", "state": "started"}
+    with pytest.raises(ValueError, match="file intent state must be monotonic"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_verify_pass_requires_ok_true(state_store):
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.verify.pass"
+    args["payload"] = {"ok": False}
+    with pytest.raises(ValueError, match="payload.ok must be true"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_verify_fail_requires_ok_false(state_store):
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.verify.fail"
+    args["payload"] = {"ok": True}
+    with pytest.raises(ValueError, match="payload.ok must be false"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_commit_start_requires_payload_fields(state_store):
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.commit.start"
+    args["payload"] = {"message": "commit", "diff_summary": "diff"}
+    with pytest.raises(ValueError, match="payload.branch is required"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_commit_done_requires_payload_fields(state_store):
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.commit.done"
+    args["payload"] = {"branch": "main", "diff_summary": "diff"}
+    with pytest.raises(ValueError, match="payload.sha is required"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_commit_fail_requires_error(state_store):
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.commit.fail"
+    args["payload"] = {}
+    with pytest.raises(ValueError, match="payload.error is required"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_end_done_requires_summary(state_store):
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.end.done"
+    args["payload"] = {}
+    with pytest.raises(ValueError, match="payload.summary is required"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_end_blocked_requires_reason(state_store):
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.end.blocked"
+    args["payload"] = {}
+    with pytest.raises(ValueError, match="payload.reason is required"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_user_intent_set_requires_user_intent(state_store):
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.user_intent.set"
+    args["payload"] = {}
+    with pytest.raises(ValueError, match="payload.user_intent is required"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_and_state_save_updates_last_applied_seq(
+    state_store, repo_context
+):
+    state = _valid_tx_state()
+
+    result = state_store.tx_event_append_and_state_save(
+        **_base_tx_event_args(),
+        state=state,
+    )
+    assert result["ok"] is True
+
+    saved = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    assert saved["last_applied_seq"] == result["seq"]
+
+
+def test_tx_state_save_sets_updated_at_when_missing(state_store, repo_context):
+    state = _valid_tx_state()
+
+    result = state_store.tx_state_save(state)
+    assert result["ok"] is True
+
+    saved = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    assert isinstance(saved.get("updated_at"), str)
+    assert saved["updated_at"]
+
+
+def test_read_last_json_line_returns_last_valid(state_store, repo_context):
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_event_log.write_text(
+        "\n".join(["", json.dumps({"seq": 1}), "   ", json.dumps({"seq": 2})]) + "\n",
+        encoding="utf-8",
+    )
+
+    assert state_store.read_last_json_line(repo_context.tx_event_log) == {"seq": 2}
+
+
+def test_read_json_file_valid_returns_dict(state_store, repo_context):
+    repo_context.tx_state.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_state.write_text(json.dumps({"ok": True}), encoding="utf-8")
+
+    assert state_store.read_json_file(repo_context.tx_state) == {"ok": True}
+
+
+def test_next_tx_event_seq_missing_log_returns_one(state_store, repo_context):
+    assert state_store.next_tx_event_seq() == 1
+
+
+def test_read_last_json_line_all_blank_returns_none(state_store, repo_context):
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_event_log.write_text("\n\n   \n", encoding="utf-8")
+
+    assert state_store.read_last_json_line(repo_context.tx_event_log) is None
+
+
+def test_tx_event_append_rejects_blank_payload_string(state_store):
+    args = _base_tx_event_args()
+    args["payload"] = {"ticket_id": " "}
+    with pytest.raises(ValueError, match="payload.ticket_id is required"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_allows_tx_begin_when_event_log_empty(state_store):
+    state = _valid_tx_state()
+    state_store.tx_state_save(state)
+
+    result = state_store.tx_event_append(**_base_tx_event_args())
+    assert result["ok"] is True
+
+
+def test_tx_event_append_allows_verify_start_with_missing_file_intents_list(
+    state_store, repo_context
+):
+    state = _valid_tx_state()
+    state["active_tx"]["file_intents"] = None
+    repo_context.tx_state.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_state.write_text(json.dumps(state), encoding="utf-8")
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.verify.start"
+    args["payload"] = {}
+    result = state_store.tx_event_append(**args)
+    assert result["ok"] is True
+
+
+def test_tx_event_append_file_intent_add_requires_matching_planned_step(state_store):
+    state = _valid_tx_state()
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.file_intent.add"
+    args["payload"] = {
+        "path": "a.py",
+        "operation": "update",
+        "purpose": "update tests",
+        "planned_step": "different-step",
+        "state": "planned",
+    }
+    with pytest.raises(ValueError, match="planned_step must match current_step"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_file_intent_add_rejects_duplicate_path(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["file_intents"] = [
+        {
+            "path": "a.py",
+            "operation": "update",
+            "purpose": "update tests",
+            "planned_step": "p4-t1-s1",
+            "state": "planned",
+            "last_event_seq": 0,
+        }
+    ]
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.file_intent.add"
+    args["payload"] = {
+        "path": "a.py",
+        "operation": "update",
+        "purpose": "update tests",
+        "planned_step": "p4-t1-s1",
+        "state": "planned",
+    }
+    with pytest.raises(ValueError, match="file intent already exists for path"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_verify_pass_requires_running_state(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["verify_state"] = {"status": "not_started", "last_result": None}
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.verify.pass"
+    args["payload"] = {"ok": True}
+    with pytest.raises(ValueError, match="verify result requires verify.start"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_commit_done_requires_running_commit_state(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["commit_state"] = {"status": "not_started", "last_result": None}
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.commit.done"
+    args["payload"] = {"sha": "sha", "branch": "main", "diff_summary": "diff"}
+    with pytest.raises(ValueError, match="commit result requires commit.start"):
+        state_store.tx_event_append(**args)
+
+
+def test_tx_event_append_commit_fail_allows_running_commit_state(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["commit_state"] = {"status": "running", "last_result": None}
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.commit.fail"
+    args["payload"] = {"error": "boom"}
+    result = state_store.tx_event_append(**args)
+    assert result["ok"] is True
+
+
+def test_tx_event_append_verify_fail_allows_running_state(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["verify_state"] = {"status": "running", "last_result": None}
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.verify.fail"
+    args["payload"] = {"ok": False}
+    result = state_store.tx_event_append(**args)
+    assert result["ok"] is True
+
+
+def test_tx_event_append_file_intent_update_allows_non_str_current_state(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["file_intents"] = [
+        {
+            "path": "a.py",
+            "operation": "update",
+            "purpose": "update tests",
+            "planned_step": "p4-t1-s1",
+            "state": None,
+            "last_event_seq": 0,
+        }
+    ]
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.file_intent.update"
+    args["payload"] = {"path": "a.py", "state": "started"}
+    result = state_store.tx_event_append(**args)
+    assert result["ok"] is True
+
+
+def test_tx_state_save_rejects_none_state(state_store):
+    with pytest.raises(ValueError, match="state is required"):
+        state_store.tx_state_save(None)
+
+
+def test_validate_tx_state_requires_updated_at(state_store):
+    state = _valid_tx_state()
+    with pytest.raises(ValueError, match="updated_at is required"):
+        state_store._validate_tx_state(state)
+
+
+def test_validate_tx_state_requires_active_tx_dict(state_store):
+    state = _valid_tx_state()
+    state["updated_at"] = "now"
+    state["active_tx"] = None
+    with pytest.raises(ValueError, match="active_tx is required"):
+        state_store._validate_tx_state(state)
+
+
+def test_validate_tx_state_rejects_invalid_phase_value(state_store):
+    state = _valid_tx_state()
+    state["updated_at"] = "now"
+    state["active_tx"]["phase"] = "bogus"
+    with pytest.raises(ValueError, match="active_tx.phase is invalid"):
+        state_store._validate_tx_state(state)
+
+
+def test_validate_tx_state_requires_verify_state_dict(state_store):
+    state = _valid_tx_state()
+    state["updated_at"] = "now"
+    state["active_tx"]["verify_state"] = None
+    with pytest.raises(ValueError, match="active_tx.verify_state is required"):
+        state_store._validate_tx_state(state)
+
+
+def test_validate_tx_state_requires_commit_state_dict(state_store):
+    state = _valid_tx_state()
+    state["updated_at"] = "now"
+    state["active_tx"]["commit_state"] = None
+    with pytest.raises(ValueError, match="active_tx.commit_state is required"):
+        state_store._validate_tx_state(state)
+
+
+def test_validate_tx_state_requires_integrity_dict(state_store):
+    state = _valid_tx_state()
+    state["updated_at"] = "now"
+    state["integrity"] = None
+    with pytest.raises(ValueError, match="integrity is required"):
+        state_store._validate_tx_state(state)
+
+
+def test_validate_tx_state_requires_integrity_rebuilt_from_seq(state_store):
+    state = _valid_tx_state()
+    state["updated_at"] = "now"
+    state["integrity"].pop("rebuilt_from_seq")
+    with pytest.raises(ValueError, match="integrity.rebuilt_from_seq is required"):
+        state_store._validate_tx_state(state)
+
+
+def test_tx_event_append_allows_verify_pass_when_running(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["verify_state"] = {"status": "running", "last_result": None}
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.verify.pass"
+    args["payload"] = {"ok": True}
+    result = state_store.tx_event_append(**args)
+    assert result["ok"] is True
+
+
+def test_tx_event_append_allows_commit_done_when_running(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["commit_state"] = {"status": "running", "last_result": None}
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.commit.done"
+    args["payload"] = {"sha": "sha", "branch": "main", "diff_summary": "diff"}
+    result = state_store.tx_event_append(**args)
+    assert result["ok"] is True
+
+
+def test_tx_event_append_allows_file_intent_complete_when_verified_and_passed(
+    state_store,
+):
+    state = _valid_tx_state()
+    state["active_tx"]["file_intents"] = [
+        {
+            "path": "a.py",
+            "operation": "update",
+            "purpose": "update tests",
+            "planned_step": "p4-t1-s1",
+            "state": "applied",
+            "last_event_seq": 0,
+        }
+    ]
+    state["active_tx"]["verify_state"] = {"status": "passed", "last_result": None}
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.file_intent.complete"
+    args["payload"] = {"path": "a.py", "state": "verified"}
+    result = state_store.tx_event_append(**args)
+    assert result["ok"] is True
+
+
+def test_require_payload_str_allows_empty_when_flagged(state_store):
+    payload = {"note": "   "}
+    result = state_store._require_payload_str(payload, "note", allow_empty=True)
+    assert result == "   "
+
+
+def test_tx_event_append_allows_end_done_with_summary(state_store):
+    state = _valid_tx_state()
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.end.done"
+    args["payload"] = {"summary": "finished"}
+    result = state_store.tx_event_append(**args)
+    assert result["ok"] is True
+
+
+def test_tx_event_append_allows_end_blocked_with_reason(state_store):
+    state = _valid_tx_state()
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args["event_type"] = "tx.end.blocked"
+    args["payload"] = {"reason": "waiting"}
+    result = state_store.tx_event_append(**args)
+    assert result["ok"] is True
+
+
+def test_read_last_json_line_skips_trailing_blanks(state_store, repo_context):
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_event_log.write_text(
+        "\n".join([json.dumps({"seq": 1}), "", "   "]) + "\n",
+        encoding="utf-8",
+    )
+
+    assert state_store.read_last_json_line(repo_context.tx_event_log) == {"seq": 1}
+
+
+def test_tx_event_append_allows_tx_begin_when_active_done(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["status"] = "done"
+    state["active_tx"]["phase"] = "done"
+    state_store.tx_state_save(state)
+
+    result = state_store.tx_event_append(**_base_tx_event_args())
+    assert result["ok"] is True
