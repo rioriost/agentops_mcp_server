@@ -117,6 +117,25 @@ def test_ops_task_lifecycle_records_events(repo_context, state_store, state_rebu
     assert "tx.end.done" in tx_events
 
 
+def test_ops_update_task_falls_back_to_active_tx_id(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    ops.ops_update_task(status="blocked", note="waiting", session_id="s1")
+
+    events = _read_tx_events(repo_context)
+    update_events = [
+        event
+        for event in events
+        if event["event_type"] == "tx.step.enter"
+        and event.get("payload", {}).get("description") == "waiting"
+    ]
+    assert update_events
+    assert update_events[-1]["tx_id"] == "t-1"
+
+
 def test_ops_task_lifecycle_emits_tx_events_and_updates_state(
     repo_context, state_store, state_rebuilder
 ):

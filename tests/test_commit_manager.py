@@ -202,6 +202,33 @@ def test_commit_if_verified_emits_tx_commit_events(tmp_path, monkeypatch):
     assert active_tx["next_action"] == "tx.end.done"
 
 
+def test_commit_if_verified_backfills_tx_begin_when_log_empty(tmp_path, monkeypatch):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    _write_tx_state(state_store)
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"}),
+        state_store,
+        state_rebuilder,
+    )
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: None)
+
+    result = manager.commit_if_verified("message", timeout_sec=5)
+    assert result["sha"] == "abc123"
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    event_types = [event["event_type"] for event in events]
+    assert "tx.begin" in event_types
+    assert event_types.index("tx.begin") < event_types.index("tx.verify.start")
+
+
 def test_repo_commit_verify_failure_raises():
     manager, *_ = _build_manager(
         status_lines=[" M file.txt"],

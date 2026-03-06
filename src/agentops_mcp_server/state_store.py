@@ -175,16 +175,25 @@ class StateStore:
                 return active_tx
         return None
 
+    def _tx_event_log_empty(self) -> bool:
+        return self.read_last_json_line(self.repo_context.tx_event_log) is None
+
     def _validate_tx_event_invariants(
         self, event_type: str, payload: Dict[str, Any], step_id: str, tx_id: str
     ) -> None:
         active_tx = self._load_active_tx()
         if not active_tx:
+            if event_type != "tx.begin":
+                raise ValueError("tx.begin required before other events")
             return
         active_tx_id = active_tx.get("tx_id")
         if isinstance(active_tx_id, str) and active_tx_id.strip():
             if event_type != "tx.begin" and active_tx_id != tx_id:
                 raise ValueError("tx_id does not match active transaction")
+
+        status = active_tx.get("status")
+        if status in {"done", "blocked"} and event_type != "tx.begin":
+            raise ValueError("event after terminal")
 
         if event_type == "tx.begin":
             status = active_tx.get("status")
@@ -193,6 +202,8 @@ class StateStore:
                 and active_tx_id.strip()
                 and status not in {"done", "blocked"}
             ):
+                if self._tx_event_log_empty():
+                    return
                 raise ValueError("active transaction already in progress")
             return
 
@@ -231,6 +242,14 @@ class StateStore:
                 current_state
             ):
                 raise ValueError("file intent state must be monotonic")
+            if new_state == "verified":
+                verify_state = (
+                    active_tx.get("verify_state")
+                    if isinstance(active_tx.get("verify_state"), dict)
+                    else {}
+                )
+                if verify_state.get("status") != "passed":
+                    raise ValueError("file intent verified requires verify.pass")
             return
 
         if event_type == "tx.verify.start":

@@ -51,6 +51,26 @@ class CommitManager:
             "step_id": step_id,
         }
 
+    def _event_log_empty(self) -> bool:
+        last = self.state_store.read_last_json_line(self.repo_context.tx_event_log)
+        return last is None
+
+    def _ensure_tx_begin(self) -> None:
+        context = self._load_tx_context()
+        if not context:
+            return
+        if not self._event_log_empty():
+            return
+        self._emit_tx_event(
+            event_type="tx.begin",
+            payload={
+                "ticket_id": context["ticket_id"],
+                "ticket_title": context["ticket_id"],
+            },
+            phase_override=context["phase"],
+            step_id_override="none",
+        )
+
     def _emit_tx_event(
         self,
         *,
@@ -144,6 +164,7 @@ class CommitManager:
     def commit_if_verified(
         self, message: str, timeout_sec: Optional[int] = None
     ) -> Dict[str, str]:
+        self._ensure_tx_begin()
         self._emit_tx_event(
             event_type="tx.verify.start",
             payload={"command": str(self.repo_context.verify)},

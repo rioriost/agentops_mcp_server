@@ -1,0 +1,47 @@
+{
+  "id": "p6-t1",
+  "phase": 6,
+  "title": "Backfill tx.begin and ops task fallback fixes",
+  "status": "done",
+  "summary": "Completed tx.begin backfill in commit flow, ops task fallback for missing task_id, and added regression coverage.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "tests/test_commit_manager.py",
+    "tests/test_ops_tools.py"
+  ],
+  "outputs": [
+    "tx.begin backfill logic in commit flow",
+    "write-time invariant adjustment for tx.begin acceptance",
+    "ops task update/end fallback to active transaction",
+    "regression tests for missing tx.begin and missing task_id"
+  ],
+  "acceptance_criteria": [
+    "commit_if_verified inserts tx.begin when tx_event_log is empty and tx_state is present.",
+    "tx.begin is accepted when the event log is empty and an active transaction exists.",
+    "ops_update_task and ops_end_task work without task_id by reusing the active transaction id.",
+    "pytest coverage run passes with the new regression tests."
+  ],
+  "deps": ["p5-t5"],
+  "steps": [
+    {
+      "id": "p6-t1-s1",
+      "description": "Add tx.begin backfill and invariant adjustments for empty event logs."
+    },
+    {
+      "id": "p6-t1-s2",
+      "description": "Implement ops task fallback to active transaction when task_id is missing."
+    },
+    {
+      "id": "p6-t1-s3",
+      "description": "Add regression tests covering both behaviors."
+    }
+  ],
+  "notes": [
+    "Completion: added tx.begin backfill, active-tx fallback for ops tasks, and regression tests.",
+    "Keep invariants aligned with lifecycle_invariants.md while allowing recovery from missing tx_event_log.",
+    "Prefer minimal changes that preserve existing event ordering."
+  ]
+}

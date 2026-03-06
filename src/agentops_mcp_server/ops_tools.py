@@ -341,24 +341,31 @@ class OpsTools:
             raise ValueError("status or note is required")
         event = None
 
-        tx_phase = (
-            status.strip()
-            if isinstance(status, str) and status.strip()
-            else "in-progress"
-        )
+        resolved_task_id = task_id.strip() if isinstance(task_id, str) else ""
+        if not resolved_task_id:
+            active_tx = self._active_tx()
+            active_tx_id = active_tx.get("tx_id")
+            if isinstance(active_tx_id, str) and active_tx_id.strip():
+                resolved_task_id = active_tx_id.strip()
+        if resolved_task_id and "task_id" not in payload:
+            payload["task_id"] = resolved_task_id
+
+        resolved_status = status.strip() if isinstance(status, str) else ""
+        if resolved_status in {"blocked", "done"}:
+            tx_phase = "in-progress"
+        else:
+            tx_phase = resolved_status or "in-progress"
         tx_step_id = (
             task_id.strip()
             if isinstance(task_id, str) and task_id.strip()
-            else (
-                status.strip() if isinstance(status, str) and status.strip() else "task"
-            )
+            else (resolved_status if resolved_status else "task")
         )
         description = payload.get("note") or "task updated"
         self._emit_tx_event(
             event_type="tx.step.enter",
             payload={"step_id": tx_step_id, "description": description},
-            title=task_id or "task",
-            task_id=task_id,
+            title=resolved_task_id or "task",
+            task_id=resolved_task_id or None,
             phase=tx_phase,
             step_id=tx_step_id,
             session_id=session_id,
@@ -368,8 +375,8 @@ class OpsTools:
             self._emit_tx_event(
                 event_type="tx.user_intent.set",
                 payload={"user_intent": user_intent.strip()},
-                title=task_id or "task",
-                task_id=task_id,
+                title=resolved_task_id or "task",
+                task_id=resolved_task_id or None,
                 phase=tx_phase,
                 step_id=tx_step_id,
                 session_id=session_id,
@@ -398,12 +405,19 @@ class OpsTools:
             payload["task_id"] = task_id.strip()
         event = None
 
+        resolved_task_id = task_id.strip() if isinstance(task_id, str) else ""
+        if not resolved_task_id:
+            active_tx = self._active_tx()
+            active_tx_id = active_tx.get("tx_id")
+            if isinstance(active_tx_id, str) and active_tx_id.strip():
+                resolved_task_id = active_tx_id.strip()
+        if resolved_task_id and "task_id" not in payload:
+            payload["task_id"] = resolved_task_id
+
         tx_phase = (
             status.strip() if isinstance(status, str) and status.strip() else "done"
         )
-        tx_step_id = (
-            task_id.strip() if isinstance(task_id, str) and task_id.strip() else "task"
-        )
+        tx_step_id = resolved_task_id or "task"
         end_type = "tx.end.blocked" if tx_phase == "blocked" else "tx.end.done"
         end_payload = {"summary": payload.get("summary", "")}
         if isinstance(payload.get("next_action"), str) and payload.get("next_action"):
@@ -413,8 +427,8 @@ class OpsTools:
         self._emit_tx_event(
             event_type=end_type,
             payload=end_payload,
-            title=task_id or "task",
-            task_id=task_id,
+            title=resolved_task_id or "task",
+            task_id=resolved_task_id or None,
             phase=tx_phase,
             step_id=tx_step_id,
             session_id=session_id,

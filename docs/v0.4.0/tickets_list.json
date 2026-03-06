@@ -204,10 +204,28 @@
       "id": "p5-t4",
       "phase": 5,
       "title": "Add spec compliance tests for 0.4.0 runtime",
-      "status": "planned",
+      "status": "done",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p5-t4.json"],
       "deps": ["p5-t3"]
+    },
+    {
+      "id": "p5-t5",
+      "phase": 5,
+      "title": "Close remaining spec gaps (write-time invariants + legacy cleanup)",
+      "status": "done",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p5-t5.json"],
+      "deps": ["p5-t4"]
+    },
+    {
+      "id": "p6-t1",
+      "phase": 6,
+      "title": "Backfill tx.begin and ops task fallback fixes",
+      "status": "done",
+      "inputs": ["docs/v0.4.0/plan.md"],
+      "outputs": ["docs/v0.4.0/p6-t1.json"],
+      "deps": ["p5-t5"]
     }
   ]
 }
