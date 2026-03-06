@@ -2,7 +2,7 @@
   "id": "p2-t1",
   "phase": 2,
   "title": "Define writer pipeline and semantic memory rules",
-  "status": "verified",
+  "status": "done",
   "summary": "Specify event→state→cursor ordering and semantic memory capture/update rules for 0.4.0.",
   "inputs": ["docs/v0.4.0/plan.md"],
   "outputs": [
