@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -87,6 +88,454 @@ class StateRebuilder:
             "invalid_lines": invalid_lines,
             "last_seq": last_seq,
             "path": str(path),
+        }
+
+    def read_tx_event_log(
+        self,
+        start_seq: int,
+        end_seq: Optional[int] = None,
+        event_log_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        if start_seq < 0:
+            raise ValueError("start_seq must be >= 0")
+        if end_seq is not None and end_seq < start_seq:
+            raise ValueError("end_seq must be >= start_seq")
+
+        path = event_log_path or self.repo_context.tx_event_log
+        events: List[Dict[str, Any]] = []
+        invalid_lines = 0
+        last_seq = start_seq
+
+        if not path.exists():
+            return {
+                "events": events,
+                "invalid_lines": invalid_lines,
+                "last_seq": last_seq,
+                "path": str(path),
+            }
+
+        with path.open("r", encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    invalid_lines += 1
+                    continue
+                if not isinstance(rec, dict):
+                    invalid_lines += 1
+                    continue
+                seq = rec.get("seq")
+                if not isinstance(seq, int):
+                    invalid_lines += 1
+                    continue
+                if seq <= start_seq:
+                    continue
+                if end_seq is not None and seq > end_seq:
+                    continue
+                events.append(rec)
+                if seq > last_seq:
+                    last_seq = seq
+
+        return {
+            "events": events,
+            "invalid_lines": invalid_lines,
+            "last_seq": last_seq,
+            "path": str(path),
+        }
+
+    def _init_active_tx(
+        self, tx_id: str, ticket_id: str, phase: str, step_id: str
+    ) -> Dict[str, Any]:
+        return {
+            "tx_id": tx_id,
+            "ticket_id": ticket_id,
+            "status": phase,
+            "phase": phase,
+            "current_step": step_id,
+            "last_completed_step": "",
+            "next_action": "",
+            "semantic_summary": "",
+            "user_intent": None,
+            "verify_state": {"status": "not_started", "last_result": None},
+            "commit_state": {"status": "not_started", "last_result": None},
+            "file_intents": [],
+            "_last_event_seq": -1,
+            "_terminal": False,
+        }
+
+    def _init_tx_state(self) -> Dict[str, Any]:
+        return {
+            "schema_version": "0.4.0",
+            "active_tx": self._init_active_tx("", "", "planned", "none"),
+            "last_applied_seq": 0,
+            "integrity": {"state_hash": "", "rebuilt_from_seq": 0},
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def _compute_state_hash(self, state: Dict[str, Any]) -> str:
+        sanitized = json.loads(json.dumps(state, ensure_ascii=False))
+        sanitized.pop("updated_at", None)
+        integrity = sanitized.get("integrity")
+        if isinstance(integrity, dict):
+            integrity.pop("state_hash", None)
+        active_tx = sanitized.get("active_tx")
+        if isinstance(active_tx, dict):
+            active_tx.pop("_last_event_seq", None)
+            active_tx.pop("_terminal", None)
+        payload = json.dumps(
+            sanitized, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _validate_tx_event(self, event: Dict[str, Any]) -> Tuple[bool, str]:
+        if not isinstance(event.get("seq"), int):
+            return False, "missing seq"
+        if not isinstance(event.get("tx_id"), str):
+            return False, "missing tx_id"
+        if not isinstance(event.get("ticket_id"), str):
+            return False, "missing ticket_id"
+        if not isinstance(event.get("event_type"), str):
+            return False, "missing event_type"
+        if not isinstance(event.get("phase"), str):
+            return False, "missing phase"
+        if not isinstance(event.get("step_id"), str):
+            return False, "missing step_id"
+        if not isinstance(event.get("actor"), dict):
+            return False, "missing actor"
+        if not isinstance(event.get("session_id"), str):
+            return False, "missing session_id"
+        if not isinstance(event.get("payload"), dict):
+            return False, "missing payload"
+        return True, ""
+
+    def _update_semantic_summary(
+        self, event_type: str, payload: Dict[str, Any], step_id: str
+    ) -> str:
+        if event_type == "tx.begin":
+            ticket_id = (
+                payload.get("ticket_id")
+                if isinstance(payload.get("ticket_id"), str)
+                else ""
+            )
+            return f"Started transaction {ticket_id}".strip()
+        if event_type == "tx.step.enter":
+            return f"Entered step {step_id}"
+        if event_type == "tx.file_intent.add":
+            path = (
+                payload.get("path") if isinstance(payload.get("path"), str) else "file"
+            )
+            operation = (
+                payload.get("operation")
+                if isinstance(payload.get("operation"), str)
+                else "update"
+            )
+            return f"Planned {operation} for {path}"
+        if event_type == "tx.file_intent.update":
+            path = (
+                payload.get("path") if isinstance(payload.get("path"), str) else "file"
+            )
+            state = (
+                payload.get("state")
+                if isinstance(payload.get("state"), str)
+                else "updated"
+            )
+            return f"Updated intent for {path} to {state}"
+        if event_type == "tx.file_intent.complete":
+            path = (
+                payload.get("path") if isinstance(payload.get("path"), str) else "file"
+            )
+            return f"Completed intent for {path}"
+        if event_type == "tx.verify.pass":
+            return "Verification passed"
+        if event_type == "tx.verify.fail":
+            return "Verification failed"
+        if event_type == "tx.commit.done":
+            return "Commit completed"
+        if event_type == "tx.commit.fail":
+            return "Commit failed"
+        if event_type.startswith("tx.end."):
+            return "Transaction ended"
+        return ""
+
+    def _apply_tx_event_to_state(
+        self, active_tx: Dict[str, Any], event: Dict[str, Any]
+    ) -> None:
+        event_type = event.get("event_type")
+        payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+        phase = event.get("phase")
+        step_id = event.get("step_id")
+        seq = event.get("seq")
+
+        if isinstance(phase, str):
+            active_tx["status"] = phase
+            active_tx["phase"] = phase
+
+        if isinstance(step_id, str) and event_type == "tx.step.enter":
+            active_tx["current_step"] = step_id
+
+        if event_type == "tx.begin":
+            active_tx["tx_id"] = event.get("tx_id")
+            active_tx["ticket_id"] = event.get("ticket_id")
+            active_tx["current_step"] = step_id if isinstance(step_id, str) else "none"
+        if event_type and event_type.startswith("tx.file_intent."):
+            file_intents = active_tx.get("file_intents")
+            if not isinstance(file_intents, list):
+                file_intents = []
+                active_tx["file_intents"] = file_intents
+            path = payload.get("path") if isinstance(payload.get("path"), str) else ""
+            intent = None
+            for item in file_intents:
+                if isinstance(item, dict) and item.get("path") == path:
+                    intent = item
+                    break
+            if intent is None:
+                intent = {
+                    "path": path,
+                    "operation": payload.get("operation")
+                    if isinstance(payload.get("operation"), str)
+                    else "",
+                    "purpose": payload.get("purpose")
+                    if isinstance(payload.get("purpose"), str)
+                    else "",
+                    "planned_step": payload.get("planned_step")
+                    if isinstance(payload.get("planned_step"), str)
+                    else "",
+                    "state": payload.get("state")
+                    if isinstance(payload.get("state"), str)
+                    else "planned",
+                    "last_event_seq": seq if isinstance(seq, int) else 0,
+                }
+                file_intents.append(intent)
+            else:
+                if isinstance(payload.get("state"), str):
+                    intent["state"] = payload.get("state")
+                if isinstance(seq, int):
+                    intent["last_event_seq"] = seq
+
+        if event_type == "tx.verify.start":
+            active_tx["verify_state"] = {"status": "running", "last_result": payload}
+        if event_type == "tx.verify.pass":
+            active_tx["verify_state"] = {"status": "passed", "last_result": payload}
+        if event_type == "tx.verify.fail":
+            active_tx["verify_state"] = {"status": "failed", "last_result": payload}
+
+        if event_type == "tx.commit.start":
+            active_tx["commit_state"] = {"status": "running", "last_result": payload}
+        if event_type == "tx.commit.done":
+            active_tx["commit_state"] = {"status": "passed", "last_result": payload}
+        if event_type == "tx.commit.fail":
+            active_tx["commit_state"] = {"status": "failed", "last_result": payload}
+
+        if event_type == "tx.user_intent.set":
+            user_intent = payload.get("user_intent")
+            if isinstance(user_intent, str):
+                active_tx["user_intent"] = user_intent
+
+        summary = self._update_semantic_summary(
+            event_type, payload, step_id if isinstance(step_id, str) else ""
+        )
+        if summary:
+            active_tx["semantic_summary"] = summary
+
+    def _derive_next_action(self, active_tx: Dict[str, Any]) -> str:
+        status = active_tx.get("status")
+        file_intents = active_tx.get("file_intents")
+        verify_state = (
+            active_tx.get("verify_state")
+            if isinstance(active_tx.get("verify_state"), dict)
+            else {}
+        )
+        commit_state = (
+            active_tx.get("commit_state")
+            if isinstance(active_tx.get("commit_state"), dict)
+            else {}
+        )
+
+        if status == "planned":
+            return "tx.begin"
+        if status == "in-progress":
+            if isinstance(file_intents, list):
+                if any(
+                    intent.get("state") in {"planned", "started"}
+                    for intent in file_intents
+                    if isinstance(intent, dict)
+                ):
+                    return "continue file intents"
+                if all(
+                    intent.get("state") in {"applied", "verified"}
+                    for intent in file_intents
+                    if isinstance(intent, dict)
+                ):
+                    return "tx.verify.start"
+            return "tx.verify.start"
+        if status == "checking":
+            if verify_state.get("status") == "not_started":
+                return "tx.verify.start"
+            if verify_state.get("status") == "failed":
+                return "fix and re-verify"
+        if status == "verified":
+            if commit_state.get("status") == "not_started":
+                return "tx.commit.start"
+        if status == "committed":
+            return "tx.end.done"
+        if status == "blocked":
+            return "tx.end.blocked"
+        if status == "done":
+            return "tx.end.done"
+        return "tx.begin"
+
+    def _tx_state_integrity_ok(self, state: Dict[str, Any], last_seq: int) -> bool:
+        if state.get("schema_version") != "0.4.0":
+            return False
+        if not isinstance(state.get("last_applied_seq"), int):
+            return False
+        if state.get("last_applied_seq") != last_seq:
+            return False
+        integrity = state.get("integrity")
+        if not isinstance(integrity, dict):
+            return False
+        if not isinstance(integrity.get("rebuilt_from_seq"), int):
+            return False
+        if not isinstance(integrity.get("state_hash"), str):
+            return False
+        if state.get("last_applied_seq") < integrity.get("rebuilt_from_seq"):
+            return False
+        return integrity.get("state_hash") == self._compute_state_hash(state)
+
+    def rebuild_tx_state(
+        self,
+        start_seq: Optional[int] = None,
+        end_seq: Optional[int] = None,
+        tx_state_path: Optional[str] = None,
+        event_log_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        resolved_state_path = self.resolve_path(
+            tx_state_path, self.repo_context.tx_state
+        )
+        existing_state = self.state_store.read_json_file(resolved_state_path)
+        resolved_event_log = (
+            self.resolve_path(event_log_path, self.repo_context.tx_event_log)
+            if event_log_path is not None
+            else self.repo_context.tx_event_log
+        )
+
+        event_log = self.read_tx_event_log(
+            start_seq=0, end_seq=end_seq, event_log_path=resolved_event_log
+        )
+        last_seq = (
+            event_log.get("last_seq")
+            if isinstance(event_log.get("last_seq"), int)
+            else 0
+        )
+
+        if isinstance(existing_state, dict) and self._tx_state_integrity_ok(
+            existing_state, last_seq
+        ):
+            return {
+                "ok": True,
+                "state": existing_state,
+                "last_applied_seq": existing_state.get("last_applied_seq"),
+                "event_log_path": str(resolved_event_log),
+                "source": "materialized",
+            }
+
+        replay_start = start_seq if isinstance(start_seq, int) else 0
+        event_log = self.read_tx_event_log(
+            start_seq=replay_start, end_seq=end_seq, event_log_path=resolved_event_log
+        )
+        events = (
+            event_log.get("events") if isinstance(event_log.get("events"), list) else []
+        )
+        invalid_lines = (
+            event_log.get("invalid_lines")
+            if isinstance(event_log.get("invalid_lines"), int)
+            else 0
+        )
+
+        state = self._init_tx_state()
+        state["last_applied_seq"] = replay_start
+        state["integrity"]["rebuilt_from_seq"] = replay_start
+
+        tx_states: Dict[str, Dict[str, Any]] = {}
+        applied_event_ids: set[str] = set()
+        dropped_events = 0
+        last_valid_seq = replay_start
+
+        for event in events:
+            if not isinstance(event, dict):
+                break
+            valid, _reason = self._validate_tx_event(event)
+            if not valid:
+                # Torn-state recovery: truncate at last valid seq and rebuild deterministically.
+                break
+            event_id = event.get("event_id")
+            if isinstance(event_id, str) and event_id in applied_event_ids:
+                dropped_events += 1
+                continue
+
+            tx_id = event.get("tx_id")
+            ticket_id = event.get("ticket_id")
+            phase = event.get("phase")
+            step_id = event.get("step_id")
+            active_tx = tx_states.get(tx_id)
+            if active_tx is None:
+                active_tx = self._init_active_tx(
+                    tx_id if isinstance(tx_id, str) else "",
+                    ticket_id if isinstance(ticket_id, str) else "",
+                    phase if isinstance(phase, str) else "planned",
+                    step_id if isinstance(step_id, str) else "none",
+                )
+            self._apply_tx_event_to_state(active_tx, event)
+            if isinstance(event.get("seq"), int):
+                active_tx["_last_event_seq"] = event.get("seq")
+                last_valid_seq = event.get("seq")
+            if isinstance(event.get("event_type"), str) and event.get(
+                "event_type"
+            ).startswith("tx.end."):
+                active_tx["_terminal"] = True
+            tx_states[tx_id] = active_tx
+            if isinstance(event_id, str):
+                applied_event_ids.add(event_id)
+
+        candidates = [
+            tx
+            for tx in tx_states.values()
+            if isinstance(tx, dict) and not tx.get("_terminal")
+        ]
+        if candidates:
+            active_tx = max(
+                candidates, key=lambda item: item.get("_last_event_seq", -1)
+            )
+            active_tx.pop("_last_event_seq", None)
+            active_tx.pop("_terminal", None)
+            if not active_tx.get("semantic_summary"):
+                active_tx["semantic_summary"] = "Rebuilt state from tx event log."
+            active_tx["next_action"] = self._derive_next_action(active_tx)
+            state["active_tx"] = active_tx
+        else:
+            if not state["active_tx"].get("semantic_summary"):
+                state["active_tx"]["semantic_summary"] = "No active transaction."
+            state["active_tx"]["next_action"] = self._derive_next_action(
+                state["active_tx"]
+            )
+
+        state["last_applied_seq"] = last_valid_seq
+        state["integrity"]["rebuilt_from_seq"] = last_valid_seq
+        state["updated_at"] = datetime.now(timezone.utc).isoformat()
+        state["integrity"]["state_hash"] = self._compute_state_hash(state)
+
+        return {
+            "ok": True,
+            "state": state,
+            "last_applied_seq": last_valid_seq,
+            "rebuilt_from_seq": state["integrity"]["rebuilt_from_seq"],
+            "invalid_lines": invalid_lines,
+            "dropped_events": dropped_events,
+            "event_log_path": str(resolved_event_log),
+            "source": "rebuild",
         }
 
     def read_recent_journal_events(

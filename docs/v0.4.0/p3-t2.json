@@ -2,7 +2,7 @@
   "id": "p3-t2",
   "phase": 3,
   "title": "Implement rebuild engine for transaction state",
-  "status": "planned",
+  "status": "done",
   "summary": "Implement deterministic rebuild of materialized transaction state from the transaction event log, including semantic memory reconstruction.",
   "inputs": ["docs/v0.4.0/plan.md", "docs/v0.4.0/p2-t2.json"],
   "outputs": [
