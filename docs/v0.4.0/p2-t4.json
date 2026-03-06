@@ -2,7 +2,7 @@
   "id": "p2-t4",
   "phase": 2,
   "title": "Define removal/replacement of legacy artifact paths",
-  "status": "planned",
+  "status": "done",
   "summary": "Specify how legacy snapshot/handoff/checkpoint artifacts are removed or replaced in the 0.4.0 redesign (no backward compatibility).",
   "inputs": ["docs/v0.4.0/plan.md"],
   "outputs": ["docs/v0.4.0/specs/legacy-artifact-policy.md"],
