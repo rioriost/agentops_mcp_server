@@ -1,0 +1,36 @@
+{
+  "id": "p6-t2",
+  "phase": 6,
+  "title": "Expand coverage for state rebuilder",
+  "status": "done",
+  "summary": "Add targeted tests to raise overall coverage to >= 90% with state_rebuilder.py at >= 95%.",
+  "inputs": [
+    "docs/v0.4.0/plan.md",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "tests/test_state_rebuilder.py"
+  ],
+  "outputs": [
+    "Expanded StateRebuilder test suite",
+    "Coverage report meeting 0.4.0 targets"
+  ],
+  "acceptance_criteria": [
+    "state_rebuilder.py coverage >= 95%.",
+    "Overall project coverage >= 90%.",
+    "verify-release passes."
+  ],
+  "deps": ["p6-t1"],
+  "steps": [
+    {
+      "id": "p6-t2-s1",
+      "description": "Add coverage-focused tests for state rebuilder helpers, invariants, and replay paths."
+    },
+    {
+      "id": "p6-t2-s2",
+      "description": "Run verify-release and confirm coverage thresholds."
+    }
+  ],
+  "notes": [
+    "Prefer deterministic tests that do not rely on external state.",
+    "Cover helper methods like parse/rotate/replay utilities."
+  ]
+}
