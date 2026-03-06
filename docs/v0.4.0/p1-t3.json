@@ -2,7 +2,7 @@
   "id": "p1-t3",
   "phase": 1,
   "title": "Define recovery algorithm & torn-state policy",
-  "status": "verified",
+  "status": "done",
   "summary": "Finalize deterministic recovery logic and torn-state resolution rules for 0.4.0, including semantic resume intent handling.",
   "inputs": ["docs/v0.4.0/plan.md"],
   "outputs": ["docs/v0.4.0/architecture/recovery-algorithm.md"],
