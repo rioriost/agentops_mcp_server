@@ -21,7 +21,7 @@ brew tap rioriost/agentops_mcp_server
 brew install agentops_mcp_server
 ```
 
-`zed-agentops-init.sh` を使ってディレクトリをスキャフォールドします（`.rules`、`.zed/`、`.agent`、`.zed/scripts/verify` に加え、`.agent/journal.jsonl`、`.agent/snapshot.json`、`.agent/checkpoint.json` を作成）。
+`zed-agentops-init.sh` を使ってディレクトリをスキャフォールドします（`.rules`、`.zed/`、`.agent`、`.zed/scripts/verify` に加え、canonical な `.agent/tx_event_log.jsonl` と `.agent/tx_state.json`、および legacy の派生専用 `.agent/journal.jsonl`、`.agent/snapshot.json`、`.agent/checkpoint.json` を作成）。
 ディレクトリを Zed で開き、Agent パネルを使ってください。
 リリース向けのカバレッジ計測は `.zed/scripts/verify-release`（`pytest-cov` が必要）を使ってください。
 `.gitignore` にはエントリが自動追記されます。
@@ -37,6 +37,11 @@ brew install agentops_mcp_server
 - トークン節約: フル diff より要約・diff stats を優先し、出力は短く保つ
 - 全ての MCP ツールは `workspace_root` と `truncate_limit` を任意で受け付ける（`tools/list` で確認）
 
+## セマンティック再開（0.4.0）
+- canonical なソースは `.agent/tx_event_log.jsonl`（イベントログ）と `.agent/tx_state.json`（マテリアライズド状態）。
+- `semantic_summary` は進捗の要約、`user_intent` は明示的な再開意図（例: “continue”）を記録。
+- `.agent/handoff.json` は派生専用で、再開判断の canonical 入力にはならない。
+
 ## .rulesについて（from v0.2.0）
 zed-agentops-init は `.rules` を生成しますが、必要に応じて `docs/rules_short` か `docs/rules_long` も試してみてください。
 
@@ -47,9 +52,10 @@ zed-agentops-init は `.rules` を生成しますが、必要に応じて `docs/
 - `.zed/scripts/verify` : build/test/lint の単一エントリーポイント（必要に応じて拡張）
 - `.zed/scripts/verify-release` : リリース向けのカバレッジ計測（pytest-cov）
 
-- `.agent/journal.jsonl` : 追記専用のイベントログ
-- `.agent/snapshot.json` : 状態スナップショット
-- `.agent/checkpoint.json` : ロールフォワード開始位置
+- `.agent/tx_event_log.jsonl` : canonical なトランザクションイベントログ
+- `.agent/tx_state.json` : canonical なマテリアライズド状態
+- `.agent/handoff.json` : 派生専用の引き継ぎサマリ
+- `.agent/journal.jsonl` / `.agent/snapshot.json` / `.agent/checkpoint.json` : legacy の派生専用アーティファクト
 - `/opt/homebrew/bin/agentops_mcp_server` : Homebrew でインストールされる MCP サーババイナリ（macOS）
 
 ## MCP Server (Zed)
@@ -169,6 +175,9 @@ Tool Settings (settings.json):
 
 提供ツール（snake_case）:
 - `journal_append`
+- `tx_event_append`
+- `tx_state_save`
+- `tx_state_rebuild`
 - `snapshot_save`
 - `snapshot_load`
 - `checkpoint_update`

@@ -21,7 +21,7 @@ brew tap rioriost/agentops_mcp_server
 brew install agentops_mcp_server
 ```
 
-Use `zed-agentops-init.sh` to scaffold a directory (it creates `.rules`, `.zed/`, `.agent`, and `.zed/scripts/verify`, plus `.agent/journal.jsonl`, `.agent/snapshot.json`, `.agent/checkpoint.json`).
+Use `zed-agentops-init.sh` to scaffold a directory (it creates `.rules`, `.zed/`, `.agent`, and `.zed/scripts/verify`, plus canonical `.agent/tx_event_log.jsonl` and `.agent/tx_state.json`, along with legacy derived-only `.agent/journal.jsonl`, `.agent/snapshot.json`, `.agent/checkpoint.json`).
 It also auto-appends common entries to `.gitignore`.
 Open the directory in Zed and use the Agent Panel.
 For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-cov`).
@@ -35,6 +35,11 @@ For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-c
 - Token discipline: prefer summaries/diff stats over full diffs and keep outputs short
 - All MCP tools accept optional `workspace_root` and `truncate_limit` (as exposed by `tools/list`)
 
+## Semantic resume (0.4.0)
+- Canonical sources of truth are `.agent/tx_event_log.jsonl` (event log) and `.agent/tx_state.json` (materialized state).
+- `semantic_summary` captures concise progress; `user_intent` records explicit resume intent (e.g., “continue”).
+- `.agent/handoff.json` is derived-only and never a canonical input for resume decisions.
+
 ## About .rules (from v0.2.0)
 `zed-agentops-init` generates `.rules`, but if needed, try `docs/rules_short` or `docs/rules_long`.
 
@@ -44,9 +49,10 @@ For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-c
 - `.zed/tasks.json` : reusable Tasks (verify, git helpers)
 - `.zed/scripts/verify` : the single entry point for build/test/lint (extend as needed)
 - `.zed/scripts/verify-release` : release-only coverage run (pytest-cov)
-- `.agent/journal.jsonl` : append-only event log
-- `.agent/snapshot.json` : state snapshot
-- `.agent/checkpoint.json` : roll-forward start
+- `.agent/tx_event_log.jsonl` : canonical transaction event log
+- `.agent/tx_state.json` : canonical materialized transaction state
+- `.agent/handoff.json` : derived-only human-readable summary
+- `.agent/journal.jsonl` / `.agent/snapshot.json` / `.agent/checkpoint.json` : legacy derived-only artifacts
 - `/opt/homebrew/bin/agentops_mcp_server` : MCP server binary installed by Homebrew (macOS)
 
 ## MCP Server (Zed)
@@ -166,6 +172,9 @@ Tool Settings (settings.json):
 
 MCP tools (snake_case):
 - `journal_append`
+- `tx_event_append`
+- `tx_state_save`
+- `tx_state_rebuild`
 - `snapshot_save`
 - `snapshot_load`
 - `checkpoint_update`

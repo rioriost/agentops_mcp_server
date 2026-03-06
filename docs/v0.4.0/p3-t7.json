@@ -2,7 +2,7 @@
   "id": "p3-t7",
   "phase": 3,
   "title": "Update documentation for semantic resume workflow",
-  "status": "planned",
+  "status": "done",
   "summary": "Update README docs to describe canonical artifacts, semantic memory, and deterministic resume behavior.",
   "inputs": ["docs/v0.4.0/plan.md"],
   "outputs": [
