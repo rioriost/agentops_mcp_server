@@ -2,7 +2,7 @@
   "id": "p4-t5",
   "phase": 4,
   "title": "Interruption matrix tests with semantic resume assertions",
-  "status": "planned",
+  "status": "done",
   "summary": "Implement interruption matrix tests and validate semantic resume intent handling with coverage gate >= 90%.",
   "inputs": [
     "docs/v0.4.0/plan.md",

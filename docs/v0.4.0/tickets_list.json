@@ -168,7 +168,7 @@
       "id": "p4-t5",
       "phase": 4,
       "title": "Interruption matrix tests with semantic resume assertions",
-      "status": "planned",
+      "status": "done",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p4-t5.json"],
       "deps": ["p4-t1", "p4-t2", "p4-t3", "p4-t4"]
