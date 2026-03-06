@@ -2,7 +2,7 @@
   "id": "p4-t1",
   "phase": 4,
   "title": "Update tests for state store schema (semantic fields)",
-  "status": "planned",
+  "status": "done",
   "summary": "Update state store tests to validate the 0.4.0 transaction event log and materialized state schema, including semantic memory fields.",
   "inputs": ["docs/v0.4.0/plan.md", "docs/v0.4.0/p3-t1.json"],
   "outputs": ["tests/test_state_store.py"],
