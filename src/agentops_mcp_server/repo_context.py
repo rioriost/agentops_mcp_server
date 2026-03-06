@@ -42,6 +42,15 @@ class RepoContext:
         candidate = Path(value).expanduser()
         if candidate.is_absolute():
             return candidate.resolve()
+
+        repo_root = self.repo_root
+        if candidate in {Path("."), Path(repo_root.name)}:
+            return repo_root
+
+        parent_candidate = (repo_root.parent / candidate).resolve()
+        if parent_candidate.exists():
+            return parent_candidate
+
         cwd = Path.cwd().resolve()
         if candidate in {Path("."), Path(cwd.name)}:
             return cwd

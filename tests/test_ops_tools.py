@@ -28,6 +28,18 @@ def _journal_kinds(repo_context):
     ]
 
 
+def _read_tx_events(repo_context):
+    return [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+
+def _tx_event_types(repo_context):
+    return [event["event_type"] for event in _read_tx_events(repo_context)]
+
+
 def test_ops_compact_context_updates_snapshot_and_journal(
     repo_context, state_store, state_rebuilder
 ):
@@ -163,6 +175,53 @@ def test_ops_task_lifecycle_records_events(repo_context, state_store, state_rebu
     assert "task.start" in kinds
     assert "task.update" in kinds
     assert "task.end" in kinds
+
+
+def test_ops_task_lifecycle_emits_tx_events_and_updates_state(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    ops.ops_update_task(
+        status="checking",
+        note="step",
+        task_id="t-1",
+        session_id="s1",
+        user_intent="continue",
+    )
+
+    events = _read_tx_events(repo_context)
+    tx_events = [event["event_type"] for event in events]
+    assert "tx.begin" in tx_events
+    assert "tx.step.enter" in tx_events
+    assert "tx.user_intent.set" in tx_events
+    assert (
+        tx_events.index("tx.begin")
+        < tx_events.index("tx.step.enter")
+        < tx_events.index("tx.user_intent.set")
+    )
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    active_tx = tx_state["active_tx"]
+    assert active_tx["user_intent"] == "continue"
+    assert active_tx["semantic_summary"].startswith("Entered step")
+    assert active_tx["status"] == "checking"
+    assert active_tx["phase"] == "checking"
+    assert active_tx["current_step"] == "t-1"
+    assert active_tx["next_action"] == "tx.verify.start"
+    last_seq = max(event["seq"] for event in _read_tx_events(repo_context))
+    assert tx_state["last_applied_seq"] == last_seq
+
+    ops.ops_end_task(summary="done", next_action="next", status="done", task_id="t-1")
+    tx_events = _tx_event_types(repo_context)
+    assert "tx.end.done" in tx_events
+    assert tx_events.index("tx.user_intent.set") < tx_events.index("tx.end.done")
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    last_seq = max(event["seq"] for event in _read_tx_events(repo_context))
+    assert tx_state["last_applied_seq"] == last_seq
+    assert tx_state["integrity"]["rebuilt_from_seq"] == last_seq
 
 
 def test_ops_capture_state_updates_snapshot_and_checkpoint(

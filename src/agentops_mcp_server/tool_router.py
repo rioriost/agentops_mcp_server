@@ -92,7 +92,10 @@ class ToolRouter:
 
         previous_root = self.repo_context.get_repo_root()
         workspace_root = arguments.get("workspace_root") if arguments else None
-        if isinstance(workspace_root, str) and workspace_root.strip():
+        missing_workspace_root = not (
+            isinstance(workspace_root, str) and workspace_root.strip()
+        )
+        if not missing_workspace_root:
             resolved_root = self.repo_context.resolve_workspace_root(
                 workspace_root.strip()
             )
@@ -128,6 +131,17 @@ class ToolRouter:
 
         summary_limit = truncate_limit if truncate_limit is not None else 2000
         result_payload = summarize_result(result, limit=summary_limit)
+        if missing_workspace_root:
+            hint = "workspace_root is missing; pass CWD as workspace_root."
+            if isinstance(result_payload, dict):
+                warnings = list(result_payload.get("warnings") or [])
+                warnings.append({"code": "workspace_root.missing", "message": hint})
+                result_payload["warnings"] = warnings
+            else:
+                result_payload = {
+                    "result": result_payload,
+                    "warnings": [{"code": "workspace_root.missing", "message": hint}],
+                }
         self.state_store.journal_safe(
             "tool.result",
             {"call_id": call_id, "ok": True, "result": result_payload},

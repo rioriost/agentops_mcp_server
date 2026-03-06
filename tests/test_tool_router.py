@@ -72,3 +72,14 @@ def test_tools_call_truncate_limit_summarizes(repo_context, state_store):
 
     assert content["truncated"] is True
     assert "summary" in content
+
+
+def test_tools_call_missing_workspace_root_adds_warning(repo_context, state_store):
+    calls = {}
+    tool_router = ToolRouter(_build_registry(calls), repo_context, state_store)
+
+    payload = tool_router.tools_call("echo", {"value": "ok"})
+    content = json.loads(payload["content"][0]["text"])
+
+    warnings = content.get("warnings") or []
+    assert any(warning.get("code") == "workspace_root.missing" for warning in warnings)

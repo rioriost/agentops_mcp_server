@@ -21,6 +21,19 @@ def test_resolve_workspace_root_relative_to_cwd(tmp_path, monkeypatch):
     assert resolved == tmp_path.resolve()
 
 
+def test_resolve_workspace_root_prefers_repo_root_name(tmp_path, monkeypatch):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    other_root = tmp_path / "other"
+    other_root.mkdir()
+
+    monkeypatch.chdir(other_root)
+    context = RepoContext(repo_root)
+    resolved = context.resolve_workspace_root(repo_root.name)
+
+    assert resolved == repo_root.resolve()
+
+
 def test_set_repo_root_updates_artifacts(tmp_path):
     context = RepoContext(tmp_path)
     new_root = tmp_path / "other"

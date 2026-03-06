@@ -2,7 +2,7 @@
   "id": "p4-t3",
   "phase": 4,
   "title": "Update tests for ops tools and commit flow semantics",
-  "status": "planned",
+  "status": "done",
   "summary": "Update tests to cover tx boundary events, semantic memory updates, and post-commit persistence flow.",
   "inputs": [
     "docs/v0.4.0/plan.md",
