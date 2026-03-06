@@ -42,7 +42,7 @@
       "id": "p2-t2",
       "phase": 2,
       "title": "Define rebuild engine from event log",
-      "status": "planned",
+      "status": "verified",
       "inputs": ["docs/v0.4.0/plan.md"],
       "outputs": ["docs/v0.4.0/p2-t2.json"],
       "deps": ["p2-t1"]
