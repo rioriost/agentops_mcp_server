@@ -2,8 +2,8 @@
   "id": "p4-t2",
   "phase": 4,
   "title": "Confirm acceptance criteria for 0.4.4",
-  "status": "planned",
-  "summary": "",
+  "status": "done",
+  "summary": "Confirmed 0.4.4 acceptance criteria: verify/commit ordering enforced, start/update gating validated, rebuild no longer halts on bad ordering, and coverage/verification targets met (verify warns about missing targets).",
   "inputs": ["docs/v0.4.4/plan.md", "docs/v0.4.4/p4-t1.json"],
   "outputs": ["docs/v0.4.4/p4-t2.json"],
   "acceptance_criteria": [
@@ -28,5 +28,10 @@
       "description": "Record confirmation and any remaining risks or follow-ups."
     }
   ],
-  "notes": ["Summarize evidence for each acceptance criterion."]
+  "notes": [
+    "Evidence: p2-t1 enforced verify.start ordering and commit gating; p3-t1 added tests for verify lifecycle.",
+    "Evidence: p2-t2 hardened start/update gating and tx_id mismatch handling; p3-t1 tests cover ops_start_task/ops_update_task behavior.",
+    "Evidence: p2-t3 rebuild ordering warnings prevent halting; p3-t1 tests cover rebuild guardrails.",
+    "Evidence: coverage.xml line-rate 0.9551 (p3-t2) and repo_verify OK with warning (p4-t1)."
+  ]
 }
