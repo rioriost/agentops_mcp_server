@@ -245,22 +245,6 @@ def test_rebuild_tx_state_semantic_summary_fallback(
     assert active_tx["semantic_summary"]
 
 
-def test_rebuild_tx_state_ignores_legacy_artifacts(repo_context, state_rebuilder):
-    repo_context.journal.parent.mkdir(parents=True, exist_ok=True)
-    repo_context.journal.write_text(
-        json.dumps({"event_type": "legacy", "ts": "2020-01-01T00:00:00Z"}) + "\n",
-        encoding="utf-8",
-    )
-    repo_context.snapshot.write_text(
-        json.dumps({"schema_version": "0.3.0"}) + "\n", encoding="utf-8"
-    )
-    repo_context.checkpoint.write_text("123\n", encoding="utf-8")
-
-    result = state_rebuilder.rebuild_tx_state()
-    assert result["ok"] is False
-    assert result["reason"] == "tx_event_log missing"
-
-
 def test_rebuild_tx_state_user_intent_guides_resume(
     repo_context, state_store, state_rebuilder
 ):

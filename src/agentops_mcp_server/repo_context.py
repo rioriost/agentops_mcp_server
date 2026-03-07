@@ -15,8 +15,6 @@ DERIVED_ARTIFACT_FILES = {
 
 LEGACY_ARTIFACT_FILES = {
     "journal": "journal.jsonl",
-    "snapshot": "snapshot.json",
-    "checkpoint": "checkpoint.json",
 }
 
 STATE_ARTIFACT_FILES = {
@@ -47,8 +45,6 @@ class RepoContext:
     def set_repo_root(self, root: Path) -> None:
         self.repo_root = root
         self.journal = self.legacy_artifact_path("journal", root)
-        self.snapshot = self.legacy_artifact_path("snapshot", root)
-        self.checkpoint = self.legacy_artifact_path("checkpoint", root)
         self.handoff = self.state_artifact_path("handoff", root)
         self.observability = self.state_artifact_path("observability", root)
         self.tx_event_log = self.state_artifact_path("tx_event_log", root)

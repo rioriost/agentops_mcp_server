@@ -185,7 +185,7 @@ cat <<'RULES' > "$SOURCE_RULES"
 ## Handoff & session safety (mandatory)
 - When a tool execution adds/modifies files:
   1) ops_compact_context (compact context)
-  2) ops_capture_state (snapshot + checkpoint)
+  2) ops_capture_state (tx_state capture)
   3) ops_handoff_export (handoff summary, optional file write)
 
 ## Tooling (mandatory)
@@ -195,8 +195,6 @@ cat <<'RULES' > "$SOURCE_RULES"
   - tx_event_append
   - tx_state_save
   - tx_state_rebuild
-  - snapshot_save
-  - checkpoint_update
   - roll_forward_replay / continue_state_rebuild (if needed)
   - ops_compact_context
   - ops_handoff_export

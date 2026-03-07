@@ -31,7 +31,7 @@ def _tx_event_types(repo_context):
     return [event["event_type"] for event in _read_tx_events(repo_context)]
 
 
-def test_ops_compact_context_updates_snapshot_and_journal(
+def test_ops_compact_context_updates_journal(
     repo_context, state_store, state_rebuilder
 ):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
@@ -183,9 +183,7 @@ def test_ops_task_lifecycle_emits_tx_events_and_updates_state(
     assert tx_state["integrity"]["rebuilt_from_seq"] == last_seq
 
 
-def test_ops_capture_state_updates_snapshot_and_checkpoint(
-    repo_context, state_store, state_rebuilder
-):
+def test_ops_capture_state_updates_tx_state(repo_context, state_store, state_rebuilder):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
 
     ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")

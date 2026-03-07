@@ -855,10 +855,8 @@ class StateRebuilder:
             "invalid_ts": invalid_ts,
         }
 
-    def init_replay_state(
-        self, snapshot_state: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        base_state = snapshot_state if isinstance(snapshot_state, dict) else {}
+    def init_replay_state(self, seed_state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        base_state = seed_state if isinstance(seed_state, dict) else {}
         state: Dict[str, Any] = dict(base_state)
         state.setdefault("session_id", "")
         state.setdefault("current_phase", "")
@@ -1170,12 +1168,12 @@ class StateRebuilder:
 
     def replay_events_to_state(
         self,
-        snapshot_state: Optional[Dict[str, Any]],
+        seed_state: Optional[Dict[str, Any]],
         events: List[Dict[str, Any]],
         preferred_session_id: Optional[str] = None,
         invalid_lines: int = 0,
     ) -> Dict[str, Any]:
-        state = self.init_replay_state(snapshot_state)
+        state = self.init_replay_state(seed_state)
         if invalid_lines:
             state["replay_warnings"]["invalid_lines"] = invalid_lines
 

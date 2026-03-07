@@ -21,7 +21,7 @@ brew tap rioriost/agentops_mcp_server
 brew install agentops_mcp_server
 ```
 
-Use `zed-agentops-init.sh` to scaffold a directory (it creates `.rules`, `.zed/`, `.agent`, and `.zed/scripts/verify`, plus canonical `.agent/tx_event_log.jsonl` and `.agent/tx_state.json`, along with legacy derived-only `.agent/journal.jsonl`, `.agent/snapshot.json`, `.agent/checkpoint.json`).
+Use `zed-agentops-init.sh` to scaffold a directory (it creates `.rules`, `.zed/`, `.agent`, and `.zed/scripts/verify`, plus canonical `.agent/tx_event_log.jsonl` and `.agent/tx_state.json`, along with legacy derived-only `.agent/journal.jsonl`).
 It also auto-appends common entries to `.gitignore`.
 Open the directory in Zed and use the Agent Panel.
 For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-cov`).
@@ -52,7 +52,7 @@ For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-c
 - `.agent/tx_event_log.jsonl` : canonical transaction event log
 - `.agent/tx_state.json` : canonical materialized transaction state
 - `.agent/handoff.json` : derived-only human-readable summary
-- `.agent/journal.jsonl` / `.agent/snapshot.json` / `.agent/checkpoint.json` : legacy derived-only artifacts
+- `.agent/journal.jsonl` : legacy derived-only artifacts
 - `/opt/homebrew/bin/agentops_mcp_server` : MCP server binary installed by Homebrew (macOS)
 
 ## MCP Server (Zed)
@@ -94,18 +94,7 @@ Tool Settings (settings.json):
       "mcp:agentops-server:journal_append": {
         "default": "allow"
       },
-      "mcp:agentops-server:snapshot_save": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:snapshot_load": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:checkpoint_update": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:checkpoint_read": {
-        "default": "allow"
-      },
+
       "mcp:agentops-server:roll_forward_replay": {
         "default": "allow"
       },
@@ -177,10 +166,7 @@ MCP tools (snake_case):
 - `tx_event_append`
 - `tx_state_save`
 - `tx_state_rebuild`
-- `snapshot_save`
-- `snapshot_load`
-- `checkpoint_update`
-- `checkpoint_read`
+
 - `roll_forward_replay`
 - `continue_state_rebuild`
 - `session_capture_context`

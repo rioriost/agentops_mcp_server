@@ -21,7 +21,7 @@ brew tap rioriost/agentops_mcp_server
 brew install agentops_mcp_server
 ```
 
-`zed-agentops-init.sh` を使ってディレクトリをスキャフォールドします（`.rules`、`.zed/`、`.agent`、`.zed/scripts/verify` に加え、canonical な `.agent/tx_event_log.jsonl` と `.agent/tx_state.json`、および legacy の派生専用 `.agent/journal.jsonl`、`.agent/snapshot.json`、`.agent/checkpoint.json` を作成）。
+`zed-agentops-init.sh` を使ってディレクトリをスキャフォールドします（`.rules`、`.zed/`、`.agent`、`.zed/scripts/verify` に加え、canonical な `.agent/tx_event_log.jsonl` と `.agent/tx_state.json`、および legacy の派生専用 `.agent/journal.jsonl` を作成）。
 ディレクトリを Zed で開き、Agent パネルを使ってください。
 リリース向けのカバレッジ計測は `.zed/scripts/verify-release`（`pytest-cov` が必要）を使ってください。
 `.gitignore` にはエントリが自動追記されます。
@@ -33,7 +33,7 @@ brew install agentops_mcp_server
   - `ops_handoff_export` は `.agent/handoff.json` に書き出し（`path` 指定時は `.agent/` 配下の相対パスとして扱う）
 - すぐ再開する場合は `ops_resume_brief` を実行
 - タスクの進行記録: `ops_start_task` / `ops_update_task` / `ops_end_task`
-- 状態スナップショットと要約: `ops_capture_state` / `ops_task_summary` / `ops_observability_summary`
+- 状態保存と要約: `ops_capture_state` / `ops_task_summary` / `ops_observability_summary`
 - トークン節約: フル diff より要約・diff stats を優先し、出力は短く保つ
 - 全ての MCP ツールは `truncate_limit` を任意で受け付ける（`tools/list` で確認）
 
@@ -55,7 +55,7 @@ zed-agentops-init は `.rules` を生成します。
 - `.agent/tx_event_log.jsonl` : canonical なトランザクションイベントログ
 - `.agent/tx_state.json` : canonical なマテリアライズド状態
 - `.agent/handoff.json` : 派生専用の引き継ぎサマリ
-- `.agent/journal.jsonl` / `.agent/snapshot.json` / `.agent/checkpoint.json` : legacy の派生専用アーティファクト
+- `.agent/journal.jsonl` : legacy の派生専用アーティファクト
 - `/opt/homebrew/bin/agentops_mcp_server` : Homebrew でインストールされる MCP サーババイナリ（macOS）
 
 ## MCP Server (Zed)
@@ -97,18 +97,7 @@ Tool Settings (settings.json):
       "mcp:agentops-server:journal_append": {
         "default": "allow"
       },
-      "mcp:agentops-server:snapshot_save": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:snapshot_load": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:checkpoint_update": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:checkpoint_read": {
-        "default": "allow"
-      },
+
       "mcp:agentops-server:roll_forward_replay": {
         "default": "allow"
       },
@@ -180,10 +169,7 @@ Tool Settings (settings.json):
 - `tx_event_append`
 - `tx_state_save`
 - `tx_state_rebuild`
-- `snapshot_save`
-- `snapshot_load`
-- `checkpoint_update`
-- `checkpoint_read`
+
 - `roll_forward_replay`
 - `continue_state_rebuild`
 - `session_capture_context`
