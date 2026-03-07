@@ -136,78 +136,81 @@ SOURCE_RULES="${PWD}/.rules"
 if [ -f "$SOURCE_RULES" ]; then
   cp "$SOURCE_RULES" "$SOURCE_RULES.bak"
 fi
-{
-  printf '%s\n' \
-    '# AgentOps (project rules)' \
-    '# Goal: Max automation for (1) tx_event_log/tx_state persistence, (2) verify->commit loop, (3) test generation.' \
-    '' \
-    '## Always do this at the start' \
-    '- Review `.agent/tx_state.json` for current state and last applied seq.' \
-    '- Inspect `.agent/tx_event_log.jsonl` for recent events if needed.' \
-    '- Treat `.agent/handoff.json` as derived-only.' \
-    '' \
-    '## Work loop (mandatory)' \
-    '- For any code change:' \
-    '  1) Emit tx.begin for the ticket if new' \
-    '  2) Register file intents before mutation' \
-    '  3) Implement smallest safe change' \
-    '  4) Update semantic summary (required) and user_intent only on explicit user resume intent; persist tx_state after mutation' \
-    '  5) Run "${VERIFY_REL}"' \
-    '  6) If it fails: fix and repeat (update semantic summary)' \
-    '  7) If it passes: commit changes (emit tx.commit.start/done|fail)' \
-    '  8) Emit tx.end.done|blocked' \
-    '' \
-    '## Handoff checklist' \
-    '- Before ending a session or when context is tight:' \
-    '  - Run `ops_compact_context` (keep output short; prefer include_diff=false)' \
-    '  - Run `ops_handoff_export` (write `.agent/handoff.json` if needed)' \
-    '' \
-    '## Task wrap-up' \
-    '- At task end: record a short summary and next action (e.g. `journal_append` task.end)' \
-    '' \
-    '## Token discipline' \
-    '- Prefer summaries and diff stats over full diffs' \
-    '- Keep outputs short and avoid repeating large logs' \
-    '' \
-    '## State persistence (v0.4.0)' \
-    '- Use `.agent/tx_event_log.jsonl` for append-only transaction events.' \
-    '- Use `.agent/tx_state.json` for materialized transaction state.' \
-    '- Treat `.agent/handoff.json` as derived-only (never canonical).' \
-    '' \
-    '## Roll-forward recovery' \
-    '- Rebuild tx_state by replaying tx_event_log when resuming.' \
-    '- Use tx_state_rebuild or continue-ready reconstruction if provided.' \
-    '' \
-    '## Commit message' \
-    '- ~80 chars, semantic summary (not strict conventional commits)' \
-    '- Mention scope if useful (e.g. "rust:", "py:", "swift:", "infra:")' \
-    '' \
-    '## Prefer MCP tools if available' \
-    '- If MCP tools exist:' \
-    '  - use mcp:agentops:tx_event_append for tx events' \
-    '  - use mcp:agentops:tx_state_save for materialized state' \
-    '  - use mcp:agentops:tx_state_rebuild for rebuilds' \
-    '  - use mcp:agentops:roll_forward_replay for recovery' \
-    '  - use mcp:agentops:continue_state_rebuild for continue-ready state' \
-    '  - use mcp:agentops:ops_compact_context for compact context' \
-    '  - use mcp:agentops:ops_handoff_export for handoff JSON' \
-    '  - use mcp:agentops:ops_resume_brief for quick resume' \
-    '  - use mcp:agentops:repo_commit to commit after verify' \
-    '' \
-    '## MCP tool usage requirements' \
-    '- Call `tools/list` only once at session start; re-fetch only when tool errors indicate a schema mismatch or when tools are unavailable.' \
-    '- When calling `tools/call`, always include all fields listed in `inputSchema.required`.' \
-    '- If required fields are unclear or missing, re-fetch `tools/list` before calling.' \
-    '' \
-    '## Commit suggestion guardrails' \
-    '- After `repo_verify`, call `repo_status_summary` and confirm there are changes.' \
-    '- If `diff` and `files` are empty, do not call `repo_commit_message_suggest` or `repo_commit`.' \
-    '- Do not retry `repo_commit_message_suggest` on parsing errors; treat as a hard error and stop.' \
-    '' \
+cat <<'RULES' > "$SOURCE_RULES"
+# AgentOps (strict rules)
+# Goal: Maximize resumability and stable execution under session interruption.
 
-    '## For GPT-5.3-Codex' \
-    '- If instruction begins with "EXECUTE:", skip analysis and start implementation immediately.'
-} > "$SOURCE_RULES"
+## Start (mandatory)
+- Read/restore in this order:
+  1) tx_state (materialized transaction state)
+  2) tx_event_log (transaction event log replay if needed)
+  3) handoff (derived-only, never canonical)
+- Resume decisions must use canonical tx_state + tx_event_log only; handoff is derived.
+- If resume state is incomplete:
+  - run ops_resume_brief (or equivalent) and emit a short brief
+- Identify active ticket (status != done) and resume it.
+
+## Planning flow (mandatory)
+- User provides docs/draft.md.
+- Generate docs/__version__/plan.md with phases.
+- Split phases into tasks and generate:
+  - docs/__version__/tickets_list.json (metadata)
+  - docs/__version__/pX-tY.json (full ticket with status/inputs/outputs/deps)
+- Ticket status enum: planned, in-progress, checking, verified, committed, done, blocked.
+
+## Work loop (mandatory)
+- Tickets are the only unit of work.
+- For any code change:
+  1) Set status -> in-progress (emit tx.begin if new)
+  2) Register file intents before mutation
+  3) Implement smallest safe change
+  4) Update semantic_summary (required) and user_intent only on explicit user resume intent; persist tx_state after mutation
+  5) Run "${VERIFY_REL}"
+     - If fails: fix and repeat (update semantic summary)
+  6) Set status -> checking
+     - Compare acceptance_criteria AND plan.md to avoid omissions
+  7) Set status -> verified
+  8) Commit changes (emit tx.commit.start/done|fail)
+  9) Set status -> committed
+  10) Set status -> done (emit tx.end.done|blocked)
+
+## Persistence & logging (mandatory)
+- Always record events for plan/task/progress/verify/commit.
+- Canonical write ordering: event append → tx_state update → cursor persist.
+- semantic_summary is required for non-terminal tx; user_intent is only set on explicit user resume intent.
+- Keep log outputs short (summaries over full diffs).
+- Prefer diff stats over full diffs.
+
+## Handoff & session safety (mandatory)
+- When a tool execution adds/modifies files:
+  1) ops_compact_context (compact context)
+  2) ops_capture_state (snapshot + checkpoint)
+  3) ops_handoff_export (handoff summary, optional file write)
+
+## Tooling (mandatory)
+- Prefer MCP tools if available.
+- Use:
+  - journal_append
+  - tx_event_append
+  - tx_state_save
+  - tx_state_rebuild
+  - snapshot_save
+  - checkpoint_update
+  - roll_forward_replay / continue_state_rebuild (if needed)
+  - ops_compact_context
+  - ops_handoff_export
+  - ops_resume_brief
+  - repo_commit
+
+
+## Commit rules (mandatory)
+- After verify: check repo status; commit only if changes exist.
+- Commit message: ~80 chars, add scope if useful.
+
+## Token discipline (mandatory)
+- Keep outputs short; avoid large logs.
+- Prefer summaries and diff stats.
+RULES
 
 if [ -e "$root/.rules" ] && [ ! -f "$root/.rules" ]; then
   echo "Skipping .rules (path exists and is not a file)."
