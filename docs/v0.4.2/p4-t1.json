@@ -1,0 +1,33 @@
+{
+  "id": "p4-t1",
+  "phase": 4,
+  "title": "Run verification suite",
+  "status": "done",
+  "summary": "Execute the verification suite to confirm changes are correct and ready for release.",
+  "inputs": ["docs/v0.4.2/plan.md", "docs/v0.4.2/p3-t2.json"],
+  "outputs": ["docs/v0.4.2/p4-t1.json"],
+  "acceptance_criteria": [
+    "Verification suite is executed successfully or failures are recorded with notes.",
+    "Results are captured in notes for downstream review.",
+    "Execution aligns with project verification workflow."
+  ],
+  "deps": ["p3-t2"],
+  "steps": [
+    {
+      "id": "p4-t1-s1",
+      "description": "Run the verification suite according to the project’s standard process."
+    },
+    {
+      "id": "p4-t1-s2",
+      "description": "Record the outcome and any failures with concise notes."
+    },
+    {
+      "id": "p4-t1-s3",
+      "description": "Confirm readiness to proceed to acceptance criteria review."
+    }
+  ],
+  "notes": [
+    "verify-release executed successfully; 251 tests passed.",
+    "Coverage reported at 96% (>= 90%)."
+  ]
+}

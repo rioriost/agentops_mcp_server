@@ -1,0 +1,43 @@
+{
+  "id": "p1-t1",
+  "phase": 1,
+  "title": "Inventory mismatches across rules, script, docs, and src",
+  "status": "done",
+  "summary": "Locate and document mismatches between .rules, zed-agentops-init.sh, README*, and current MCP server behavior to guide aligned updates.",
+  "inputs": ["docs/v0.4.2/plan.md"],
+  "outputs": ["docs/v0.4.2/p1-t1.json"],
+  "acceptance_criteria": [
+    "All relevant mismatches across .rules, zed-agentops-init.sh, README.md, README-jp.md, and src/ are enumerated.",
+    "Each mismatch includes a brief note on expected correction (update/remove/clarify).",
+    "Findings are sufficient to drive tickets p1-t2 through p2-t3."
+  ],
+  "deps": [],
+  "steps": [
+    {
+      "id": "p1-t1-s1",
+      "description": "Review .rules and identify any instructions that diverge from actual MCP server behavior."
+    },
+    {
+      "id": "p1-t1-s2",
+      "description": "Review zed-agentops-init.sh and compare its behavior and comments with current runtime expectations."
+    },
+    {
+      "id": "p1-t1-s3",
+      "description": "Review README.md and README-jp.md for inaccuracies or missing guidance compared to src/ behavior."
+    },
+    {
+      "id": "p1-t1-s4",
+      "description": "Document mismatches with proposed fix type and file targets."
+    }
+  ],
+  "notes": [
+    "Mismatch: `.rules` and README* list tools `journal_append`, `roll_forward_replay`, and `continue_state_rebuild`, but tool registry does not expose them. Fix: remove from docs or implement in src.",
+    "Mismatch: README* says `zed-agentops-init.sh` creates `.agent/journal.jsonl` and `--update` removes legacy files, but the script does neither. Fix: update script or docs.",
+    "Mismatch: README* describes `ops_handoff_export` taking an optional path, but the tool signature accepts no arguments. Fix: update docs or add parameter support.",
+    "Mismatch: README* claims all MCP tools accept `truncate_limit`, but tool schemas do not include it. Fix: update docs or extend tool registry.",
+    "Mismatch: README quick start uses `zed-agentops-init`, while repository only ships `zed-agentops-init.sh`. Fix: clarify installed command name or rename script.",
+    "Mismatch: README-jp includes `ops_start_task`/`ops_update_task`/`ops_end_task` tips, English README omits. Fix: align bilingual sections.",
+    "Mismatch: README* omits `.agent/observability_summary.json`, but src defines and writes it via `ops_observability_summary`. Fix: document it in “Where things live.”",
+    "Mismatch: `.rules` in repo differs from the template written by `zed-agentops-init.sh` (explicit handoff-derived-only line). Fix: align the two sources."
+  ]
+}

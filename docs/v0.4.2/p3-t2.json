@@ -1,0 +1,30 @@
+{
+  "id": "p3-t2",
+  "phase": 3,
+  "title": "Validate coverage remains >= 90%",
+  "status": "done",
+  "summary": "Verify test coverage stays at or above 90% after documentation and script alignment changes.",
+  "inputs": ["docs/v0.4.2/plan.md", "docs/v0.4.2/p3-t1.json"],
+  "outputs": ["docs/v0.4.2/p3-t2.json"],
+  "acceptance_criteria": [
+    "Coverage remains at or above 90% after running the verification suite.",
+    "Any coverage regressions are identified with a brief note on cause.",
+    "Coverage validation aligns with the project’s verification workflow."
+  ],
+  "deps": ["p3-t1"],
+  "steps": [
+    {
+      "id": "p3-t2-s1",
+      "description": "Run the verification suite with coverage enabled."
+    },
+    {
+      "id": "p3-t2-s2",
+      "description": "Record coverage results and confirm the threshold is met."
+    },
+    {
+      "id": "p3-t2-s3",
+      "description": "Note any regressions and identify impacted areas if the threshold is not met."
+    }
+  ],
+  "notes": ["verify-release passed with coverage 96% (>= 90%)."]
+}

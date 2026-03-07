@@ -1,0 +1,37 @@
+{
+  "id": "p3-t1",
+  "phase": 3,
+  "title": "Update tests if behavior or docs changes require it",
+  "status": "done",
+  "summary": "Adjust or add tests only when changes to .rules, zed-agentops-init.sh, or README* affect behavior or documented expectations.",
+  "inputs": [
+    "docs/v0.4.2/plan.md",
+    "docs/v0.4.2/p2-t2.json",
+    "docs/v0.4.2/p2-t3.json"
+  ],
+  "outputs": ["docs/v0.4.2/p3-t1.json"],
+  "acceptance_criteria": [
+    "Tests are updated or added only when needed for behavioral or documented changes.",
+    "Updated tests align with the current MCP server behavior and guidance.",
+    "No unrelated test modifications are introduced."
+  ],
+  "deps": ["p2-t2", "p2-t3"],
+  "steps": [
+    {
+      "id": "p3-t1-s1",
+      "description": "Identify any behavior or expectation changes introduced by p2-t1 through p2-t3."
+    },
+    {
+      "id": "p3-t1-s2",
+      "description": "Update or add tests to reflect the changes, keeping scope minimal."
+    },
+    {
+      "id": "p3-t1-s3",
+      "description": "Confirm tests remain consistent with src/ behavior and documentation."
+    }
+  ],
+  "notes": [
+    "No test updates required; documentation/script changes did not alter runtime behavior.",
+    "verify-release executed successfully with coverage >= 90%."
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "p2-t2",
+  "phase": 2,
+  "title": "Align zed-agentops-init.sh behavior and guidance",
+  "status": "done",
+  "summary": "Update zed-agentops-init.sh so its behavior, comments, and usage align with current MCP server expectations and .rules guidance.",
+  "inputs": [
+    "docs/v0.4.2/plan.md",
+    "docs/v0.4.2/p1-t1.json",
+    "docs/v0.4.2/p1-t2.json"
+  ],
+  "outputs": ["docs/v0.4.2/p2-t2.json"],
+  "acceptance_criteria": [
+    "zed-agentops-init.sh behavior matches the MCP server runtime expectations.",
+    "Script comments and usage guidance align with .rules and README* updates.",
+    "Any mismatches identified in p1-t1 are resolved or explicitly documented."
+  ],
+  "deps": ["p2-t1"],
+  "steps": [
+    {
+      "id": "p2-t2-s1",
+      "description": "Review current zed-agentops-init.sh behavior and comments against src/ behavior."
+    },
+    {
+      "id": "p2-t2-s2",
+      "description": "Update script logic and guidance to align with transaction-aware workflow expectations."
+    },
+    {
+      "id": "p2-t2-s3",
+      "description": "Cross-check alignment with .rules and README* changes."
+    }
+  ],
+  "notes": [
+    "Updated embedded .rules template to match current tool list and `repo_verify` guidance.",
+    "Removed optional path wording for ops_handoff_export in the template.",
+    "Added legacy `.agent/journal.jsonl` creation to align with legacy artifact expectations."
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "id": "p2-t3",
+  "phase": 2,
+  "title": "Update README.md and README-jp.md for correctness",
+  "status": "done",
+  "summary": "Revise README.md and README-jp.md to match current MCP server behavior, .rules guidance, and usage expectations.",
+  "inputs": [
+    "docs/v0.4.2/plan.md",
+    "docs/v0.4.2/p1-t1.json",
+    "docs/v0.4.2/p1-t2.json"
+  ],
+  "outputs": ["docs/v0.4.2/p2-t3.json"],
+  "acceptance_criteria": [
+    "README.md reflects current MCP server setup and runtime behavior accurately.",
+    "README-jp.md mirrors the English README updates with consistent guidance.",
+    "All mismatches identified in p1-t1 are addressed in the documentation updates."
+  ],
+  "deps": ["p1-t2"],
+  "steps": [
+    {
+      "id": "p2-t3-s1",
+      "description": "Review README.md and README-jp.md against src/ behavior and .rules guidance."
+    },
+    {
+      "id": "p2-t3-s2",
+      "description": "Update configuration examples, prerequisites, and operational notes for accuracy."
+    },
+    {
+      "id": "p2-t3-s3",
+      "description": "Ensure bilingual consistency and resolve any remaining mismatches."
+    }
+  ],
+  "notes": [
+    "Updated Quick start to use zed-agentops-init.sh and clarified --update behavior (no legacy removal).",
+    "Aligned workflow tips: added ops_capture_state and task tracking, removed truncate_limit and optional path wording.",
+    "Updated Where things live and tool lists to include observability_summary and remove unsupported tools.",
+    "Adjusted MCP tool settings and examples to match current tool registry."
+  ]
+}

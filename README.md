@@ -8,11 +8,11 @@ Note: This project currently supports macOS only.
 ## Quick start
 
 ```bash
-zed-agentops-init project_name
-zed-agentops-init --update existing_project
+zed-agentops-init.sh project_name
+zed-agentops-init.sh --update existing_project
 ```
 
-Use `--update` to migrate an existing AgentOps-managed directory (removes legacy files, creates `.agent` state files, and refreshes `.rules`).
+Use `--update` to migrate an existing AgentOps-managed directory (refreshes `.rules` and ensures `.agent` state files exist; it does not remove legacy artifacts).
 
 ## Installation
 
@@ -30,10 +30,11 @@ For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-c
 
 - Before ending a session or when context is tight:
   - Run `ops_compact_context` (prefer `include_diff=false`, `max_chars` optional)
-  - Run `ops_handoff_export` (writes `.agent/handoff.json` by default; optional path writes under `.agent`)
+  - Run `ops_capture_state` (captures transaction state)
+  - Run `ops_handoff_export` (writes `.agent/handoff.json`)
 - To resume quickly: run `ops_resume_brief`
+- Task tracking: `ops_start_task` / `ops_update_task` / `ops_end_task`
 - Token discipline: prefer summaries/diff stats over full diffs and keep outputs short
-- All MCP tools accept optional `truncate_limit` (as exposed by `tools/list`)
 
 ## Semantic resume (0.4.0)
 - Canonical sources of truth are `.agent/tx_event_log.jsonl` (event log) and `.agent/tx_state.json` (materialized state).
@@ -41,7 +42,7 @@ For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-c
 - `.agent/handoff.json` is derived-only and never a canonical input for resume decisions.
 
 ## About .rules (from v0.2.0)
-`zed-agentops-init` generates `.rules`.
+`zed-agentops-init.sh` generates `.rules`.
 
 ## Where things live
 
@@ -52,6 +53,7 @@ For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-c
 - `.agent/tx_event_log.jsonl` : canonical transaction event log
 - `.agent/tx_state.json` : canonical materialized transaction state
 - `.agent/handoff.json` : derived-only human-readable summary
+- `.agent/observability_summary.json` : derived-only observability summary
 - `.agent/journal.jsonl` : legacy derived-only artifacts
 - `/opt/homebrew/bin/agentops_mcp_server` : MCP server binary installed by Homebrew (macOS)
 
@@ -89,16 +91,6 @@ Tool Settings (settings.json):
         "default": "allow"
       },
       "terminal": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:journal_append": {
-        "default": "allow"
-      },
-
-      "mcp:agentops-server:roll_forward_replay": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:continue_state_rebuild": {
         "default": "allow"
       },
       "mcp:agentops-server:session_capture_context": {
@@ -162,13 +154,10 @@ Tool Settings (settings.json):
 ```
 
 MCP tools (snake_case):
-- `journal_append`
+- `commit_if_verified`
 - `tx_event_append`
 - `tx_state_save`
 - `tx_state_rebuild`
-
-- `roll_forward_replay`
-- `continue_state_rebuild`
 - `session_capture_context`
 - `repo_verify`
 - `repo_commit`
@@ -176,7 +165,6 @@ MCP tools (snake_case):
 - `repo_commit_message_suggest`
 - `tests_suggest`
 - `tests_suggest_from_failures`
-- `commit_if_verified`
 - `ops_compact_context`
 - `ops_handoff_export`
 - `ops_resume_brief`
@@ -186,11 +174,11 @@ MCP tools (snake_case):
 - `ops_capture_state`
 - `ops_task_summary`
 - `ops_observability_summary`
-- Aliases: dotted names (e.g. `roll_forward.replay`) map to snake_case for compatibility.
+- Aliases: dotted names (e.g. `ops.handoff_export`) map to snake_case for compatibility.
 
 Usage notes:
 - Call `tools/list` to enumerate tools. Example request: `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
-- Call `tools/call` to invoke a tool. Example request: `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"journal_append","arguments":{"kind":"task.start","payload":{"title":"Review v0.1.0 docs"}}}}`
+- Call `tools/call` to invoke a tool. Example request: `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ops_start_task","arguments":{"title":"Review v0.1.0 docs"}}}`
 - Successful responses include a `result`; failures include an `error` with `code` and `message`.
 
 Then register the MCP server in Zed and grant tool permissions as you prefer.

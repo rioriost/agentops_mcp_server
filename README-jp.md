@@ -8,11 +8,11 @@
 ## クイックスタート
 
 ```bash
-zed-agentops-init project_name
-zed-agentops-init --update existing_project
+zed-agentops-init.sh project_name
+zed-agentops-init.sh --update existing_project
 ```
 
-`--update` を使うと既存の AgentOps 管理ディレクトリを移行できます（legacy ファイル削除、`.agent` 状態ファイル作成、`.rules` 更新）。
+`--update` を使うと既存の AgentOps 管理ディレクトリを移行できます（`.rules` を更新し、`.agent` の状態ファイルが存在することを保証します。legacy アーティファクトは削除しません）。
 
 ## インストール
 
@@ -30,12 +30,11 @@ brew install agentops_mcp_server
 
 - セッション終了前／コンテキストが厳しいとき:
   - `ops_compact_context` を実行（`include_diff=false` 推奨、`max_chars` は任意）
-  - `ops_handoff_export` は `.agent/handoff.json` に書き出し（`path` 指定時は `.agent/` 配下の相対パスとして扱う）
+  - `ops_capture_state` を実行（トランザクション状態を保存）
+  - `ops_handoff_export` は `.agent/handoff.json` に書き出し
 - すぐ再開する場合は `ops_resume_brief` を実行
 - タスクの進行記録: `ops_start_task` / `ops_update_task` / `ops_end_task`
-- 状態保存と要約: `ops_capture_state` / `ops_task_summary` / `ops_observability_summary`
 - トークン節約: フル diff より要約・diff stats を優先し、出力は短く保つ
-- 全ての MCP ツールは `truncate_limit` を任意で受け付ける（`tools/list` で確認）
 
 ## セマンティック再開（0.4.0）
 - canonical なソースは `.agent/tx_event_log.jsonl`（イベントログ）と `.agent/tx_state.json`（マテリアライズド状態）。
@@ -43,7 +42,7 @@ brew install agentops_mcp_server
 - `.agent/handoff.json` は派生専用で、再開判断の canonical 入力にはならない。
 
 ## .rulesについて（from v0.2.0）
-zed-agentops-init は `.rules` を生成します。
+zed-agentops-init.sh は `.rules` を生成します。
 
 ## 主要ファイルの配置
 
@@ -55,6 +54,7 @@ zed-agentops-init は `.rules` を生成します。
 - `.agent/tx_event_log.jsonl` : canonical なトランザクションイベントログ
 - `.agent/tx_state.json` : canonical なマテリアライズド状態
 - `.agent/handoff.json` : 派生専用の引き継ぎサマリ
+- `.agent/observability_summary.json` : 派生専用の観測サマリ
 - `.agent/journal.jsonl` : legacy の派生専用アーティファクト
 - `/opt/homebrew/bin/agentops_mcp_server` : Homebrew でインストールされる MCP サーババイナリ（macOS）
 
@@ -92,16 +92,6 @@ Tool Settings (settings.json):
         "default": "allow"
       },
       "terminal": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:journal_append": {
-        "default": "allow"
-      },
-
-      "mcp:agentops-server:roll_forward_replay": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:continue_state_rebuild": {
         "default": "allow"
       },
       "mcp:agentops-server:session_capture_context": {
@@ -165,13 +155,11 @@ Tool Settings (settings.json):
 ```
 
 提供ツール（snake_case）:
-- `journal_append`
+- `commit_if_verified`
 - `tx_event_append`
 - `tx_state_save`
 - `tx_state_rebuild`
 
-- `roll_forward_replay`
-- `continue_state_rebuild`
 - `session_capture_context`
 - `repo_verify`
 - `repo_commit`
@@ -179,7 +167,6 @@ Tool Settings (settings.json):
 - `repo_commit_message_suggest`
 - `tests_suggest`
 - `tests_suggest_from_failures`
-- `commit_if_verified`
 - `ops_compact_context`
 - `ops_handoff_export`
 - `ops_resume_brief`
@@ -189,11 +176,11 @@ Tool Settings (settings.json):
 - `ops_capture_state`
 - `ops_task_summary`
 - `ops_observability_summary`
-- 互換: ドット区切り（例: `roll_forward.replay`）は snake_case にマップされます
+- 互換: ドット区切り（例: `ops.handoff_export`）は snake_case にマップされます
 
 使用メモ:
 - `tools/list` でツール一覧を取得。例: `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
-- `tools/call` でツールを呼び出し。例: `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"journal_append","arguments":{"kind":"task.start","payload":{"title":"v0.1.0 ドキュメント確認"}}}}`
+- `tools/call` でツールを呼び出し。例: `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ops_start_task","arguments":{"title":"v0.1.0 ドキュメント確認"}}}`
 - 成功時は `result`、失敗時は `error`（`code` と `message`）が返ります。
 
 あとは Zed に MCP サーバを登録し、必要な権限を付与してください。

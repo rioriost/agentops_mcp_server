@@ -1,0 +1,35 @@
+{
+  "id": "p4-t2",
+  "phase": 4,
+  "title": "Confirm acceptance criteria",
+  "status": "done",
+  "summary": "Confirm the 0.4.2 acceptance criteria are met after verification completes.",
+  "inputs": ["docs/v0.4.2/plan.md", "docs/v0.4.2/p4-t1.json"],
+  "outputs": ["docs/v0.4.2/p4-t2.json"],
+  "acceptance_criteria": [
+    "All acceptance criteria listed in docs/v0.4.2/plan.md are explicitly checked.",
+    "Any unmet criteria are documented with concise notes.",
+    "Ticket is ready to be marked done once criteria are satisfied."
+  ],
+  "deps": ["p4-t1"],
+  "steps": [
+    {
+      "id": "p4-t2-s1",
+      "description": "Review plan.md acceptance criteria and compare against completed work."
+    },
+    {
+      "id": "p4-t2-s2",
+      "description": "Record pass/fail status with short notes for each criterion."
+    },
+    {
+      "id": "p4-t2-s3",
+      "description": "Confirm readiness to mark the release tasks complete."
+    }
+  ],
+  "notes": [
+    "Checked: .rules aligned with current tooling and workflow guidance.",
+    "Checked: zed-agentops-init.sh template and artifacts aligned.",
+    "Checked: README.md / README-jp.md updated to match tooling and workflow.",
+    "Checked: verify-release passed with coverage 96% (>= 90%)."
+  ]
+}

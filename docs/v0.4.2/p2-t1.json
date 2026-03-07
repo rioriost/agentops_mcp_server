@@ -1,0 +1,40 @@
+{
+  "id": "p2-t1",
+  "phase": 2,
+  "title": "Update .rules to reflect current transaction-aware workflow",
+  "status": "done",
+  "summary": "Revise .rules to align with current MCP server behavior and transaction-aware task management guidance.",
+  "inputs": [
+    "docs/v0.4.2/plan.md",
+    "docs/v0.4.2/p1-t1.json",
+    "docs/v0.4.2/p1-t2.json"
+  ],
+  "outputs": ["docs/v0.4.2/p2-t1.json"],
+  "acceptance_criteria": [
+    ".rules reflects the current transaction-aware workflow steps and logging/persistence expectations.",
+    "Outdated or conflicting instructions are removed or corrected.",
+    ".rules guidance is consistent with MCP server behavior described in src/."
+  ],
+  "deps": ["p1-t1", "p1-t2"],
+  "steps": [
+    {
+      "id": "p2-t1-s1",
+      "description": "Review current .rules content and mark sections that diverge from MCP server behavior."
+    },
+    {
+      "id": "p2-t1-s2",
+      "description": "Update transaction-aware workflow instructions, ordering, and persistence/logging guidance."
+    },
+    {
+      "id": "p2-t1-s3",
+      "description": "Validate .rules consistency with current src/ implementation and plan requirements."
+    }
+  ],
+  "notes": [
+    "Updated Start section to explicitly treat `.agent/handoff.json` as derived-only.",
+    "Replaced `${VERIFY_REL}` with `repo_verify` wording to match tool registry.",
+    "Removed unsupported tooling references (`journal_append`, `roll_forward_replay`, `continue_state_rebuild`).",
+    "Expanded tooling list to match current server tools (commit_if_verified, repo_* helpers, session_capture_context, tests_suggest*, ops_* task/state tools).",
+    "Clarified ops_handoff_export to remove optional path wording."
+  ]
+}

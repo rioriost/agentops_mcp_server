@@ -1,0 +1,87 @@
+{
+  "version": "0.4.2",
+  "title": "Optimize .rules, zed-agentops-init.sh, and README*",
+  "tickets": [
+    {
+      "id": "p1-t1",
+      "phase": 1,
+      "title": "Inventory mismatches across rules, script, docs, and src",
+      "status": "done",
+      "inputs": ["docs/v0.4.2/plan.md"],
+      "outputs": ["docs/v0.4.2/p1-t1.json"],
+      "deps": []
+    },
+    {
+      "id": "p1-t2",
+      "phase": 1,
+      "title": "Draft alignment plan for .rules and README updates",
+      "status": "done",
+      "inputs": ["docs/v0.4.2/plan.md"],
+      "outputs": ["docs/v0.4.2/p1-t2.json"],
+      "deps": ["p1-t1"]
+    },
+    {
+      "id": "p2-t1",
+      "phase": 2,
+      "title": "Update .rules to reflect current transaction-aware workflow",
+      "status": "done",
+      "inputs": ["docs/v0.4.2/plan.md"],
+      "outputs": ["docs/v0.4.2/p2-t1.json"],
+      "deps": ["p1-t1"]
+    },
+    {
+      "id": "p2-t2",
+      "phase": 2,
+      "title": "Align zed-agentops-init.sh behavior and guidance",
+      "status": "done",
+      "inputs": ["docs/v0.4.2/plan.md"],
+      "outputs": ["docs/v0.4.2/p2-t2.json"],
+      "deps": ["p2-t1"]
+    },
+    {
+      "id": "p2-t3",
+      "phase": 2,
+      "title": "Update README.md and README-jp.md for correctness",
+      "status": "done",
+      "inputs": ["docs/v0.4.2/plan.md"],
+      "outputs": ["docs/v0.4.2/p2-t3.json"],
+      "deps": ["p1-t2"]
+    },
+    {
+      "id": "p3-t1",
+      "phase": 3,
+      "title": "Update tests if behavior or docs changes require it",
+      "status": "done",
+      "inputs": ["docs/v0.4.2/plan.md"],
+      "outputs": ["docs/v0.4.2/p3-t1.json"],
+      "deps": ["p2-t2", "p2-t3"]
+    },
+    {
+      "id": "p3-t2",
+      "phase": 3,
+      "title": "Validate coverage remains >= 90%",
+      "status": "done",
+      "inputs": ["docs/v0.4.2/plan.md"],
+      "outputs": ["docs/v0.4.2/p3-t2.json"],
+      "deps": ["p3-t1"]
+    },
+    {
+      "id": "p4-t1",
+      "phase": 4,
+      "title": "Run verification suite",
+      "status": "done",
+      "inputs": ["docs/v0.4.2/plan.md"],
+      "outputs": ["docs/v0.4.2/p4-t1.json"],
+      "deps": ["p3-t2"]
+    },
+    {
+      "id": "p4-t2",
+      "phase": 4,
+      "title": "Confirm acceptance criteria",
+      "status": "done",
+      "inputs": ["docs/v0.4.2/plan.md"],
+      "outputs": ["docs/v0.4.2/p4-t2.json"],
+      "deps": ["p4-t1"]
+    }
+  ]
+}

@@ -166,7 +166,7 @@ cat <<'RULES' > "$SOURCE_RULES"
   2) Register file intents before mutation
   3) Implement smallest safe change
   4) Update semantic_summary (required) and user_intent only on explicit user resume intent; persist tx_state after mutation
-  5) Run "${VERIFY_REL}"
+  5) Run `repo_verify` (runs `.zed/scripts/verify`)
      - If fails: fix and repeat (update semantic summary)
   6) Set status -> checking
      - Compare acceptance_criteria AND plan.md to avoid omissions
@@ -186,20 +186,31 @@ cat <<'RULES' > "$SOURCE_RULES"
 - When a tool execution adds/modifies files:
   1) ops_compact_context (compact context)
   2) ops_capture_state (tx_state capture)
-  3) ops_handoff_export (handoff summary, optional file write)
+  3) ops_handoff_export (handoff summary)
 
 ## Tooling (mandatory)
 - Prefer MCP tools if available.
 - Use:
-  - journal_append
+  - commit_if_verified
   - tx_event_append
   - tx_state_save
   - tx_state_rebuild
-  - roll_forward_replay / continue_state_rebuild (if needed)
+  - repo_verify
+  - repo_commit
+  - repo_status_summary
+  - repo_commit_message_suggest
+  - session_capture_context
+  - tests_suggest
+  - tests_suggest_from_failures
   - ops_compact_context
   - ops_handoff_export
   - ops_resume_brief
-  - repo_commit
+  - ops_start_task
+  - ops_update_task
+  - ops_end_task
+  - ops_capture_state
+  - ops_task_summary
+  - ops_observability_summary
 
 
 ## Commit rules (mandatory)
@@ -258,7 +269,12 @@ else
     '}' > "$AGENT_DIR/tx_state.json"
 fi
 
-
+# --- legacy journal ---
+if [ -f "$AGENT_DIR/journal.jsonl" ]; then
+  echo "Skipping .agent/journal.jsonl (already exists)."
+else
+  touch "$AGENT_DIR/journal.jsonl"
+fi
 
 if (( update_mode == 1 )); then
   echo "Skipping .zed scaffold (update mode)."

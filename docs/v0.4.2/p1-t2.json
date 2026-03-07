@@ -1,0 +1,36 @@
+{
+  "id": "p1-t2",
+  "phase": 1,
+  "title": "Draft alignment plan for .rules and README updates",
+  "status": "done",
+  "summary": "Define the concrete update plan for .rules and README* based on mismatches identified in p1-t1.",
+  "inputs": ["docs/v0.4.2/plan.md", "docs/v0.4.2/p1-t1.json"],
+  "outputs": ["docs/v0.4.2/p1-t2.json"],
+  "acceptance_criteria": [
+    "Planned changes list targeted sections and intended edits for .rules.",
+    "Planned changes list targeted sections and intended edits for README.md and README-jp.md.",
+    "Plan is consistent with current MCP server behavior and supports downstream implementation tickets."
+  ],
+  "deps": ["p1-t1"],
+  "steps": [
+    {
+      "id": "p1-t2-s1",
+      "description": "Translate p1-t1 mismatches into a concrete edit plan for .rules."
+    },
+    {
+      "id": "p1-t2-s2",
+      "description": "Translate p1-t1 mismatches into a concrete edit plan for README.md and README-jp.md."
+    },
+    {
+      "id": "p1-t2-s3",
+      "description": "Validate the planned edits against current src/ behavior to avoid contradictions."
+    }
+  ],
+  "notes": [
+    "Plan (.rules): remove references to non-existent tools (`journal_append`, `roll_forward_replay`, `continue_state_rebuild`), align handoff-derived-only phrasing with init template, and ensure tooling list matches tool registry (tx_event_append/tx_state_save/tx_state_rebuild/repo_verify/repo_commit/ops_*).",
+    "Plan (.rules): clarify verification step to invoke the verify tool or script consistently and keep ordering/persistence steps aligned with actual tx event taxonomy.",
+    "Plan (README.md/README-jp.md): update init command naming (`zed-agentops-init` vs `zed-agentops-init.sh`) and `--update` behavior description to match script behavior.",
+    "Plan (README.md/README-jp.md): correct `ops_handoff_export` signature (no path argument), remove `truncate_limit` claim unless added to tool schemas, and add `.agent/observability_summary.json` to “Where things live”.",
+    "Plan (README parity): align English/Japanese workflow tips (include ops_* task tracking consistently) and remove any tool references not present in tool registry."
+  ]
+}
