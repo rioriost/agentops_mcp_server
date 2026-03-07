@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from .git_repo import GitRepo
 from .test_suggestions import CODE_SUFFIXES, is_test_path, parse_changed_files
