@@ -1,23 +1,12 @@
-# Draft for 0.4.1: remove workplace_root
+# Draft for 0.4.2: optimize .rules, zed-agentops-init.sh, and README*
 
 ## Background
-- .rulesでworkspace_rootを指定しているが、[Zedのコード](https://github.com/zed-industries/zed)を調査すると、CWD については、ContextServerStore::create_context_server で root_path を取り、ローカルプロジェクトならそれを working_directory として MCP サーバに渡す実装になっているため、agentops_mcp_serverではworkspace_rootを指定する必要は無いことが判明した。
-- 同じくコードでの調査では、ShellBuilder::new(...).non_interactive()をコールした後、.envs(binary.env.unwrap_or_default()) を追加しているだけなので、.zlogin / .zshrc / .zprofileのいずれも読み込まれず、.zshenvのみが読み込まれる。Homebrewでインストールされたgitコマンド等は、.zprofileによって/opt/homebrew/binがパスに追加されるため、ZedのMCPサーバでは見つけることが出来ないことも判明した。
+- 0.4.0でtransaction-aware task managingを導入し、セッション中断後のリストア耐性を改善したが、主にMCPサーバ側(src/agentops_mcp_server/*.py)への実装が先行し、実装された機能を.rules / zed-agentops-init.sh が完全に利用できる状態になっているかを検証する必要がある。
+- 併せて、README*の全面的な見直しも必要となる。
 
 ## Goal
-- workspace_rootを指定する必要が無いので.rulesから削除し、併せてsrc/以下のコードからworkspace_rootに関する処理を全て削除する。
-- README*中の`setting.json`は以下になる。
-```json
-{
-  "agentops-server": {
-    "command": "/opt/homebrew/bin/agentops_mcp_server",
-    "args": [],
-    "env": {
-            "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-          }
-  }
-}
-```
+- MCPサーバの実装と、.rules / zed-agentops-init.shが整合している。
+- README*が、Pythonコードの動作と矛盾しておらず、zed-agentops-init.sh、.rulesの使い方を正しく説明していること。
 
 ## Acceptance criteria
 - カバレッジ90%以上
