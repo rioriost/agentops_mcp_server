@@ -94,6 +94,8 @@ class ToolRouter:
 
         summary_limit = truncate_limit if truncate_limit is not None else 2000
         result_payload = summarize_result(result, limit=summary_limit)
+        if not isinstance(result_payload, dict):
+            result_payload = {"result": result_payload}
 
         content_payload = {
             "content": [

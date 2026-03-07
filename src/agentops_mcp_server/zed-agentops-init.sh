@@ -146,6 +146,7 @@ cat <<'RULES' > "$SOURCE_RULES"
   2) tx_event_log (transaction event log replay if needed)
   3) handoff (derived-only, never canonical)
 - Resume decisions must use canonical tx_state + tx_event_log only; handoff is derived.
+- Treat `.agent/handoff.json` as derived-only.
 - If resume state is incomplete:
   - run ops_resume_brief (or equivalent) and emit a short brief
 - Identify active ticket (status != done) and resume it.
