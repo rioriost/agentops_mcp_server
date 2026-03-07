@@ -132,17 +132,25 @@ def test_repo_commit_auto_message(monkeypatch):
     assert ("add", "-A") in git_repo.calls
 
 
-def test_commit_if_verified_runs_verify(monkeypatch):
-    manager, git_repo, verify_runner, *_ = _build_manager(
-        status_lines=[" M file.txt"], verify_result={"ok": True}
+def test_commit_if_verified_runs_verify(tmp_path, monkeypatch):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    _write_tx_state(state_store)
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"}),
+        state_store,
+        state_rebuilder,
     )
-    monkeypatch.setattr(manager, "_run_git_commit", lambda msg: ("sha", "summary"))
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: None)
 
     result = manager.commit_if_verified("message", timeout_sec=5)
 
-    assert result["sha"] == "sha"
-    assert verify_runner.calls == [5]
-    assert ("add", "-A") in git_repo.calls
+    assert result["sha"] == "abc123"
+    assert manager.verify_runner.calls == [5]
+    assert ("add", "-A") in manager.git_repo.calls
 
 
 def test_commit_if_verified_emits_tx_commit_events(tmp_path, monkeypatch):

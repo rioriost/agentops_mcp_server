@@ -361,6 +361,29 @@ def test_tx_event_append_rejects_tx_begin_when_active_tx_in_progress_and_log_not
         state_store.tx_event_append(**args)
 
 
+def test_tx_event_append_allows_tx_begin_when_active_tx_id_is_none(
+    state_store, repo_context
+):
+    state = _valid_tx_state()
+    state["active_tx"]["tx_id"] = "none"
+    state["active_tx"]["ticket_id"] = "none"
+    state["active_tx"]["status"] = "planned"
+    state["active_tx"]["phase"] = "planned"
+    state["active_tx"]["current_step"] = "none"
+    state["active_tx"]["next_action"] = "tx.begin"
+    state["active_tx"]["semantic_summary"] = "No active transaction."
+    state_store.tx_state_save(state)
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_event_log.write_text(
+        json.dumps({"seq": 1}) + "\n", encoding="utf-8"
+    )
+
+    args = _base_tx_event_args()
+    args["tx_id"] = "tx-2"
+    result = state_store.tx_event_append(**args)
+    assert result["ok"] is True
+
+
 def test_tx_event_append_rejects_mismatched_tx_id(state_store):
     state = _valid_tx_state()
     state_store.tx_state_save(state)

@@ -215,6 +215,13 @@ def test_rebuild_tx_state_missing_file_intent_truncates(
     rebuild = state_rebuilder.rebuild_tx_state()
     assert rebuild["ok"] is True
     assert rebuild["last_applied_seq"] == 1
+    assert rebuild["state"]["rebuild_warning"] == "file intent missing for path"
+    assert rebuild["state"]["rebuild_invalid_seq"] == 2
+    assert (
+        rebuild["state"]["rebuild_invalid_event"]["event_type"]
+        == "tx.file_intent.update"
+    )
+    assert rebuild["state"]["active_tx"]["tx_id"] == "none"
 
 
 def test_rebuild_tx_state_preserves_user_intent(

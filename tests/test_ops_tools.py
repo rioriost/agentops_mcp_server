@@ -117,6 +117,40 @@ def test_ops_task_lifecycle_records_events(repo_context, state_store, state_rebu
     assert "tx.end.done" in tx_events
 
 
+def test_ops_start_task_rejects_when_active_tx_exists(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    state = {
+        "schema_version": "0.4.0",
+        "active_tx": {
+            "tx_id": "t-1",
+            "ticket_id": "t-1",
+            "status": "in-progress",
+            "phase": "in-progress",
+            "current_step": "t-1",
+            "last_completed_step": "",
+            "next_action": "tx.verify.start",
+            "semantic_summary": "Active transaction",
+            "user_intent": None,
+            "verify_state": {"status": "not_started", "last_result": None},
+            "commit_state": {"status": "not_started", "last_result": None},
+            "file_intents": [],
+        },
+        "last_applied_seq": 1,
+        "integrity": {"state_hash": "hash", "rebuilt_from_seq": 1},
+    }
+    state_store.tx_state_save(state)
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_event_log.write_text(
+        json.dumps({"seq": 1}) + "\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError, match="active transaction already in progress"):
+        ops.ops_start_task(title="Build", task_id="t-2", session_id="s1")
+
+
 def test_ops_update_task_falls_back_to_active_tx_id(
     repo_context, state_store, state_rebuilder
 ):
