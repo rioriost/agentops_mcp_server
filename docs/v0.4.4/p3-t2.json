@@ -3,7 +3,7 @@
   "phase": 3,
   "title": "Validate coverage remains >= 90%",
   "status": "planned",
-  "summary": "",
+  "summary": "Coverage.xml reports line-rate 0.9551 (1937/2028), meeting the >= 90% target; branch-rate is 0.",
   "inputs": ["docs/v0.4.4/plan.md", "coverage.xml"],
   "outputs": ["docs/v0.4.4/p3-t2.json"],
   "acceptance_criteria": [
@@ -22,6 +22,7 @@
     }
   ],
   "notes": [
-    "Keep the report concise and focus on actionable gaps if coverage is below target."
+    "Keep the report concise and focus on actionable gaps if coverage is below target.",
+    "Measured from coverage.xml: line-rate 0.9551 (1937/2028)."
   ]
 }
