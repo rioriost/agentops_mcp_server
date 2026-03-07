@@ -1,0 +1,30 @@
+{
+  "id": "p2-t3",
+  "phase": 2,
+  "title": "Update tool path expansion to resolve against CWD",
+  "status": "done",
+  "summary": "Update tool path expansion logic so all tool paths resolve relative to CWD via the centralized resolver.",
+  "inputs": ["docs/v0.4.3/plan.md"],
+  "outputs": ["docs/v0.4.3/p2-t3.json"],
+  "acceptance_criteria": [
+    "All tool path expansions resolve relative to CWD (e.g., CWD/.agent).",
+    "No direct path expansion remains outside the centralized resolver.",
+    "Behavior is consistent across all tools using filesystem paths."
+  ],
+  "deps": ["p2-t1"],
+  "steps": [
+    {
+      "id": "p2-t3-s1",
+      "description": "Identify tool call sites that expand or build filesystem paths."
+    },
+    {
+      "id": "p2-t3-s2",
+      "description": "Update call sites to use the centralized resolver for all tool paths."
+    },
+    {
+      "id": "p2-t3-s3",
+      "description": "Validate that paths now resolve relative to CWD in all tools."
+    }
+  ],
+  "notes": ["Keep the change minimal and focused on path expansion behavior."]
+}

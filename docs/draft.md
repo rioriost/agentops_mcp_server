@@ -1,12 +1,22 @@
-# Draft for 0.4.2: optimize .rules, zed-agentops-init.sh, and README*
+# Draft for 0.4.3: fix path resolution
 
 ## Background
-- 0.4.0でtransaction-aware task managingを導入し、セッション中断後のリストア耐性を改善したが、主にMCPサーバ側(src/agentops_mcp_server/*.py)への実装が先行し、実装された機能を.rules / zed-agentops-init.sh が完全に利用できる状態になっているかを検証する必要がある。
-- 併せて、README*の全面的な見直しも必要となる。
+- Zedによって起動したMCPサーバツール群は、起動したディレクトリのnon-interactive shellとして起動し、起動されたディレクトリをCWDとして動作する。
+- しかし、0.4.2のツールに、このパスを適切に展開していない問題がある。例えば、以下のメッセージを出力する。
+  ops_start_task failed with a read‑only filesystem error on `/.agent`.
+  これは本来なら、CWD/.agentと展開されなければならない。
+- あるいは以下のようなエラーになる。
+```quot
+ツール実行結果
+- `ops_capture_state` が `/.agent/tx_event_log.jsonl` 参照で失敗（read‑only filesystem）
+- `ops_handoff_export` が `/.agent` への書き込みで失敗（read‑only filesystem）
+```
+- ツール群のパスの展開ロジックが**1箇所に集約されている**かチェックし、されていなければ修正する。
+- 唯一のパスの展開ロジックが、正しくパスを展開するようにする。
 
 ## Goal
-- MCPサーバの実装と、.rules / zed-agentops-init.shが整合している。
-- README*が、Pythonコードの動作と矛盾しておらず、zed-agentops-init.sh、.rulesの使い方を正しく説明していること。
+- MCPサーバ起動時にCWDをチェックし、"/"だった場合はエラーとする。
+- ツールが正常に動作する。
 
 ## Acceptance criteria
 - カバレッジ90%以上

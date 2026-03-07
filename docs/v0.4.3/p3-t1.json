@@ -1,0 +1,29 @@
+{
+  "id": "p3-t1",
+  "phase": 3,
+  "title": "Update tests if behavior changes require it",
+  "status": "done",
+  "summary": "Assess and update tests for path resolution and CWD validation changes to ensure correct behavior and maintain coverage.",
+  "inputs": ["docs/v0.4.3/plan.md"],
+  "outputs": ["docs/v0.4.3/p3-t1.json"],
+  "acceptance_criteria": [
+    "Tests updated or added for any code changes introduced in v0.4.3.",
+    "Path resolution and CWD validation behavior is covered.",
+    "Coverage remains at or above 90%."
+  ],
+  "deps": ["p2-t1", "p2-t2", "p2-t3"],
+  "steps": [
+    {
+      "id": "p3-t1-s1",
+      "description": "Identify behavior changes introduced in v0.4.3 that require test updates."
+    },
+    {
+      "id": "p3-t1-s2",
+      "description": "Add or update unit/integration tests to cover path resolution and CWD validation."
+    },
+    {
+      "id": "p3-t1-s3",
+      "description": "Run the test suite and confirm coverage remains >= 90%."
+    }
+  ]
+}

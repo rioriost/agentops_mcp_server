@@ -1,0 +1,34 @@
+{
+  "id": "p2-t1",
+  "phase": 2,
+  "title": "Centralize path resolution and enforce CWD validation",
+  "status": "done",
+  "summary": "Implemented repo_root validation to reject '/' and added tests to cover the guard and .agent path resolution.",
+  "inputs": ["docs/v0.4.3/plan.md"],
+  "outputs": ["docs/v0.4.3/p2-t1.json"],
+  "acceptance_criteria": [
+    "There is exactly one path resolution implementation used by all tools.",
+    "On MCP server startup, if CWD is \"/\", the server errors out with a clear message.",
+    "Tool path resolution expands paths relative to CWD (e.g., CWD/.agent)."
+  ],
+  "deps": ["p1-t2"],
+  "steps": [
+    {
+      "id": "p2-t1-s1",
+      "description": "Identify all code paths that expand or resolve tool file system paths."
+    },
+    {
+      "id": "p2-t1-s2",
+      "description": "Implement or refactor to a single shared path resolver and update all callers."
+    },
+    {
+      "id": "p2-t1-s3",
+      "description": "Add startup validation to reject CWD == \"/\" with a clear error."
+    },
+    {
+      "id": "p2-t1-s4",
+      "description": "Add or update tests to cover resolver behavior and CWD validation."
+    }
+  ],
+  "notes": ["Keep changes minimal and focused on path resolution logic."]
+}

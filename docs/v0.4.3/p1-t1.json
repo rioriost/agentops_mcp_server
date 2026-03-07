@@ -1,0 +1,37 @@
+{
+  "id": "p1-t1",
+  "phase": 1,
+  "title": "Inventory path resolution logic and failure cases",
+  "status": "done",
+  "summary": "Completed inventory: RepoContext centralizes .agent paths via repo_root, StateRebuilder handles relative path resolution, and CWD is captured on startup in main.py.",
+  "inputs": ["docs/draft.md"],
+  "outputs": ["docs/v0.4.3/p1-t1.json"],
+  "acceptance_criteria": [
+    "All path resolution entry points are enumerated with file locations.",
+    "It is clear whether path expansion logic is centralized or duplicated.",
+    "Known failure scenario (/.agent expansion) is linked to specific code paths."
+  ],
+  "deps": [],
+  "steps": [
+    {
+      "id": "p1-t1-s1",
+      "description": "Locate all functions/classes responsible for path resolution or tool filesystem paths."
+    },
+    {
+      "id": "p1-t1-s2",
+      "description": "Trace tool initialization flow to identify how CWD is captured and propagated."
+    },
+    {
+      "id": "p1-t1-s3",
+      "description": "Document any duplicated or inconsistent path expansion logic and propose consolidation targets."
+    }
+  ],
+  "notes": [
+    "RepoContext.state_artifact_path/legacy_artifact_path build .agent paths from repo_root.",
+    "RepoContext repo_root is set from Path.cwd().resolve() in main.py (module import) or RepoContext.__init__ default.",
+    "StateRebuilder.resolve_path resolves relative paths against repo_root (used for rebuild inputs).",
+    "TestSuggester.tests_suggest_from_failures resolves log_path against repo_root when relative.",
+    "No other direct .agent path expansion found in src; zed-agentops-init.sh manages .agent setup only.",
+    "If CWD is '/', repo_root becomes '/', leading to paths like '/.agent/...'."
+  ]
+}

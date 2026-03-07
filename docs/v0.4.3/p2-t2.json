@@ -1,0 +1,33 @@
+{
+  "id": "p2-t2",
+  "phase": 2,
+  "title": "Add startup CWD guard and fix path resolution",
+  "status": "done",
+  "summary": "Implement a startup CWD check to error on root CWD and ensure path resolution is centralized and correct.",
+  "inputs": ["docs/v0.4.3/plan.md"],
+  "outputs": ["docs/v0.4.3/p2-t2.json"],
+  "acceptance_criteria": [
+    "Startup checks CWD and errors when CWD is \"/\".",
+    "Path resolution logic is centralized in a single location.",
+    "The centralized path resolution expands paths relative to CWD correctly."
+  ],
+  "deps": ["p2-t1"],
+  "steps": [
+    {
+      "id": "p2-t2-s1",
+      "description": "Identify or create the single path resolution entry point and ensure all tools route through it."
+    },
+    {
+      "id": "p2-t2-s2",
+      "description": "Add a startup guard that validates CWD and returns a clear error when it is \"/\"."
+    },
+    {
+      "id": "p2-t2-s3",
+      "description": "Update or add tests to cover CWD guard and path expansion behavior."
+    }
+  ],
+  "notes": [
+    "Ensure the guard does not break normal execution when CWD is a project directory.",
+    "Keep error messaging consistent with existing error handling patterns."
+  ]
+}

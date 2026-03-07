@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from agentops_mcp_server.repo_context import RepoContext
@@ -30,3 +32,8 @@ def test_state_artifact_path_known_kind(repo_context):
     path = repo_context.state_artifact_path("tx_state")
     assert path.name == "tx_state.json"
     assert path.parent.name == ".agent"
+
+
+def test_repo_context_rejects_root_path():
+    with pytest.raises(ValueError, match="repo_root cannot be '/'"):
+        RepoContext(Path("/"))

@@ -1,0 +1,25 @@
+{
+  "id": "p4-t1",
+  "phase": 4,
+  "title": "Run verification suite",
+  "status": "done",
+  "summary": "Verification succeeded via .zed/scripts/verify (tests passed).",
+  "inputs": ["docs/v0.4.3/plan.md"],
+  "outputs": ["docs/v0.4.3/p4-t1.json"],
+  "acceptance_criteria": [
+    "Verification command completes successfully with no failures.",
+    "Any failures are investigated and addressed before marking the ticket verified."
+  ],
+  "deps": ["p3-t2"],
+  "steps": [
+    {
+      "id": "p4-t1-s1",
+      "description": "Run the repository verification suite."
+    },
+    {
+      "id": "p4-t1-s2",
+      "description": "Review results and record outcomes in the ticket summary."
+    }
+  ],
+  "notes": []
+}

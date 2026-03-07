@@ -1,0 +1,35 @@
+{
+  "id": "p1-t2",
+  "phase": 1,
+  "title": "Draft solution and test plan for path resolution fixes",
+  "status": "done",
+  "summary": "Plan drafted: enforce repo_root validation at startup, keep .agent paths centralized in RepoContext, and add tests for CWD guard and path resolution.",
+  "inputs": ["docs/v0.4.3/plan.md", "docs/draft.md"],
+  "outputs": ["docs/v0.4.3/p1-t2.json"],
+  "acceptance_criteria": [
+    "Defines the proposed fix scope and target modules/files.",
+    "Specifies how path expansion is centralized and corrected.",
+    "Includes a test plan aligned with >=90% coverage requirement.",
+    "Identifies any risks or edge cases (e.g., CWD == '/')."
+  ],
+  "deps": ["p1-t1"],
+  "steps": [
+    {
+      "id": "p1-t2-s1",
+      "description": "Summarize the intended fix and enumerate target modules for changes."
+    },
+    {
+      "id": "p1-t2-s2",
+      "description": "Describe how to centralize path resolution logic and validate CWD at startup."
+    },
+    {
+      "id": "p1-t2-s3",
+      "description": "Draft a test plan covering success/failure paths and coverage targets."
+    }
+  ],
+  "notes": [
+    "Target modules: repo_context.py (repo_root validation + .agent path helpers), main.py (startup guard), state_rebuilder.py (relative path resolution), ops_tools.py/state_store.py (consumers).",
+    "Approach: add a single repo_root validation/normalization step to reject CWD == '/' and ensure all tool paths flow through RepoContext; audit for any direct '/.agent' usage (none found so far).",
+    "Test plan: add unit tests for RepoContext root guard (raises on '/'); verify state artifact paths resolve to '<cwd>/.agent/...'; verify StateRebuilder.resolve_path resolves relative paths against repo_root; ensure coverage >= 90%."
+  ]
+}

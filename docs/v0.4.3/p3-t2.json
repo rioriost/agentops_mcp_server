@@ -1,0 +1,25 @@
+{
+  "id": "p3-t2",
+  "phase": 3,
+  "title": "Validate coverage remains >= 90%",
+  "status": "done",
+  "summary": "Coverage validated via .zed/scripts/verify; total coverage 96%.",
+  "inputs": ["docs/v0.4.3/plan.md"],
+  "outputs": ["docs/v0.4.3/p3-t2.json"],
+  "acceptance_criteria": [
+    "Coverage report shows overall coverage >= 90%.",
+    "Any coverage regressions are identified with file-level notes."
+  ],
+  "deps": ["p3-t1"],
+  "steps": [
+    {
+      "id": "p3-t2-s1",
+      "description": "Run the standard coverage workflow."
+    },
+    {
+      "id": "p3-t2-s2",
+      "description": "Record the overall coverage result and note any regressions."
+    }
+  ],
+  "notes": ["verify succeeded via .zed/scripts/verify", "coverage total: 96%"]
+}

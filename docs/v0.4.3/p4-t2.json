@@ -1,0 +1,20 @@
+{
+  "id": "p4-t2",
+  "phase": 4,
+  "title": "Confirm acceptance criteria",
+  "status": "done",
+  "summary": "Acceptance criteria confirmed after successful verification and coverage checks.",
+  "inputs": ["docs/v0.4.3/plan.md"],
+  "outputs": ["docs/v0.4.3/p4-t2.json"],
+  "acceptance_criteria": [
+    "Acceptance criteria from the 0.4.3 plan are explicitly checked and confirmed."
+  ],
+  "deps": ["p4-t1"],
+  "steps": [
+    {
+      "id": "p4-t2-s1",
+      "description": "Review the 0.4.3 plan acceptance criteria and confirm each item is satisfied."
+    }
+  ],
+  "notes": []
+}
