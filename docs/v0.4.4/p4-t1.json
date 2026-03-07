@@ -1,0 +1,29 @@
+{
+  "id": "p4-t1",
+  "phase": 4,
+  "title": "Run verification suite",
+  "status": "planned",
+  "summary": "",
+  "inputs": ["docs/v0.4.4/plan.md"],
+  "outputs": ["docs/v0.4.4/p4-t1.json"],
+  "acceptance_criteria": [
+    "Verification suite runs successfully.",
+    "Verify results are recorded in the ticket summary.",
+    "Any failures are captured with actionable notes."
+  ],
+  "deps": ["p3-t2"],
+  "steps": [
+    {
+      "id": "p4-t1-s1",
+      "description": "Run the project verification script."
+    },
+    {
+      "id": "p4-t1-s2",
+      "description": "Capture and summarize verification output in this ticket."
+    }
+  ],
+  "notes": [
+    "Use the standard verify command defined in .rules.",
+    "Keep output summary concise (pass/fail + key warnings)."
+  ]
+}

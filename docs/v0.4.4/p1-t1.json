@@ -1,0 +1,34 @@
+{
+  "id": "p1-t1",
+  "phase": 1,
+  "title": "Inventory sequencing violations and lifecycle flow",
+  "status": "planned",
+  "summary": "Sequencing enforcement is centered in state_store.py (tx_event invariants), state_rebuilder.py (rebuild halts on invalid ordering), ops_tools.py (ops_start_task/ops_update_task), and commit_manager.py (commit_if_verified). Reported errors map to invariant checks for missing verify.start, active-tx gating on tx.begin, and tx_id mismatches during updates.",
+  "inputs": ["docs/draft.md", "docs/v0.4.4/plan.md"],
+  "outputs": ["docs/v0.4.4/p1-t1.json"],
+  "acceptance_criteria": [
+    "All tool sequencing touchpoints in src/ are enumerated with file locations.",
+    "Transaction lifecycle flow (start/update/verify/commit) is documented with current ordering.",
+    "Each reported error case is mapped to a specific code path and missing precondition."
+  ],
+  "deps": [],
+  "steps": [
+    {
+      "id": "p1-t1-s1",
+      "description": "Locate all tools and helpers that emit or validate transaction events and lifecycle state."
+    },
+    {
+      "id": "p1-t1-s2",
+      "description": "Trace verify/commit/task flows to capture current ordering and missing guardrails."
+    },
+    {
+      "id": "p1-t1-s3",
+      "description": "Map the three reported errors to concrete code paths and required ordering fixes."
+    }
+  ],
+  "notes": [
+    "Focus on sequencing and transaction state validation only; avoid unrelated refactors.",
+    "Sequencing touchpoints: state_store._validate_tx_event_invariants/tx_event_append, state_rebuilder.rebuild_tx_state, ops_tools._emit_tx_event + ops_start_task/ops_update_task, commit_manager.commit_if_verified/_emit_tx_event.",
+    "Error mapping: commit_if_verified -> verify result requires verify.start (state_store); ops_start_task -> tx.begin rejected when active_tx not terminal + event log non-empty; ops_update_task -> tx_id mismatch when active_tx is stale due to rebuild stopping on invalid event ordering."
+  ]
+}

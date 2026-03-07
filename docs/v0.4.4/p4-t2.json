@@ -1,0 +1,32 @@
+{
+  "id": "p4-t2",
+  "phase": 4,
+  "title": "Confirm acceptance criteria for 0.4.4",
+  "status": "planned",
+  "summary": "",
+  "inputs": ["docs/v0.4.4/plan.md", "docs/v0.4.4/p4-t1.json"],
+  "outputs": ["docs/v0.4.4/p4-t2.json"],
+  "acceptance_criteria": [
+    "`commit_if_verified` succeeds after a valid verify lifecycle.",
+    "`ops_start_task` handles existing transactions correctly.",
+    "`ops_update_task` rejects mismatched `tx_id` and succeeds when aligned.",
+    "Transaction state rebuild completes without halting on invalid event ordering.",
+    "Test coverage >= 90% and verification suite passes."
+  ],
+  "deps": ["p4-t1"],
+  "steps": [
+    {
+      "id": "p4-t2-s1",
+      "description": "Review test results and coverage to confirm requirements are met."
+    },
+    {
+      "id": "p4-t2-s2",
+      "description": "Validate tool sequencing behavior matches the acceptance criteria."
+    },
+    {
+      "id": "p4-t2-s3",
+      "description": "Record confirmation and any remaining risks or follow-ups."
+    }
+  ],
+  "notes": ["Summarize evidence for each acceptance criterion."]
+}

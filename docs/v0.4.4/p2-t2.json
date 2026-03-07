@@ -1,0 +1,37 @@
+{
+  "id": "p2-t2",
+  "phase": 2,
+  "title": "Harden start/update logic (start gating + tx_id validation)",
+  "status": "planned",
+  "summary": "",
+  "inputs": ["docs/v0.4.4/plan.md"],
+  "outputs": ["docs/v0.4.4/p2-t2.json"],
+  "acceptance_criteria": [
+    "`ops_start_task` rejects new starts when a different transaction is already active, with a clear error.",
+    "`ops_start_task` allows re-entry only when it matches the current active transaction.",
+    "`ops_update_task` requires a matching `tx_id` and returns a clear error on mismatch."
+  ],
+  "deps": ["p1-t2"],
+  "steps": [
+    {
+      "id": "p2-t2-s1",
+      "description": "Locate the transaction start/update handlers and their current validation rules."
+    },
+    {
+      "id": "p2-t2-s2",
+      "description": "Add gating for start requests when another active transaction exists."
+    },
+    {
+      "id": "p2-t2-s3",
+      "description": "Enforce `tx_id` matching for updates with explicit error messaging."
+    },
+    {
+      "id": "p2-t2-s4",
+      "description": "Document expected behavior and edge cases in the ticket summary."
+    }
+  ],
+  "notes": [
+    "Keep changes minimal and localized to start/update validation logic.",
+    "Error messages should be explicit about the active transaction and expected tx_id."
+  ]
+}

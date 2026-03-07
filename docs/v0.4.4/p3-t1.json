@@ -1,0 +1,44 @@
+{
+  "id": "p3-t1",
+  "phase": 3,
+  "title": "Add tests for verify/commit gating and tx mismatch errors",
+  "status": "planned",
+  "summary": "Add tests to validate sequencing enforcement, tx mismatch handling, and rebuild-stability guardrails.",
+  "inputs": [
+    "docs/v0.4.4/plan.md",
+    "docs/v0.4.4/p2-t1.json",
+    "docs/v0.4.4/p2-t2.json",
+    "docs/v0.4.4/p2-t3.json"
+  ],
+  "outputs": ["docs/v0.4.4/p3-t1.json"],
+  "acceptance_criteria": [
+    "Tests cover verify lifecycle ordering: reject verify results before verify.start.",
+    "Tests cover commit gating: commit_if_verified fails without successful verify lifecycle.",
+    "Tests cover ops_start_task rejection when an unrelated active transaction exists.",
+    "Tests cover ops_update_task rejecting mismatched tx_id and succeeding when aligned.",
+    "Tests cover event ordering guardrails that prevent rebuild-halting sequences."
+  ],
+  "deps": ["p2-t1", "p2-t2", "p2-t3"],
+  "steps": [
+    {
+      "id": "p3-t1-s1",
+      "description": "Identify test locations and existing fixtures for tool sequencing and transaction state handling."
+    },
+    {
+      "id": "p3-t1-s2",
+      "description": "Add tests for verify.start ordering and commit_if_verified gating behavior."
+    },
+    {
+      "id": "p3-t1-s3",
+      "description": "Add tests for ops_start_task and ops_update_task tx_id validation."
+    },
+    {
+      "id": "p3-t1-s4",
+      "description": "Add tests ensuring event ordering prevents rebuild-halting sequences."
+    }
+  ],
+  "notes": [
+    "Keep tests focused on sequencing and transaction integrity behavior.",
+    "Prefer minimal, deterministic fixtures; avoid reliance on external state."
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "p3-t2",
+  "phase": 3,
+  "title": "Validate coverage remains >= 90%",
+  "status": "planned",
+  "summary": "",
+  "inputs": ["docs/v0.4.4/plan.md", "coverage.xml"],
+  "outputs": ["docs/v0.4.4/p3-t2.json"],
+  "acceptance_criteria": [
+    "Coverage is measured and confirmed to be >= 90%.",
+    "If coverage is below 90%, the shortfall and likely sources are documented."
+  ],
+  "deps": ["p3-t1"],
+  "steps": [
+    {
+      "id": "p3-t2-s1",
+      "description": "Run coverage reporting for the current test suite."
+    },
+    {
+      "id": "p3-t2-s2",
+      "description": "Record the coverage percentage and note any gaps if below target."
+    }
+  ],
+  "notes": [
+    "Keep the report concise and focus on actionable gaps if coverage is below target."
+  ]
+}

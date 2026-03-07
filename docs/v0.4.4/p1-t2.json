@@ -1,0 +1,33 @@
+{
+  "id": "p1-t2",
+  "phase": 1,
+  "title": "Draft sequencing enforcement plan",
+  "status": "planned",
+  "summary": "",
+  "inputs": ["docs/draft.md", "docs/v0.4.4/p1-t1.json", "docs/v0.4.4/plan.md"],
+  "outputs": ["docs/v0.4.4/p1-t2.json"],
+  "acceptance_criteria": [
+    "Sequencing enforcement plan maps each reported error to a concrete fix.",
+    "Plan specifies ordering guarantees for verify/commit and task lifecycle tools.",
+    "Plan includes test coverage updates required to maintain >= 90%."
+  ],
+  "deps": ["p1-t1"],
+  "steps": [
+    {
+      "id": "p1-t2-s1",
+      "description": "Summarize findings from p1-t1 and extract ordering gaps tied to reported errors."
+    },
+    {
+      "id": "p1-t2-s2",
+      "description": "Define concrete sequencing rules to enforce in `src/` for verify/commit and task lifecycle."
+    },
+    {
+      "id": "p1-t2-s3",
+      "description": "Draft implementation outline and required tests to validate ordering and tx integrity."
+    }
+  ],
+  "notes": [
+    "Keep the plan focused on sequencing and transaction integrity, avoid unrelated refactors.",
+    "Ensure error messages are explicit about missing prerequisites (e.g., `verify.start`)."
+  ]
+}

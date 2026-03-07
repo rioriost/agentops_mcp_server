@@ -1,0 +1,37 @@
+{
+  "id": "p2-t3",
+  "phase": 2,
+  "title": "Ensure canonical event ordering (append → state → cursor)",
+  "status": "planned",
+  "summary": "",
+  "inputs": ["docs/v0.4.4/plan.md"],
+  "outputs": ["docs/v0.4.4/p2-t3.json"],
+  "acceptance_criteria": [
+    "Event append → tx_state update → cursor persist is enforced for all transaction events.",
+    "Invalid event sequences (e.g., tx.commit.start without tx.begin/verify.start) are rejected with clear errors.",
+    "tx_state rebuild completes without halting on malformed ordering."
+  ],
+  "deps": ["p1-t2"],
+  "steps": [
+    {
+      "id": "p2-t3-s1",
+      "description": "Locate where transaction events are appended, state is updated, and cursor is persisted."
+    },
+    {
+      "id": "p2-t3-s2",
+      "description": "Enforce canonical ordering in tool wrappers and persistence helpers."
+    },
+    {
+      "id": "p2-t3-s3",
+      "description": "Add ordering validation to prevent event log sequences that break rebuild."
+    },
+    {
+      "id": "p2-t3-s4",
+      "description": "Update tests to cover rebuild stability and ordering errors."
+    }
+  ],
+  "notes": [
+    "Keep changes minimal and focused on ordering and validation.",
+    "Surface precise error messages for missing prerequisites."
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "p2-t1",
+  "phase": 2,
+  "title": "Enforce verify lifecycle ordering for commit_if_verified",
+  "status": "planned",
+  "summary": "Ensure verify.start precedes verify results and gate commit_if_verified on a successful verify lifecycle with clear errors.",
+  "inputs": ["docs/v0.4.4/plan.md"],
+  "outputs": ["docs/v0.4.4/p2-t1.json"],
+  "acceptance_criteria": [
+    "`commit_if_verified` rejects calls made before `verify.start` with a clear error.",
+    "A valid verify lifecycle (`verify.start` → verify result) allows `commit_if_verified` to proceed.",
+    "Ordering checks are enforced consistently across verify/commit tool calls.",
+    "Error messages explicitly mention missing `verify.start` when applicable."
+  ],
+  "deps": ["p1-t2"],
+  "steps": [
+    {
+      "id": "p2-t1-s1",
+      "description": "Locate all verify lifecycle emitters and consumers in the tool flow."
+    },
+    {
+      "id": "p2-t1-s2",
+      "description": "Add ordering guards so verify results are only accepted after `verify.start`."
+    },
+    {
+      "id": "p2-t1-s3",
+      "description": "Gate `commit_if_verified` on a successful verify lifecycle and return clear errors otherwise."
+    },
+    {
+      "id": "p2-t1-s4",
+      "description": "Add/adjust tests to cover correct ordering and error paths."
+    }
+  ],
+  "notes": [
+    "Keep changes minimal and localized to verify/commit ordering enforcement.",
+    "Avoid unrelated refactors while tightening sequencing checks."
+  ]
+}
