@@ -1,0 +1,33 @@
+{
+  "id": "p2-t3",
+  "phase": 2,
+  "title": "Update README files with PATH guidance",
+  "status": "done",
+  "summary": "Update README documentation to include the PATH guidance in the setting.json example.",
+  "inputs": ["docs/v0.4.1/plan.md"],
+  "outputs": ["README.md", "README-jp.md", "docs/v0.4.1/p2-t3.json"],
+  "acceptance_criteria": [
+    "README.md includes the updated setting.json example with PATH.",
+    "README-jp.md includes the updated setting.json example with PATH.",
+    "No remaining README references to workspace_root in configuration examples."
+  ],
+  "deps": ["p1-t2"],
+  "steps": [
+    {
+      "id": "p2-t3-s1",
+      "description": "Locate setting.json examples in README.md and README-jp.md."
+    },
+    {
+      "id": "p2-t3-s2",
+      "description": "Replace the examples with the PATH-enabled snippet from the plan."
+    },
+    {
+      "id": "p2-t3-s3",
+      "description": "Verify both documents are consistent and mention PATH only in the example."
+    }
+  ],
+  "notes": [
+    "Keep changes limited to documentation examples.",
+    "Use the exact PATH string specified in the plan."
+  ]
+}

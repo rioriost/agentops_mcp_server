@@ -2,12 +2,8 @@ import agentops_mcp_server.main as main
 
 
 def test_main_wrapper_delegates(monkeypatch):
-    calls = {}
-
     class DummyRepoContext:
-        def resolve_workspace_root(self, value):
-            calls["resolve_workspace_root"] = value
-            return f"resolved:{value}"
+        pass
 
     class DummyStore:
         pass
@@ -103,9 +99,6 @@ def test_main_wrapper_delegates(monkeypatch):
     monkeypatch.setattr(main, "_OPS_TOOLS", DummyOpsTools())
     monkeypatch.setattr(main, "_TOOL_ROUTER", DummyToolRouter())
     monkeypatch.setattr(main, "_RPC_SERVER", dummy_rpc)
-
-    assert main._resolve_workspace_root("root") == "resolved:root"
-    assert calls["resolve_workspace_root"] == "root"
 
     assert main.run_verify(timeout_sec=3)["verify"] == 3
     assert main.commit_if_verified("msg", timeout_sec=2)["commit_if_verified"] == "msg"

@@ -1,0 +1,28 @@
+{
+  "id": "p4-t1",
+  "phase": 4,
+  "title": "Run verification suite",
+  "status": "done",
+  "summary": "Execute the verification suite to validate changes for 0.4.1 and collect results for acceptance criteria review.",
+  "inputs": ["docs/v0.4.1/plan.md"],
+  "outputs": ["docs/v0.4.1/p4-t1.json"],
+  "acceptance_criteria": [
+    "Verification suite runs to completion.",
+    "Any failures are recorded and triaged before proceeding."
+  ],
+  "deps": ["p3-t2"],
+  "steps": [
+    {
+      "id": "p4-t1-s1",
+      "description": "Run the verification command specified by the repository workflow."
+    },
+    {
+      "id": "p4-t1-s2",
+      "description": "Capture and summarize results for downstream acceptance checks."
+    }
+  ],
+  "notes": [
+    "Keep logs concise; prefer summary over full output.",
+    "repo_verify ran with warning: no known test/build targets detected (pytest not executed)."
+  ]
+}

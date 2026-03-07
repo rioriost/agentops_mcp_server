@@ -1,0 +1,33 @@
+{
+  "id": "p1-t2",
+  "phase": 1,
+  "title": "Draft README setting.json updates with PATH guidance",
+  "status": "done",
+  "summary": "Prepare documentation changes for README examples to include PATH guidance for Homebrew-installed binaries.",
+  "inputs": ["docs/v0.4.1/plan.md"],
+  "outputs": ["docs/v0.4.1/p1-t2.json"],
+  "acceptance_criteria": [
+    "README update scope is clearly defined for both English and Japanese docs.",
+    "Proposed setting.json snippet includes PATH guidance exactly as specified in the plan.",
+    "No references to workspace_root are included in the updated snippet."
+  ],
+  "deps": ["p1-t1"],
+  "steps": [
+    {
+      "id": "p1-t2-s1",
+      "description": "Identify README files that contain setting.json examples."
+    },
+    {
+      "id": "p1-t2-s2",
+      "description": "Draft the updated setting.json snippet with PATH guidance."
+    },
+    {
+      "id": "p1-t2-s3",
+      "description": "Record intended documentation update targets and snippet placement."
+    }
+  ],
+  "notes": [
+    "Ticket is doc-planning only; no runtime changes.",
+    "Snippet must match the plan’s PATH example exactly."
+  ]
+}

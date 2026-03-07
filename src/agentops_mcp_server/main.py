@@ -90,10 +90,6 @@ _TOOL_ROUTER = ToolRouter(TOOL_REGISTRY, _REPO_CONTEXT, _STATE_STORE)
 _RPC_SERVER = JsonRpcServer(_TOOL_ROUTER, _STATE_STORE)
 
 
-def _resolve_workspace_root(value: str) -> Path:
-    return _REPO_CONTEXT.resolve_workspace_root(value)
-
-
 def tx_event_append(
     tx_id: str,
     ticket_id: str,

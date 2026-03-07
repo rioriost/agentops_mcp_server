@@ -1,0 +1,31 @@
+{
+  "id": "p2-t2",
+  "phase": 2,
+  "title": "Remove workspace_root from config schema and runtime code",
+  "status": "done",
+  "summary": "Remove workspace_root from configuration models, parsing, and runtime code paths so the server relies on the host working directory.",
+  "inputs": ["docs/v0.4.1/plan.md"],
+  "outputs": ["src/**", "tests/**"],
+  "acceptance_criteria": [
+    "No workspace_root fields exist in configuration schema or parsing.",
+    "Runtime code no longer reads or propagates workspace_root.",
+    "Any path resolution uses only the host working directory.",
+    "Tests updated to reflect removal."
+  ],
+  "deps": ["p2-t1"],
+  "steps": [
+    {
+      "id": "p2-t2-s1",
+      "description": "Find and remove workspace_root in config models and parsing."
+    },
+    {
+      "id": "p2-t2-s2",
+      "description": "Delete runtime code paths that reference workspace_root."
+    },
+    {
+      "id": "p2-t2-s3",
+      "description": "Adjust tests and fixtures to match new config."
+    }
+  ],
+  "notes": ["Keep changes minimal and scoped to workspace_root removal."]
+}

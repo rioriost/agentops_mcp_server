@@ -1,0 +1,32 @@
+{
+  "id": "p2-t1",
+  "phase": 2,
+  "title": "Remove workspace_root from .rules",
+  "status": "done",
+  "summary": "Delete any workspace_root directives or references from .rules while preserving all other mandatory instructions.",
+  "inputs": ["docs/v0.4.1/plan.md", ".rules"],
+  "outputs": [".rules"],
+  "acceptance_criteria": [
+    ".rules no longer mentions workspace_root.",
+    "All remaining required instructions in .rules are preserved.",
+    "No other behavior or constraints in .rules are altered."
+  ],
+  "deps": ["p1-t1"],
+  "steps": [
+    {
+      "id": "p2-t1-s1",
+      "description": "Open .rules and locate workspace_root directives or mentions."
+    },
+    {
+      "id": "p2-t1-s2",
+      "description": "Remove only workspace_root-related lines or sections."
+    },
+    {
+      "id": "p2-t1-s3",
+      "description": "Re-read .rules to ensure no accidental changes were made elsewhere."
+    }
+  ],
+  "notes": [
+    "Keep the remainder of .rules intact to avoid breaking process requirements."
+  ]
+}

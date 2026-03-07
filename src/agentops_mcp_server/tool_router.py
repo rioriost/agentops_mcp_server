@@ -45,7 +45,7 @@ class ToolRouter:
         for name, spec in self.tool_registry.items():
             input_schema = dict(spec["input_schema"])
             properties = dict(input_schema.get("properties") or {})
-            properties["workspace_root"] = {"type": ["string", "null"]}
+
             properties["truncate_limit"] = {"type": ["integer", "null"]}
             input_schema["properties"] = properties
             input_schema["required"] = list(input_schema.get("required") or [])
@@ -82,18 +82,6 @@ class ToolRouter:
                 missing_list = ", ".join(missing)
                 raise ValueError(f"Missing required argument(s): {missing_list}")
 
-        previous_root = self.repo_context.get_repo_root()
-        workspace_root = arguments.get("workspace_root") if arguments else None
-        missing_workspace_root = not (
-            isinstance(workspace_root, str) and workspace_root.strip()
-        )
-        if not missing_workspace_root:
-            resolved_root = self.repo_context.resolve_workspace_root(
-                workspace_root.strip()
-            )
-            self.repo_context.set_repo_root(resolved_root)
-            arguments = {k: v for k, v in arguments.items() if k != "workspace_root"}
-
         truncate_limit = None
         if arguments and "truncate_limit" in arguments:
             raw_limit = arguments.get("truncate_limit")
@@ -102,24 +90,10 @@ class ToolRouter:
             arguments = {k: v for k, v in arguments.items() if k != "truncate_limit"}
 
         handler = tool_spec["handler"]
-        try:
-            result = handler(**arguments) if arguments else handler()  # type: ignore[misc]
-        finally:
-            self.repo_context.set_repo_root(previous_root)
+        result = handler(**arguments) if arguments else handler()  # type: ignore[misc]
 
         summary_limit = truncate_limit if truncate_limit is not None else 2000
         result_payload = summarize_result(result, limit=summary_limit)
-        if missing_workspace_root:
-            hint = "workspace_root is missing; pass CWD as workspace_root."
-            if isinstance(result_payload, dict):
-                warnings = list(result_payload.get("warnings") or [])
-                warnings.append({"code": "workspace_root.missing", "message": hint})
-                result_payload["warnings"] = warnings
-            else:
-                result_payload = {
-                    "result": result_payload,
-                    "warnings": [{"code": "workspace_root.missing", "message": hint}],
-                }
 
         content_payload = {
             "content": [

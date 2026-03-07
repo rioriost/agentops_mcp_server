@@ -33,7 +33,7 @@ For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-c
   - Run `ops_handoff_export` (writes `.agent/handoff.json` by default; optional path writes under `.agent`)
 - To resume quickly: run `ops_resume_brief`
 - Token discipline: prefer summaries/diff stats over full diffs and keep outputs short
-- All MCP tools accept optional `workspace_root` and `truncate_limit` (as exposed by `tools/list`)
+- All MCP tools accept optional `truncate_limit` (as exposed by `tools/list`)
 
 ## Semantic resume (0.4.0)
 - Canonical sources of truth are `.agent/tx_event_log.jsonl` (event log) and `.agent/tx_state.json` (materialized state).
@@ -67,7 +67,9 @@ Zed (MCP Server):
   "agentops-server": {
     "command": "/opt/homebrew/bin/agentops_mcp_server",
     "args": [],
-    "env": {}
+    "env": {
+      "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    }
   }
 }
 ```

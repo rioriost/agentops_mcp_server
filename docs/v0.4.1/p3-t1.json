@@ -1,0 +1,33 @@
+{
+  "id": "p3-t1",
+  "phase": 3,
+  "title": "Update tests to remove workspace_root expectations",
+  "status": "done",
+  "summary": "Revise unit/integration tests to reflect removal of workspace_root from config and runtime flows while preserving coverage targets.",
+  "inputs": ["docs/v0.4.1/plan.md", "docs/v0.4.1/tickets_list.json"],
+  "outputs": ["tests/*"],
+  "acceptance_criteria": [
+    "All tests referencing workspace_root are removed or updated.",
+    "Test expectations align with host working directory behavior.",
+    "No test failures caused by the removal of workspace_root."
+  ],
+  "deps": ["p2-t2", "p2-t3"],
+  "steps": [
+    {
+      "id": "p3-t1-s1",
+      "description": "Identify tests asserting workspace_root presence or propagation."
+    },
+    {
+      "id": "p3-t1-s2",
+      "description": "Update or remove those tests to match new config/runtime behavior."
+    },
+    {
+      "id": "p3-t1-s3",
+      "description": "Add/adjust tests to validate defaults without workspace_root."
+    }
+  ],
+  "notes": [
+    "Keep changes minimal and focused on workspace_root removal.",
+    "Ensure overall coverage remains >= 90%."
+  ]
+}

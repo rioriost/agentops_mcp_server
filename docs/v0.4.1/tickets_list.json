@@ -1,0 +1,87 @@
+{
+  "version": "0.4.1",
+  "title": "Remove workspace_root + PATH guidance",
+  "tickets": [
+    {
+      "id": "p1-t1",
+      "phase": 1,
+      "title": "Define removal scope and locate workspace_root references",
+      "status": "done",
+      "inputs": ["docs/v0.4.1/plan.md"],
+      "outputs": ["docs/v0.4.1/p1-t1.json"],
+      "deps": []
+    },
+    {
+      "id": "p1-t2",
+      "phase": 1,
+      "title": "Draft README setting.json updates with PATH guidance",
+      "status": "done",
+      "inputs": ["docs/v0.4.1/plan.md"],
+      "outputs": ["docs/v0.4.1/p1-t2.json"],
+      "deps": ["p1-t1"]
+    },
+    {
+      "id": "p2-t1",
+      "phase": 2,
+      "title": "Remove workspace_root from .rules",
+      "status": "done",
+      "inputs": ["docs/v0.4.1/plan.md"],
+      "outputs": ["docs/v0.4.1/p2-t1.json"],
+      "deps": ["p1-t1"]
+    },
+    {
+      "id": "p2-t2",
+      "phase": 2,
+      "title": "Remove workspace_root from config schema and runtime code",
+      "status": "done",
+      "inputs": ["docs/v0.4.1/plan.md"],
+      "outputs": ["docs/v0.4.1/p2-t2.json"],
+      "deps": ["p2-t1"]
+    },
+    {
+      "id": "p2-t3",
+      "phase": 2,
+      "title": "Update README files with PATH guidance",
+      "status": "done",
+      "inputs": ["docs/v0.4.1/plan.md"],
+      "outputs": ["docs/v0.4.1/p2-t3.json"],
+      "deps": ["p1-t2"]
+    },
+    {
+      "id": "p3-t1",
+      "phase": 3,
+      "title": "Update tests to remove workspace_root expectations",
+      "status": "done",
+      "inputs": ["docs/v0.4.1/plan.md"],
+      "outputs": ["docs/v0.4.1/p3-t1.json"],
+      "deps": ["p2-t2", "p2-t3"]
+    },
+    {
+      "id": "p3-t2",
+      "phase": 3,
+      "title": "Verify coverage remains >= 90%",
+      "status": "done",
+      "inputs": ["docs/v0.4.1/plan.md"],
+      "outputs": ["docs/v0.4.1/p3-t2.json"],
+      "deps": ["p3-t1"]
+    },
+    {
+      "id": "p4-t1",
+      "phase": 4,
+      "title": "Run verification suite",
+      "status": "done",
+      "inputs": ["docs/v0.4.1/plan.md"],
+      "outputs": ["docs/v0.4.1/p4-t1.json"],
+      "deps": ["p3-t2"]
+    },
+    {
+      "id": "p4-t2",
+      "phase": 4,
+      "title": "Confirm acceptance criteria",
+      "status": "done",
+      "inputs": ["docs/v0.4.1/plan.md"],
+      "outputs": ["docs/v0.4.1/p4-t2.json"],
+      "deps": ["p4-t1"]
+    }
+  ]
+}

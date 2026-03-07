@@ -35,7 +35,7 @@ brew install agentops_mcp_server
 - タスクの進行記録: `ops_start_task` / `ops_update_task` / `ops_end_task`
 - 状態スナップショットと要約: `ops_capture_state` / `ops_task_summary` / `ops_observability_summary`
 - トークン節約: フル diff より要約・diff stats を優先し、出力は短く保つ
-- 全ての MCP ツールは `workspace_root` と `truncate_limit` を任意で受け付ける（`tools/list` で確認）
+- 全ての MCP ツールは `truncate_limit` を任意で受け付ける（`tools/list` で確認）
 
 ## セマンティック再開（0.4.0）
 - canonical なソースは `.agent/tx_event_log.jsonl`（イベントログ）と `.agent/tx_state.json`（マテリアライズド状態）。
@@ -70,7 +70,9 @@ Zed (MCP):
   "agentops-server": {
     "command": "/opt/homebrew/bin/agentops_mcp_server",
     "args": [],
-    "env": {}
+    "env": {
+      "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    }
   }
 }
 ```

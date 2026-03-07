@@ -35,4 +35,3 @@
 
 ## Tools (must)
 - Prefer MCP tools if available.
-- Always pass workspace_root to MCP tools.

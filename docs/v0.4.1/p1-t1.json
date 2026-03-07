@@ -1,0 +1,33 @@
+{
+  "id": "p1-t1",
+  "phase": 1,
+  "title": "Define removal scope and locate workspace_root references",
+  "status": "done",
+  "summary": "Identify every reference to workspace_root across rules, code, and tests to scope removal work.",
+  "inputs": ["docs/v0.4.1/plan.md"],
+  "outputs": ["docs/v0.4.1/p1-t1.json"],
+  "acceptance_criteria": [
+    "A complete list of workspace_root references across .rules, src, tests, and docs is captured in notes.",
+    "Removal scope identifies config schema, runtime usage, and test expectations.",
+    "Findings align with the 0.4.1 plan and guide subsequent tickets."
+  ],
+  "deps": [],
+  "steps": [
+    {
+      "id": "p1-t1-s1",
+      "description": "Search the repository for workspace_root references and categorize by area."
+    },
+    {
+      "id": "p1-t1-s2",
+      "description": "Document impacted files and the type of change needed (delete, update, or replace)."
+    },
+    {
+      "id": "p1-t1-s3",
+      "description": "Confirm no hidden dependency is required for runtime behavior."
+    }
+  ],
+  "notes": [
+    "References found: .rules; docs/rules_short; docs/rules_long; README.md; README-jp.md; src/agentops_mcp_server/main.py; src/agentops_mcp_server/repo_context.py; src/agentops_mcp_server/tool_router.py; src/agentops_mcp_server/zed-agentops-init.sh; tests/test_init.py; tests/test_main_wrappers.py; tests/test_repo_context.py; tests/test_tool_router.py; docs/draft.md; docs/v0.2.2/ticket-p1-t01.json; docs/v0.2.2/ticket-p1-t02.json; docs/v0.2.2/ticket-p1-t03.json; docs/v0.2.2/tickets_list.json; docs/v0.3.1/p1-t01-design.md; docs/v0.3.1/p1-t03-verification.md.",
+    "No other workspace_root references were found outside the list above."
+  ]
+}

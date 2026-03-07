@@ -69,4 +69,4 @@ def test_init_script_contains_canonical_artifacts_and_rules():
     assert "snapshot-log.jsonl" not in content
     assert "work-in-progress.md" not in content
     assert "Treat `.agent/handoff.json` as derived-only" in content
-    assert "workspace_root" in content
+    assert "workspace_root" not in content

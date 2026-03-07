@@ -44,24 +44,6 @@ class RepoContext:
             raise ValueError(f"unknown legacy artifact: {kind}")
         return resolved_root / ".agent" / filename
 
-    def resolve_workspace_root(self, value: str) -> Path:
-        candidate = Path(value).expanduser()
-        if candidate.is_absolute():
-            return candidate.resolve()
-
-        repo_root = self.repo_root
-        if candidate in {Path("."), Path(repo_root.name)}:
-            return repo_root
-
-        parent_candidate = (repo_root.parent / candidate).resolve()
-        if parent_candidate.exists():
-            return parent_candidate
-
-        cwd = Path.cwd().resolve()
-        if candidate in {Path("."), Path(cwd.name)}:
-            return cwd
-        return (cwd / candidate).resolve()
-
     def set_repo_root(self, root: Path) -> None:
         self.repo_root = root
         self.journal = self.legacy_artifact_path("journal", root)

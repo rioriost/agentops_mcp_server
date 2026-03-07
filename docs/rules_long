@@ -56,7 +56,7 @@
   - ops_handoff_export
   - ops_resume_brief
   - repo_commit
-- Always pass CWD as workspace_root to MCP tools.
+
 
 ## Commit rules (mandatory)
 - After verify: check repo status; commit only if changes exist.

@@ -204,10 +204,7 @@ fi
     '- If `diff` and `files` are empty, do not call `repo_commit_message_suggest` or `repo_commit`.' \
     '- Do not retry `repo_commit_message_suggest` on parsing errors; treat as a hard error and stop.' \
     '' \
-    '## MCP workspace_root requirement' \
-    '- When calling MCP tools, always pass `workspace_root` as the absolute project root path.' \
-    '- If `workspace_root` is omitted, the server falls back to its current working directory.' \
-    '' \
+
     '## For GPT-5.3-Codex' \
     '- If instruction begins with "EXECUTE:", skip analysis and start implementation immediately.'
 } > "$SOURCE_RULES"

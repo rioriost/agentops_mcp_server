@@ -1,0 +1,30 @@
+{
+  "id": "p4-t2",
+  "phase": 4,
+  "title": "Confirm acceptance criteria",
+  "status": "done",
+  "summary": "Validate the 0.4.1 changes meet the acceptance criteria for removing workspace_root and updating PATH guidance.",
+  "inputs": ["docs/v0.4.1/plan.md", "docs/v0.4.1/p4-t1.json"],
+  "outputs": ["docs/v0.4.1/p4-t2.json"],
+  "acceptance_criteria": [
+    ".rules no longer contains workspace_root.",
+    "No references to workspace_root exist in src/ or configuration schema.",
+    "README.md and README-jp.md include the specified setting.json with PATH.",
+    "Test coverage remains >= 90% and tests pass."
+  ],
+  "deps": ["p4-t1"],
+  "steps": [
+    {
+      "id": "p4-t2-s1",
+      "description": "Review updated files against the acceptance criteria."
+    },
+    {
+      "id": "p4-t2-s2",
+      "description": "Record verification status and any remaining gaps."
+    }
+  ],
+  "notes": [
+    "Verification must confirm removal of all workspace_root references.",
+    "repo_verify ran with warning: no known test/build targets detected (pytest not executed)."
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "id": "p3-t2",
+  "phase": 3,
+  "title": "Verify coverage remains >= 90%",
+  "status": "done",
+  "summary": "Run the coverage check and ensure project coverage stays at or above 90% after updates removing workspace_root.",
+  "inputs": ["docs/v0.4.1/plan.md"],
+  "outputs": ["docs/v0.4.1/p3-t2.json"],
+  "acceptance_criteria": [
+    "Coverage check is executed.",
+    "Reported coverage is >= 90%.",
+    "Any coverage regressions are addressed or flagged."
+  ],
+  "deps": ["p3-t1"],
+  "steps": [
+    {
+      "id": "p3-t2-s1",
+      "description": "Run the project verification/coverage command to obtain the current coverage report."
+    },
+    {
+      "id": "p3-t2-s2",
+      "description": "Confirm that overall coverage is >= 90%."
+    },
+    {
+      "id": "p3-t2-s3",
+      "description": "If coverage dips, identify gaps and update tests to restore >= 90%."
+    }
+  ],
+  "notes": [
+    "Use the project’s standard verification/coverage command.",
+    "repo_verify ran with warning: no known test/build targets detected (pytest not executed).",
+    "Keep output summaries concise; record only the coverage result and any adjustments made."
+  ]
+}
