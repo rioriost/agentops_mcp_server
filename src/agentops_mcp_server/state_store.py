@@ -187,25 +187,29 @@ class StateStore:
                 raise ValueError("tx.begin required before other events")
             return
         active_tx_id = active_tx.get("tx_id")
-        if isinstance(active_tx_id, str) and active_tx_id.strip():
-            if event_type != "tx.begin" and active_tx_id != tx_id:
-                raise ValueError("tx_id does not match active transaction")
+        active_tx_id_value = (
+            active_tx_id.strip() if isinstance(active_tx_id, str) else ""
+        )
+        has_active_tx = bool(active_tx_id_value) and active_tx_id_value != "none"
+        if has_active_tx and event_type != "tx.begin" and active_tx_id_value != tx_id:
+            raise ValueError("tx_id does not match active transaction")
 
         status = active_tx.get("status")
-        if status in {"done", "blocked"} and event_type != "tx.begin":
+        if has_active_tx and status in {"done", "blocked"} and event_type != "tx.begin":
             raise ValueError("event after terminal")
 
         if event_type == "tx.begin":
+            if not has_active_tx:
+                return
             status = active_tx.get("status")
-            if (
-                isinstance(active_tx_id, str)
-                and active_tx_id.strip()
-                and status not in {"done", "blocked"}
-            ):
+            if status not in {"done", "blocked"}:
                 if self._tx_event_log_empty():
                     return
                 raise ValueError("active transaction already in progress")
             return
+
+        if not has_active_tx:
+            raise ValueError("tx.begin required before other events")
 
         file_intents = active_tx.get("file_intents")
         if not isinstance(file_intents, list):
