@@ -3,7 +3,7 @@
   "phase": 1,
   "title": "Draft sequencing enforcement plan",
   "status": "planned",
-  "summary": "",
+  "summary": "Plan targets: treat active_tx tx_id 'none' as inactive for tx.begin gating; enforce verify.start before verify pass/commit; ensure rebuild truncation reports invalid ordering; harden ops_start_task/ops_update_task tx_id checks; add tests for sequencing and rebuild stability.",
   "inputs": ["docs/draft.md", "docs/v0.4.4/p1-t1.json", "docs/v0.4.4/plan.md"],
   "outputs": ["docs/v0.4.4/p1-t2.json"],
   "acceptance_criteria": [
@@ -27,7 +27,9 @@
     }
   ],
   "notes": [
-    "Keep the plan focused on sequencing and transaction integrity, avoid unrelated refactors.",
-    "Ensure error messages are explicit about missing prerequisites (e.g., `verify.start`)."
+    "Implementation outline: update state_store._validate_tx_event_invariants to treat tx_id 'none' as inactive and avoid false active-tx blocking on tx.begin.",
+    "Enforce verify lifecycle ordering in state_store/commit_manager so verify.pass and commit.start require verify.start/verify.pass state.",
+    "Update state_rebuilder to surface invalid ordering details and avoid stale active_tx after rebuild truncation.",
+    "Add tests for verify/commit ordering, ops_start_task/ops_update_task tx_id gating, and rebuild truncation behavior."
   ]
 }
