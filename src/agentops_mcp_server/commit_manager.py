@@ -71,6 +71,23 @@ class CommitManager:
             step_id_override="none",
         )
 
+    def _ensure_verify_started(self) -> None:
+        tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
+        if not isinstance(tx_state, dict):
+            raise RuntimeError("verify.start not recorded; tx_state missing")
+        active_tx = tx_state.get("active_tx")
+        if not isinstance(active_tx, dict):
+            raise RuntimeError("verify.start not recorded; active_tx missing")
+        verify_state = (
+            active_tx.get("verify_state")
+            if isinstance(active_tx.get("verify_state"), dict)
+            else {}
+        )
+        if verify_state.get("status") != "running":
+            raise RuntimeError(
+                "verify.start not recorded; tx.begin required before verify results"
+            )
+
     def _emit_tx_event(
         self,
         *,
@@ -170,6 +187,7 @@ class CommitManager:
             payload={"command": str(self.repo_context.verify)},
             phase_override="checking",
         )
+        self._ensure_verify_started()
         verify_result = self.verify_runner.run_verify(timeout_sec=timeout_sec)
         if not verify_result["ok"]:
             self._emit_tx_event(
