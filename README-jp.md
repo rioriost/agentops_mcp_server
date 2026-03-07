@@ -43,7 +43,7 @@ brew install agentops_mcp_server
 - `.agent/handoff.json` は派生専用で、再開判断の canonical 入力にはならない。
 
 ## .rulesについて（from v0.2.0）
-zed-agentops-init は `.rules` を生成しますが、必要に応じて `docs/rules_short` か `docs/rules_long` も試してみてください。
+zed-agentops-init は `.rules` を生成します。
 
 ## 主要ファイルの配置
 

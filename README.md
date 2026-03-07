@@ -41,7 +41,7 @@ For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-c
 - `.agent/handoff.json` is derived-only and never a canonical input for resume decisions.
 
 ## About .rules (from v0.2.0)
-`zed-agentops-init` generates `.rules`, but if needed, try `docs/rules_short` or `docs/rules_long`.
+`zed-agentops-init` generates `.rules`.
 
 ## Where things live
 
