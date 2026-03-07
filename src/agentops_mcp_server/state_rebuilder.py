@@ -642,12 +642,16 @@ class StateRebuilder:
         applied_event_ids: set[str] = set()
         dropped_events = 0
         last_valid_seq = replay_start
+        invalid_reason = ""
+        invalid_event: Optional[Dict[str, Any]] = None
 
         for event in events:
             if not isinstance(event, dict):
                 break
-            valid, _reason = self._validate_tx_event(event)
+            valid, reason = self._validate_tx_event(event)
             if not valid:
+                invalid_reason = reason or "invalid event"
+                invalid_event = event
                 # Torn-state recovery: truncate at last valid seq and rebuild deterministically.
                 break
             event_id = event.get("event_id")
@@ -674,17 +678,21 @@ class StateRebuilder:
             step_value = (
                 event.get("step_id") if isinstance(event.get("step_id"), str) else ""
             )
-            valid, _reason = self._validate_tx_event_payload(
+            valid, reason = self._validate_tx_event_payload(
                 event_type, payload, step_value
             )
             if not valid:
+                invalid_reason = reason or "invalid payload"
+                invalid_event = event
                 break
             tx_context = tx_contexts.get(tx_id)
             if tx_context is None:
                 tx_context = self._init_tx_context()
                 tx_contexts[tx_id] = tx_context
-            valid, _reason = self._validate_tx_event_invariants(tx_context, event)
+            valid, reason = self._validate_tx_event_invariants(tx_context, event)
             if not valid:
+                invalid_reason = reason or "invalid ordering"
+                invalid_event = event
                 break
 
             self._apply_tx_event_to_state(active_tx, event)
@@ -699,11 +707,19 @@ class StateRebuilder:
             if isinstance(event_id, str):
                 applied_event_ids.add(event_id)
 
-        candidates = [
-            tx
-            for tx in tx_states.values()
-            if isinstance(tx, dict) and not tx.get("_terminal")
-        ]
+        candidates = []
+        if invalid_reason:
+            state["rebuild_warning"] = invalid_reason
+            if isinstance(invalid_event, dict):
+                state["rebuild_invalid_event"] = invalid_event
+                if isinstance(invalid_event.get("seq"), int):
+                    state["rebuild_invalid_seq"] = invalid_event.get("seq")
+        else:
+            candidates = [
+                tx
+                for tx in tx_states.values()
+                if isinstance(tx, dict) and not tx.get("_terminal")
+            ]
         if candidates:
             active_tx = max(
                 candidates, key=lambda item: item.get("_last_event_seq", -1)
