@@ -3,7 +3,7 @@
   "phase": 4,
   "title": "Run verification suite",
   "status": "planned",
-  "summary": "",
+  "summary": "repo_verify executed successfully; output: WARN: No known test/build targets detected. Add checks to .zed/scripts/verify. Status: OK.",
   "inputs": ["docs/v0.4.4/plan.md"],
   "outputs": ["docs/v0.4.4/p4-t1.json"],
   "acceptance_criteria": [
