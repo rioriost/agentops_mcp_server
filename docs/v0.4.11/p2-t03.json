@@ -1,0 +1,45 @@
+{
+  "id": "p2-t03",
+  "title": "Clarify runtime-to-ticket status synchronization expectations",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Define and document how runtime transaction status and persisted ticket-document status must stay synchronized during execution. The goal is to remove ambiguity about whether runtime-only status changes are sufficient and to ensure that per-ticket JSON files plus `tickets_list.json` reflect the same lifecycle progression expected by the canonical work loop.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.11/plan.md",
+    "docs/v0.4.11/p1-t01.json",
+    ".rules",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "docs/v0.4.10/plan.md",
+    "docs/v0.4.10/tickets_list.json"
+  ],
+  "outputs": [
+    "Documented synchronization expectations between runtime transaction state and ticket-document status",
+    "Clarified work-loop guidance for when persisted ticket status must change",
+    "Implementation guidance for keeping per-ticket JSON and `tickets_list.json` aligned with runtime execution"
+  ],
+  "acceptance_criteria": [
+    "The ticket defines how runtime transaction status/phase maps to persisted ticket-document status values.",
+    "The ticket defines that persisted ticket status must remain synchronized with runtime execution throughout the work loop, not only at planning start or final completion.",
+    "The ticket clarifies how per-ticket JSON files and `tickets_list.json` should be updated together when status changes.",
+    "The synchronization guidance is specific enough to prevent divergent interpretations about whether runtime-only updates are sufficient.",
+    "The ticket scope remains focused on synchronization expectations and does not introduce a separate docs-only status model."
+  ],
+  "tasks": [
+    "Review the current work-loop wording and identify where runtime-to-ticket status synchronization is implied but not explicit.",
+    "Define the expected mapping between runtime transaction lifecycle states and persisted ticket-document status values.",
+    "Define when both the per-ticket JSON file and `tickets_list.json` must be updated during the canonical work loop.",
+    "Clarify how synchronization should behave for intermediate states such as `in-progress`, `checking`, `verified`, and `committed`.",
+    "Document the synchronization expectations in a form that can guide later rules, implementation, and regression-test updates."
+  ],
+  "dependencies": [
+    "p1-t01"
+  ],
+  "notes": [
+    "This ticket is about synchronization expectations and guidance, not about changing the status enum itself.",
+    "Do not define a separate status lifecycle for docs that can drift from runtime transaction state.",
+    "Keep the contract strict enough that operators and resume logic can trust versioned planning artifacts as a reflection of execution progress.",
+    "Coordinate closely with the rules/template alignment work so persistence destinations and synchronization timing remain consistent."
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "id": "p1-t01",
+  "title": "Define ticket status persistence and synchronization contract",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Define the v0.4.11 phase 1 contract that makes ticket status persistence explicitly mandatory. The contract must specify which planning artifacts are updated when ticket status changes, how those persisted statuses relate to runtime transaction state, and how the checked-in `.rules` file stays aligned with the `.rules` template embedded in `zed-agentops-init.sh`.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.11/plan.md",
+    ".rules",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "docs/v0.4.10/plan.md",
+    "docs/v0.4.10/tickets_list.json"
+  ],
+  "outputs": [
+    "Documented contract for mandatory ticket status persistence",
+    "Defined synchronization rules between runtime transaction state and ticket-document status",
+    "Defined alignment requirements for checked-in `.rules` and the init-script rule template"
+  ],
+  "acceptance_criteria": [
+    "The phase 1 contract explicitly states that ticket status persistence is mandatory, not optional.",
+    "The contract defines that status updates must be persisted to both the per-ticket JSON file and `tickets_list.json`.",
+    "The contract defines how runtime transaction status and persisted ticket-document status are expected to stay synchronized.",
+    "The contract explicitly includes the requirement that the `.rules` template in `zed-agentops-init.sh` matches the checked-in `.rules` content for ticket status persistence requirements.",
+    "The contract makes clear when ticket status persistence must occur during the canonical work loop."
+  ],
+  "tasks": [
+    "Review the current `.rules` wording and identify where ticket status persistence is implied but not explicit.",
+    "Define the required persistence targets for ticket status changes in versioned planning artifacts.",
+    "Define the synchronization rule between runtime transaction state and persisted ticket-document status.",
+    "Define the alignment rule between the checked-in `.rules` file and the `.rules` template embedded in `zed-agentops-init.sh`.",
+    "Document the contract in a way that guides later implementation and regression-test tickets."
+  ],
+  "dependencies": [],
+  "notes": [
+    "This is a contract-definition ticket for phase 1, not the implementation ticket.",
+    "Do not change the ticket status enum as part of this ticket.",
+    "Keep the contract strict enough to avoid divergent status persistence across planning artifacts and runtime state.",
+    "Treat script/template alignment as part of the same contract, since newly initialized projects must receive the same persistence rules."
+  ]
+}

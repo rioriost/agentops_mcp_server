@@ -1,0 +1,47 @@
+{
+  "id": "p3-t03",
+  "title": "Add regression coverage for mandatory ticket status persistence and rules-template alignment",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Add regression coverage for the v0.4.11 contract so ticket status persistence remains explicitly mandatory across runtime guidance, versioned ticket artifacts, and the `.rules` template embedded in `zed-agentops-init.sh`. The tests should prevent future drift between the checked-in rules, generated rules template, and the expected persistence behavior for per-ticket JSON files plus `tickets_list.json`.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.11/plan.md",
+    "docs/v0.4.11/p1-t01.json",
+    "docs/v0.4.11/p2-t02.json",
+    ".rules",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "tests/test_init.py",
+    "tests/test_ops_tools.py",
+    "tests/test_state_store.py"
+  ],
+  "outputs": [
+    "Regression tests for mandatory ticket status persistence",
+    "Regression tests for checked-in .rules and init-script template alignment",
+    "Verification evidence that status synchronization requirements remain enforced"
+  ],
+  "acceptance_criteria": [
+    "Tests verify that the checked-in `.rules` file and the `.rules` template embedded in `zed-agentops-init.sh` both require ticket status persistence to per-ticket JSON files and `tickets_list.json`.",
+    "Tests or contract checks verify that ticket status persistence is described as mandatory during execution, not optional bookkeeping.",
+    "Tests cover the expected synchronization rule between runtime transaction status and persisted ticket-document status strongly enough to prevent divergent interpretations.",
+    "Tests protect against drift between the checked-in `.rules` file and the generated init-script rules template for the relevant ticket-status language.",
+    "Repository verification passes with the new regression coverage in place."
+  ],
+  "tasks": [
+    "Identify the existing test modules that should own rules-content and init-template alignment coverage.",
+    "Add or extend tests for mandatory ticket status persistence language in the checked-in `.rules` file.",
+    "Add or extend tests for matching ticket-status persistence language in the `zed-agentops-init.sh` embedded `.rules` template.",
+    "Add or extend contract checks that cover synchronization expectations between runtime ticket progress and persisted ticket-document status.",
+    "Run verification and confirm the v0.4.11 ticket-status persistence contract is covered by automated tests."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p2-t02"
+  ],
+  "notes": [
+    "Keep the tests focused on contract behavior and text alignment rather than incidental wording where possible.",
+    "Do not weaken strict workflow or transaction semantics in order to simplify the tests; the tests should reinforce the mandatory persistence contract.",
+    "Prefer assertions that lock the required persistence destinations and synchronization expectations directly.",
+    "Use this ticket to ensure future rule changes update both the checked-in `.rules` file and the init-script template together."
+  ]
+}

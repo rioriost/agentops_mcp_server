@@ -1,0 +1,41 @@
+{
+  "id": "p2-t02",
+  "title": "Align .rules and init-script rules template for mandatory ticket status persistence",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Update the checked-in `.rules` file and the `.rules` template embedded in `zed-agentops-init.sh` so both explicitly require ticket status persistence and synchronization across per-ticket JSON files, `tickets_list.json`, and runtime execution flow. The goal is to remove ambiguity about whether status updates are optional and to keep newly initialized projects aligned with the repository contract.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.11/plan.md",
+    ".rules",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "tests/test_init.py"
+  ],
+  "outputs": [
+    "Updated checked-in `.rules` text for mandatory ticket status persistence",
+    "Updated `zed-agentops-init.sh` embedded `.rules` template with matching requirements",
+    "Regression or contract checks that lock script/rules alignment for ticket status persistence"
+  ],
+  "acceptance_criteria": [
+    "The checked-in `.rules` file explicitly states that ticket status updates must be persisted to both per-ticket JSON files and `tickets_list.json`.",
+    "The checked-in `.rules` file explicitly states that ticket status persistence is mandatory during execution, not optional bookkeeping.",
+    "The `zed-agentops-init.sh` embedded `.rules` template matches the checked-in `.rules` content for ticket status persistence and synchronization requirements.",
+    "The rules text makes clear when ticket status persistence must occur within the work loop.",
+    "Tests or contract checks verify that the checked-in `.rules` file and init-script template remain aligned on the ticket status persistence requirements."
+  ],
+  "tasks": [
+    "Review the checked-in `.rules` file and the `zed-agentops-init.sh` embedded `.rules` template for wording gaps around ticket status persistence.",
+    "Update `.rules` so it explicitly requires persistence of ticket status changes to both per-ticket JSON files and `tickets_list.json`.",
+    "Clarify in `.rules` when those status updates must happen during the canonical work loop.",
+    "Update the `zed-agentops-init.sh` heredoc template so newly initialized projects receive the same mandatory ticket status persistence contract.",
+    "Add or update tests that lock the alignment between the checked-in `.rules` file and the init-script template."
+  ],
+  "dependencies": [
+    "p1-t01"
+  ],
+  "notes": [
+    "This ticket focuses on rules and scaffold alignment, not on changing the ticket status enum.",
+    "Do not introduce a separate or competing status model for docs versus runtime.",
+    "Keep the checked-in `.rules` file and the init-script template text synchronized closely enough that future changes can be validated by tests."
+  ]
+}
