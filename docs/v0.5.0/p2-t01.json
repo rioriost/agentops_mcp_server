@@ -2,7 +2,7 @@
   "id": "p2-t01",
   "title": "Align lifecycle APIs with the documented status machine",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Implement the Phase 3 work for v0.5.0 so the client-facing lifecycle API matches the documented workflow status machine more explicitly. The goal is to remove ambiguity between task helpers and canonical transaction progression by making start, update, verify, commit, and terminal completion behave as a coherent lifecycle contract that clients can follow safely under the 0.5.0 rules.",
   "inputs": [
     "docs/draft_0.5.0.md",

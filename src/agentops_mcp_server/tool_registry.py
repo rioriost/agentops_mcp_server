@@ -23,6 +23,9 @@ def build_tool_registry(
     ops_start_task: Callable[..., Any],
     ops_update_task: Callable[..., Any],
     ops_end_task: Callable[..., Any],
+    ops_add_file_intent: Callable[..., Any],
+    ops_update_file_intent: Callable[..., Any],
+    ops_complete_file_intent: Callable[..., Any],
     ops_capture_state: Callable[..., Any],
     ops_task_summary: Callable[..., Any],
     ops_observability_summary: Callable[..., Any],
@@ -242,6 +245,51 @@ def build_tool_registry(
                 "required": ["summary"],
             },
             "handler": ops_end_task,
+        },
+        "ops_add_file_intent": {
+            "description": "Register a file intent as a wrapper over canonical transaction state",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "operation": {"type": "string"},
+                    "purpose": {"type": "string"},
+                    "task_id": {"type": ["string", "null"]},
+                    "session_id": {"type": ["string", "null"]},
+                    "agent_id": {"type": ["string", "null"]},
+                },
+                "required": ["path", "operation", "purpose"],
+            },
+            "handler": ops_add_file_intent,
+        },
+        "ops_update_file_intent": {
+            "description": "Advance a file intent state as a wrapper over canonical transaction state",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "state": {"type": "string"},
+                    "task_id": {"type": ["string", "null"]},
+                    "session_id": {"type": ["string", "null"]},
+                    "agent_id": {"type": ["string", "null"]},
+                },
+                "required": ["path", "state"],
+            },
+            "handler": ops_update_file_intent,
+        },
+        "ops_complete_file_intent": {
+            "description": "Complete a verified file intent as a wrapper over canonical transaction state",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "task_id": {"type": ["string", "null"]},
+                    "session_id": {"type": ["string", "null"]},
+                    "agent_id": {"type": ["string", "null"]},
+                },
+                "required": ["path"],
+            },
+            "handler": ops_complete_file_intent,
         },
         "ops_capture_state": {
             "description": "Capture transaction state",

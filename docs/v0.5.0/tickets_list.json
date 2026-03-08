@@ -27,7 +27,7 @@
       "id": "p2-t01",
       "priority": "P1",
       "title": "Align lifecycle APIs with the documented status machine",
-      "status": "verified",
+      "status": "done",
       "file": "v0.5.0/p2-t01.json"
     },
     {
@@ -41,7 +41,7 @@
       "id": "p3-t01",
       "priority": "P2",
       "title": "Add ergonomic first-class file intent helper support",
-      "status": "planned",
+      "status": "verified",
       "file": "v0.5.0/p3-t01.json"
     },
     {

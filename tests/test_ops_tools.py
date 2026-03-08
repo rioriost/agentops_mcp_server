@@ -989,6 +989,222 @@ def test_ops_start_task_terminal_active_tx_without_task_id_requires_begin(
         ops.ops_start_task(title="Restart", session_id="s1")
 
 
+def test_ops_add_file_intent_emits_add_event_and_updates_state(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+
+    result = ops.ops_add_file_intent(
+        path="src/file.py",
+        operation="update",
+        purpose="implement helper",
+        task_id="t-1",
+        session_id="s1",
+    )
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert [event["event_type"] for event in events] == [
+        "tx.begin",
+        "tx.step.enter",
+        "tx.file_intent.add",
+    ]
+    add_event = events[-1]
+    assert add_event["payload"]["path"] == "src/file.py"
+    assert add_event["payload"]["operation"] == "update"
+    assert add_event["payload"]["purpose"] == "implement helper"
+    assert add_event["payload"]["planned_step"] == "t-1"
+    assert add_event["payload"]["state"] == "planned"
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    intents = tx_state["active_tx"]["file_intents"]
+    assert intents == [
+        {
+            "path": "src/file.py",
+            "operation": "update",
+            "purpose": "implement helper",
+            "planned_step": "t-1",
+            "state": "planned",
+            "last_event_seq": add_event["seq"],
+        }
+    ]
+
+
+def test_ops_update_file_intent_emits_update_event_and_advances_state(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    ops.ops_add_file_intent(
+        path="src/file.py",
+        operation="update",
+        purpose="implement helper",
+        task_id="t-1",
+        session_id="s1",
+    )
+
+    result = ops.ops_update_file_intent(
+        path="src/file.py",
+        state="applied",
+        task_id="t-1",
+        session_id="s1",
+    )
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert events[-1]["event_type"] == "tx.file_intent.update"
+    assert events[-1]["payload"]["path"] == "src/file.py"
+    assert events[-1]["payload"]["state"] == "applied"
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    intents = tx_state["active_tx"]["file_intents"]
+    assert intents[0]["state"] == "applied"
+    assert intents[0]["last_event_seq"] == events[-1]["seq"]
+
+
+def test_ops_update_file_intent_rejects_update_before_register(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+
+    with pytest.raises(ValueError, match="file intent missing for path"):
+        ops.ops_update_file_intent(
+            path="src/file.py",
+            state="applied",
+            task_id="t-1",
+            session_id="s1",
+        )
+
+
+def test_ops_update_file_intent_rejects_verified_before_verify_pass(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    ops.ops_add_file_intent(
+        path="src/file.py",
+        operation="update",
+        purpose="implement helper",
+        task_id="t-1",
+        session_id="s1",
+    )
+    ops.ops_update_file_intent(
+        path="src/file.py",
+        state="applied",
+        task_id="t-1",
+        session_id="s1",
+    )
+
+    with pytest.raises(ValueError, match="file intent verified requires verify.pass"):
+        ops.ops_update_file_intent(
+            path="src/file.py",
+            state="verified",
+            task_id="t-1",
+            session_id="s1",
+        )
+
+
+def test_ops_complete_file_intent_emits_complete_after_verify_pass(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    ops.ops_add_file_intent(
+        path="src/file.py",
+        operation="update",
+        purpose="implement helper",
+        task_id="t-1",
+        session_id="s1",
+    )
+    ops.ops_update_file_intent(
+        path="src/file.py",
+        state="applied",
+        task_id="t-1",
+        session_id="s1",
+    )
+    state_store.tx_event_append(
+        tx_id="t-1",
+        ticket_id="t-1",
+        event_type="tx.verify.start",
+        phase="checking",
+        step_id="t-1",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={},
+    )
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    tx_state["active_tx"]["verify_state"] = {
+        "status": "running",
+        "last_result": None,
+    }
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    state_store.tx_event_append(
+        tx_id="t-1",
+        ticket_id="t-1",
+        event_type="tx.verify.pass",
+        phase="verified",
+        step_id="t-1",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ok": True},
+    )
+
+    result = ops.ops_complete_file_intent(
+        path="src/file.py",
+        task_id="t-1",
+        session_id="s1",
+    )
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert events[-1]["event_type"] == "tx.file_intent.complete"
+    assert events[-1]["payload"]["path"] == "src/file.py"
+    assert events[-1]["payload"]["state"] == "verified"
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    intents = tx_state["active_tx"]["file_intents"]
+    assert intents[0]["state"] == "verified"
+    assert intents[0]["last_event_seq"] == events[-1]["seq"]
+
+
+def test_ops_complete_file_intent_rejects_before_verify_pass(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    ops.ops_add_file_intent(
+        path="src/file.py",
+        operation="update",
+        purpose="implement helper",
+        task_id="t-1",
+        session_id="s1",
+    )
+    ops.ops_update_file_intent(
+        path="src/file.py",
+        state="applied",
+        task_id="t-1",
+        session_id="s1",
+    )
+
+    with pytest.raises(ValueError, match="file intent verified requires verify.pass"):
+        ops.ops_complete_file_intent(
+            path="src/file.py",
+            task_id="t-1",
+            session_id="s1",
+        )
+
+
 def test_ops_end_task_rejects_mismatch_against_active_ticket_id_when_tx_id_is_none(
     repo_context, state_store, state_rebuilder
 ):

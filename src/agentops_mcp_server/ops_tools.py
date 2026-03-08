@@ -481,6 +481,164 @@ class OpsTools:
                 self.state_store.tx_state_save(rebuilt_state)
         return event
 
+    def _resolve_file_intent_context(
+        self,
+        task_id: Optional[str],
+        session_id: Optional[str],
+    ) -> Tuple[Dict[str, Any], str, str]:
+        resolved_task_id = self._normalize_tx_identifier(task_id)
+        active_tx, active_tx_id = self._require_active_tx(resolved_task_id or None)
+        if not resolved_task_id:
+            resolved_task_id = active_tx_id
+        resolved_session_id = (
+            session_id.strip()
+            if isinstance(session_id, str) and session_id.strip()
+            else ""
+        )
+        if not resolved_session_id:
+            raise ValueError("session_id is required")
+        return active_tx, active_tx_id, resolved_session_id
+
+    def ops_add_file_intent(
+        self,
+        path: str,
+        operation: str,
+        purpose: str,
+        task_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        resolved_path = path.strip() if isinstance(path, str) and path.strip() else ""
+        if not resolved_path:
+            raise ValueError("path is required")
+        resolved_operation = (
+            operation.strip()
+            if isinstance(operation, str) and operation.strip()
+            else ""
+        )
+        if not resolved_operation:
+            raise ValueError("operation is required")
+        resolved_purpose = (
+            purpose.strip() if isinstance(purpose, str) and purpose.strip() else ""
+        )
+        if not resolved_purpose:
+            raise ValueError("purpose is required")
+
+        active_tx, active_tx_id, resolved_session_id = (
+            self._resolve_file_intent_context(task_id, session_id)
+        )
+        planned_step = active_tx.get("current_step")
+        if not isinstance(planned_step, str) or not planned_step.strip():
+            raise ValueError("current_step is required before adding file intent")
+
+        payload = {
+            "path": resolved_path,
+            "operation": resolved_operation,
+            "purpose": resolved_purpose,
+            "planned_step": planned_step.strip(),
+            "state": "planned",
+            "task_id": active_tx_id,
+        }
+
+        self._emit_tx_event(
+            event_type="tx.file_intent.add",
+            payload=payload,
+            title=active_tx_id,
+            task_id=active_tx_id,
+            phase=active_tx.get("phase")
+            if isinstance(active_tx.get("phase"), str)
+            else "in-progress",
+            step_id=planned_step.strip(),
+            session_id=resolved_session_id,
+            agent_id=agent_id,
+        )
+
+        return {"ok": True, "payload": payload}
+
+    def ops_update_file_intent(
+        self,
+        path: str,
+        state: str,
+        task_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        resolved_path = path.strip() if isinstance(path, str) and path.strip() else ""
+        if not resolved_path:
+            raise ValueError("path is required")
+        resolved_state = (
+            state.strip() if isinstance(state, str) and state.strip() else ""
+        )
+        if not resolved_state:
+            raise ValueError("state is required")
+
+        active_tx, active_tx_id, resolved_session_id = (
+            self._resolve_file_intent_context(task_id, session_id)
+        )
+        step_id = active_tx.get("current_step")
+        if not isinstance(step_id, str) or not step_id.strip():
+            raise ValueError("current_step is required before updating file intent")
+
+        payload = {
+            "path": resolved_path,
+            "state": resolved_state,
+            "task_id": active_tx_id,
+        }
+
+        self._emit_tx_event(
+            event_type="tx.file_intent.update",
+            payload=payload,
+            title=active_tx_id,
+            task_id=active_tx_id,
+            phase=active_tx.get("phase")
+            if isinstance(active_tx.get("phase"), str)
+            else "in-progress",
+            step_id=step_id.strip(),
+            session_id=resolved_session_id,
+            agent_id=agent_id,
+        )
+
+        return {"ok": True, "payload": payload}
+
+    def ops_complete_file_intent(
+        self,
+        path: str,
+        task_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        resolved_path = path.strip() if isinstance(path, str) and path.strip() else ""
+        if not resolved_path:
+            raise ValueError("path is required")
+
+        active_tx, active_tx_id, resolved_session_id = (
+            self._resolve_file_intent_context(task_id, session_id)
+        )
+        step_id = active_tx.get("current_step")
+        if not isinstance(step_id, str) or not step_id.strip():
+            raise ValueError("current_step is required before completing file intent")
+
+        payload = {
+            "path": resolved_path,
+            "state": "verified",
+            "task_id": active_tx_id,
+        }
+
+        self._emit_tx_event(
+            event_type="tx.file_intent.complete",
+            payload=payload,
+            title=active_tx_id,
+            task_id=active_tx_id,
+            phase=active_tx.get("phase")
+            if isinstance(active_tx.get("phase"), str)
+            else "in-progress",
+            step_id=step_id.strip(),
+            session_id=resolved_session_id,
+            agent_id=agent_id,
+        )
+
+        return {"ok": True, "payload": payload}
+
     def ops_start_task(
         self,
         title: str,

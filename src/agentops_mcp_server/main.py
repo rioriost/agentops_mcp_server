@@ -28,6 +28,9 @@ Tools (snake_case):
 - ops_start_task(title, task_id?, session_id?, agent_id?, status?) -> record lifecycle start as a wrapper over canonical transaction state
 - ops_update_task(status?, note?, task_id?, session_id?, agent_id?, user_intent?) -> record lifecycle progress as a wrapper over canonical transaction state
 - ops_end_task(summary, next_action?, status?, task_id?, session_id?, agent_id?) -> record terminal lifecycle outcome as a wrapper over canonical transaction state
+- ops_add_file_intent(path, operation, purpose, task_id?, session_id?, agent_id?) -> register a file intent as a wrapper over canonical transaction state
+- ops_update_file_intent(path, state, task_id?, session_id?, agent_id?) -> advance a file intent state as a wrapper over canonical transaction state
+- ops_complete_file_intent(path, task_id?, session_id?, agent_id?) -> complete a verified file intent as a wrapper over canonical transaction state
 - ops_capture_state(session_id?) -> capture transaction state
 - ops_task_summary(session_id?, max_chars?) -> summarize task state
 - ops_observability_summary(session_id?, max_events?, max_chars?) -> write observability summary
@@ -95,6 +98,9 @@ TOOL_REGISTRY = build_tool_registry(
     ops_start_task=_OPS_TOOLS.ops_start_task,
     ops_update_task=_OPS_TOOLS.ops_update_task,
     ops_end_task=_OPS_TOOLS.ops_end_task,
+    ops_add_file_intent=_OPS_TOOLS.ops_add_file_intent,
+    ops_update_file_intent=_OPS_TOOLS.ops_update_file_intent,
+    ops_complete_file_intent=_OPS_TOOLS.ops_complete_file_intent,
     ops_capture_state=_OPS_TOOLS.ops_capture_state,
     ops_task_summary=_OPS_TOOLS.ops_task_summary,
     ops_observability_summary=_OPS_TOOLS.ops_observability_summary,
@@ -272,6 +278,54 @@ def ops_end_task(
         summary=summary,
         next_action=next_action,
         status=status,
+        task_id=task_id,
+        session_id=session_id,
+        agent_id=agent_id,
+    )
+
+
+def ops_add_file_intent(
+    path: str,
+    operation: str,
+    purpose: str,
+    task_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    return _OPS_TOOLS.ops_add_file_intent(
+        path=path,
+        operation=operation,
+        purpose=purpose,
+        task_id=task_id,
+        session_id=session_id,
+        agent_id=agent_id,
+    )
+
+
+def ops_update_file_intent(
+    path: str,
+    state: str,
+    task_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    return _OPS_TOOLS.ops_update_file_intent(
+        path=path,
+        state=state,
+        task_id=task_id,
+        session_id=session_id,
+        agent_id=agent_id,
+    )
+
+
+def ops_complete_file_intent(
+    path: str,
+    task_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    return _OPS_TOOLS.ops_complete_file_intent(
+        path=path,
         task_id=task_id,
         session_id=session_id,
         agent_id=agent_id,
