@@ -104,7 +104,12 @@ def test_ops_start_task_rejects_mismatched_task_id(
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
     _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
 
-    with pytest.raises(ValueError, match="tx_id does not match active transaction"):
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: active_tx=t-1, requested_task=t-2"
+        ),
+    ):
         ops.ops_start_task(title="Build", task_id="t-2", session_id="s1")
 
 
@@ -166,6 +171,52 @@ def test_ops_update_task_falls_back_to_active_tx_id(
     assert update_events
     assert update_events[-1]["tx_id"] == "t-1"
     assert update_events[-1]["session_id"] == "s1"
+
+
+def test_ops_update_task_rejects_mismatched_task_id(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: active_tx=t-1, requested_tx=t-2"
+        ),
+    ):
+        ops.ops_update_task(
+            status="checking",
+            note="step",
+            task_id="t-2",
+            session_id="s1",
+        )
+
+
+def test_ops_resume_brief_reports_active_transaction_guidance(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="p1-t1", session_id="s1")
+    ops.ops_update_task(
+        status="checking",
+        note="step",
+        task_id="p1-t1",
+        session_id="s1",
+    )
+
+    result = ops.ops_resume_brief(max_chars=400)
+
+    assert result["ok"] is True
+    brief = result["brief"]
+    assert "- ticket_id: p1-t1" in brief
+    assert "- status: checking" in brief
+    assert "- next_action: tx.verify.start" in brief
+    assert "- can_start_new_ticket: no" in brief
+    assert (
+        "- reason: active transaction exists and must be resumed before starting another ticket"
+        in brief
+    )
 
 
 def test_ops_update_task_records_user_intent(

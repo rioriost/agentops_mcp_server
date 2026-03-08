@@ -1,0 +1,27 @@
+{
+  "version": "0.4.10",
+  "source": "draft.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P1",
+      "title": "Define active transaction precedence and resume guidance contract",
+      "status": "done",
+      "file": "v0.4.10/p1-t01.json"
+    },
+    {
+      "id": "p1-t02",
+      "priority": "P1",
+      "title": "Add actionable mismatch diagnostics for active transaction conflicts",
+      "status": "done",
+      "file": "v0.4.10/p1-t02.json"
+    },
+    {
+      "id": "p3-t04",
+      "priority": "P1",
+      "title": "Add regression tests for resume safety and foreign state handling",
+      "status": "done",
+      "file": "v0.4.10/p3-t04.json"
+    }
+  ]
+}

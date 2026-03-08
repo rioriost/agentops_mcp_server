@@ -413,6 +413,34 @@ def test_tx_event_append_rejects_unknown_event_type(state_store):
         state_store.tx_event_append(**args)
 
 
+def test_tx_event_append_rejects_mismatched_active_transaction(state_store):
+    state = _valid_tx_state()
+    state["active_tx"]["tx_id"] = "tx-active"
+    state["active_tx"]["ticket_id"] = "p4-t-active"
+    state["active_tx"]["current_step"] = "p4-t-active-s1"
+    state_store.tx_state_save(state)
+
+    args = _base_tx_event_args()
+    args.update(
+        {
+            "tx_id": "tx-requested",
+            "ticket_id": "p4-t-requested",
+            "event_type": "tx.step.enter",
+            "step_id": "p4-t-requested-s1",
+            "payload": {"step_id": "p4-t-requested-s1", "description": "task started"},
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: "
+            "active_tx=tx-active, requested_tx=tx-requested"
+        ),
+    ):
+        state_store.tx_event_append(**args)
+
+
 def test_tx_event_append_requires_intent_before_update(state_store):
     state = _valid_tx_state()
     state_store.tx_state_save(state)

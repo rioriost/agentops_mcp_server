@@ -213,7 +213,19 @@ class StateStore:
         )
         has_active_tx = bool(active_tx_id_value) and active_tx_id_value != "none"
         if has_active_tx and event_type != "tx.begin" and active_tx_id_value != tx_id:
-            raise ValueError("tx_id does not match active transaction")
+            next_action = active_tx.get("next_action")
+            next_action_value = (
+                next_action.strip() if isinstance(next_action, str) else ""
+            )
+            next_action_hint = (
+                f" Resume active transaction '{active_tx_id_value}' first"
+                + (f" (next_action={next_action_value})." if next_action_value else ".")
+            )
+            raise ValueError(
+                "tx_id does not match active transaction: "
+                f"active_tx={active_tx_id_value}, requested_tx={tx_id}."
+                + next_action_hint
+            )
 
         status = active_tx.get("status")
         if has_active_tx and status in {"done", "blocked"} and event_type != "tx.begin":

@@ -77,4 +77,5 @@ def test_init_script_contains_canonical_artifacts_and_rules():
     assert "- task lifecycle tools" in content
     assert "- do not call task start/update/end before `tx.begin`" in content
     assert "- semantic_summary is required for non-terminal tx" in content
+    assert "- Identify active ticket (status != done) and resume it." in content
     assert "active_tx.next_action is required" not in content

@@ -232,12 +232,33 @@ class OpsTools:
             if isinstance(value, str) and value.strip():
                 lines.append(f"- {label}: {value.strip()}")
 
+        active_status = active_tx.get("status")
+        active_tx_id = active_tx.get("tx_id")
+        has_active_tx = (
+            isinstance(active_tx_id, str)
+            and active_tx_id.strip()
+            and active_tx_id.strip() != "none"
+            and isinstance(active_status, str)
+            and active_status.strip() not in {"done", "blocked"}
+        )
+
         _line("ticket_id", active_tx.get("ticket_id"))
-        _line("status", active_tx.get("status"))
+        _line("status", active_status)
         _line("current_step", active_tx.get("current_step"))
         _line("next_action", active_tx.get("next_action"))
         _line("verify_status", verify_state.get("status"))
         _line("commit_status", commit_state.get("status"))
+
+        if has_active_tx:
+            _line("active_ticket", active_tx.get("ticket_id") or active_tx_id)
+            _line("active_status", active_status)
+            _line("required_next_action", active_tx.get("next_action"))
+            lines.append("- can_start_new_ticket: no")
+            lines.append(
+                "- reason: active transaction exists and must be resumed before starting another ticket"
+            )
+        else:
+            lines.append("- can_start_new_ticket: yes")
 
         brief = "\n".join(lines).strip()
         brief = truncate_text(brief, limit=resolved_max_chars) or ""
@@ -245,6 +266,48 @@ class OpsTools:
             brief = brief[:resolved_max_chars].rstrip()
 
         return {"ok": True, "brief": brief, "max_chars": resolved_max_chars}
+
+    def _active_tx_mismatch_error(
+        self, requested_task_id: Optional[str], active_tx: Dict[str, Any]
+    ) -> ValueError:
+        active_tx_id = active_tx.get("tx_id")
+        active_ticket_id = active_tx.get("ticket_id")
+        active_status = active_tx.get("status")
+        next_action = active_tx.get("next_action")
+
+        active_value = (
+            active_tx_id.strip()
+            if isinstance(active_tx_id, str) and active_tx_id.strip()
+            else "unknown"
+        )
+        requested_value = (
+            requested_task_id.strip()
+            if isinstance(requested_task_id, str) and requested_task_id.strip()
+            else "unknown"
+        )
+        active_ticket_value = (
+            active_ticket_id.strip()
+            if isinstance(active_ticket_id, str) and active_ticket_id.strip()
+            else active_value
+        )
+        active_status_value = (
+            active_status.strip()
+            if isinstance(active_status, str) and active_status.strip()
+            else "unknown"
+        )
+        next_action_value = (
+            next_action.strip()
+            if isinstance(next_action, str) and next_action.strip()
+            else "resume the active transaction"
+        )
+
+        return ValueError(
+            "tx_id does not match active transaction: "
+            f"active_tx={active_value}, requested_task={requested_value}, "
+            f"active_ticket={active_ticket_value}, status={active_status_value}, "
+            f"next_action={next_action_value}. "
+            "Resume or complete the active transaction before starting a new ticket."
+        )
 
     def _emit_tx_event(
         self,
@@ -343,7 +406,7 @@ class OpsTools:
             raise ValueError("tx.begin required before other events")
         resolved_tx_id = active_tx_id.strip()
         if resolved_task_id and resolved_task_id != resolved_tx_id:
-            raise ValueError("tx_id does not match active transaction")
+            raise self._active_tx_mismatch_error(resolved_task_id, active_tx)
         self._emit_tx_event(
             event_type="tx.step.enter",
             payload={"step_id": tx_step_id, "description": "task started"},

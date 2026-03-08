@@ -1,0 +1,37 @@
+{
+  "id": "p1-t01",
+  "title": "Define active transaction precedence and resume guidance contract",
+  "priority": "P1",
+  "status": "done",
+  "summary": "Define the phase 1 contract for active transaction precedence so agents and operators reliably continue unfinished work instead of incorrectly starting the next ticket. The contract should make the active ticket, current status, next required action, and start-new-ticket prohibition explicit whenever a non-terminal transaction already exists.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.10/plan.md",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "tests/test_ops_tools.py"
+  ],
+  "outputs": [
+    "Documented phase 1 contract for active transaction precedence",
+    "Defined expected resume-guidance fields for non-terminal active transactions",
+    "Clearer startup/resume contract for agents following .rules"
+  ],
+  "acceptance_criteria": [
+    "The phase 1 contract explicitly states that a non-terminal active transaction must be resumed before any new ticket starts.",
+    "The contract defines the required resume-guidance fields, including active ticket, active status, required next action, and whether starting a new ticket is allowed.",
+    "The contract explicitly covers checking-phase work such as `next_action=tx.verify.start`.",
+    "The contract and ticket scope make clear that runtime guards stay strict and that guidance should favor resuming `p1-t1` instead of starting `p1-t2`."
+  ],
+  "tasks": [
+    "Review the current planning and resume guidance to identify missing active-transaction precedence rules.",
+    "Define the contract for how resume-oriented outputs should describe non-terminal active transactions.",
+    "Specify how the system distinguishes between resume-required and new-ticket-allowed states.",
+    "Document the checking-phase scenario in which `p1-t1` remains active and `p1-t2` must not start."
+  ],
+  "dependencies": [],
+  "notes": [
+    "This is a phase 1 contract-definition ticket, focused on guidance and decision support rather than implementation changes.",
+    "The runtime guard that rejects starting a different ticket while an active transaction exists should remain intact.",
+    "Keep the contract explicit enough to prevent next-ticket misselection during resume and to guide later implementation tickets."
+  ]
+}

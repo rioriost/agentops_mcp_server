@@ -1,0 +1,38 @@
+{
+  "id": "p1-t02",
+  "title": "Add actionable mismatch diagnostics for active transaction conflicts",
+  "priority": "P1",
+  "status": "done",
+  "summary": "Improve resume-safety diagnostics so the system clearly explains why work cannot proceed when an active transaction does not match the requested ticket. The goal is to preserve strict transaction guards while making the failure mode actionable for both users and agents.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.10/plan.md",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "tests/test_ops_tools.py",
+    "tests/test_state_store.py"
+  ],
+  "outputs": [
+    "Improved error messages for active transaction mismatches",
+    "Regression tests covering active transaction conflict scenarios"
+  ],
+  "acceptance_criteria": [
+    "When a requested task_id differs from the active transaction, the error message includes both the active transaction id and the requested task id.",
+    "The strict rule that a new ticket cannot start while a non-terminal active transaction exists remains unchanged.",
+    "Regression tests cover at least the active transaction mismatch path.",
+    "The new diagnostics guide the caller toward resuming or completing the active transaction instead of starting the next ticket."
+  ],
+  "tasks": [
+    "Review the current mismatch and invariant error paths in resume and task-start logic.",
+    "Design a concise diagnostic format that includes active tx id, requested task id, and next recommended action.",
+    "Update runtime code to preserve existing guards while surfacing more actionable mismatch diagnostics.",
+    "Add tests for active non-terminal transaction conflicts during task start and update."
+  ],
+  "dependencies": ["p1-t01"],
+  "notes": [
+    "Do not weaken or bypass existing transaction invariants; this ticket is diagnostic and safety-oriented.",
+    "Prefer diagnostics that help automated callers choose 'resume active transaction' over 'start next executable ticket'.",
+    "Keep the scope focused on active transaction conflicts rather than broader foreign-state detection."
+  ]
+}

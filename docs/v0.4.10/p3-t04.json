@@ -1,0 +1,46 @@
+{
+  "id": "p3-t04",
+  "title": "Add regression tests for resume safety and foreign state handling",
+  "priority": "P1",
+  "status": "done",
+  "summary": "Add regression coverage for the v0.4.10 resume-safety contract so active transaction precedence and actionable mismatch diagnostics remain aligned across runtime behavior and operator guidance. The tests should prove that the system continues to block unsafe next-ticket starts while making the correct recovery path explicit.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.10/plan.md",
+    "docs/v0.4.10/p1-t01.json",
+    "docs/v0.4.10/p1-t02.json",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    ".rules",
+    "tests/test_ops_tools.py",
+    "tests/test_state_store.py",
+    "tests/test_state_rebuilder.py"
+  ],
+  "outputs": [
+    "Regression tests for active transaction resume guidance",
+    "Regression tests for actionable tx mismatch errors",
+    "Verification evidence that the resume-safety contract remains enforced"
+  ],
+  "acceptance_criteria": [
+    "Tests cover a non-terminal active transaction such as `p1-t1` in `checking` state and confirm resume guidance favors continuing that work instead of starting `p1-t2`.",
+    "Tests verify that task-start or task-update mismatch errors include both the active transaction id and the requested task id, plus a recovery-oriented hint.",
+    "Tests cover copied `.agent` artifacts with an active non-terminal transaction and confirm resume guidance plus mismatch diagnostics remain clear.",
+    "Tests confirm strict transaction guards still reject starting a new ticket while another non-terminal active transaction exists.",
+    "Repository verification passes with the new regression coverage in place."
+  ],
+  "tasks": [
+    "Identify the existing test modules that should own resume-brief, invariant, and foreign-state coverage.",
+    "Add or extend tests for active transaction precedence in resume-oriented outputs.",
+    "Add or extend tests for actionable mismatch diagnostics in task-start and task-update paths.",
+    "Add or extend tests for copied `.agent` artifacts that retain active non-terminal transaction state.",
+    "Run verification and confirm the v0.4.10 resume-safety contract is covered by automated tests."
+  ],
+  "dependencies": ["p1-t01", "p1-t02"],
+  "notes": [
+    "Keep the tests focused on contract behavior rather than incidental formatting details where possible.",
+    "Do not weaken strict transaction invariants in order to simplify tests; the tests should preserve and validate the existing safety model.",
+    "Prefer test fixtures that model realistic copied `.agent` artifacts, including an active non-terminal transaction.",
+    "Use the tests to lock the intended behavior of `.rules`, resume guidance, and runtime enforcement together."
+  ]
+}

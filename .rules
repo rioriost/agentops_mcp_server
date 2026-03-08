@@ -20,6 +20,9 @@
   - malformed or non-parseable log content remains a strict replay/integrity failure and must not be treated like an empty log
 - If resume state is incomplete:
   - run ops_resume_brief (or equivalent) and emit a short brief
+- If `active_tx.status` is not `done` or `blocked`, resume that active transaction first.
+- Do not start a new ticket while a non-terminal active transaction exists.
+- Select the next executable ticket only when there is no active transaction to resume.
 - Identify active ticket (status != done) and resume it.
 - Root-dependent tools must not run before workspace initialization completes successfully.
 
