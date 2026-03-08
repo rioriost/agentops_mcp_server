@@ -2,8 +2,8 @@
   "id": "p1-t01",
   "title": "Define initial-state startup contract for zero-event baseline",
   "priority": "P1",
-  "status": "planned",
-  "summary": "Analyze the startup failure path from a freshly initialized .agent baseline and define the canonical contract that should govern zero-event startup, first-task bootstrap, and derived-state generation.",
+  "status": "done",
+  "summary": "The startup contract is now documented against the implemented behavior: a present-but-empty canonical event log is a valid initialized baseline, missing canonical log files remain an initialization/integrity failure, first-task bootstrap is allowed only by emitting `tx.begin` before later lifecycle events, and derived state tools must synthesize a safe `next_action` when no active work has progressed yet.",
   "inputs": [
     "docs/draft.md",
     "docs/v0.4.8/plan.md",
@@ -37,6 +37,12 @@
   "notes": [
     "Do not weaken global transaction invariants beyond what is necessary for initial bootstrap.",
     "Treat canonical transaction files as the source of truth and derived artifacts as secondary outputs.",
-    "Use this contract as the basis for the implementation and regression-test tickets."
+    "Use this contract as the basis for the implementation and regression-test tickets.",
+    "Startup contract: `.agent/tx_event_log.jsonl` present but empty is a valid zero-event baseline; missing canonical transaction log files still indicate an uninitialized or damaged workspace and must not be silently treated as an empty baseline.",
+    "No-active-transaction contract: before any work exists, resume logic may report no active ticket; lifecycle ordering remains strict and non-bootstrap task/update/end activity still requires a valid transaction context.",
+    "Bootstrap contract: the first planning/task-start action may establish transaction context only by emitting `tx.begin` first, then the task lifecycle event sequence; bootstrap requires an explicit task identifier so the new transaction can be named deterministically.",
+    "Derived-state contract: handoff/state capture must tolerate the initial baseline and produce a valid `next_action`; when replay yields no non-empty `next_action`, runtime code should fall back to the current step when present, otherwise `tx.begin`.",
+    "Mismatch ownership: runtime fixes belong in `ops_tools.py` and replay/state handling, especially startup bootstrap and derived `next_action` defaults; initialization/template fixes belong in `zed-agentops-init.sh`; operator guidance and startup semantics belong in `.rules`.",
+    "Strict-ordering constraint: this ticket does not relax the global invariant that `tx.begin` precedes later lifecycle events; it defines the only startup-safe path for the first task to create that transaction context."
   ]
 }
