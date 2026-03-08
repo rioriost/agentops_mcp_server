@@ -323,6 +323,116 @@ def test_repo_commit_verify_failure_raises():
         manager.repo_commit(run_verify=True)
 
 
+def test_commit_if_verified_synchronizes_verify_start_state(tmp_path, monkeypatch):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    state_store.tx_event_append(
+        tx_id="tx-1",
+        ticket_id="p4-t3",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="commit",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "p4-t3", "ticket_title": "p4-t3"},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+    _write_tx_state(state_store)
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"}),
+        state_store,
+        state_rebuilder,
+    )
+    original_run = subprocess.run
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: (
+            None
+            if args and args[0][:2] == ["git", "commit"]
+            else original_run(*args, **kwargs)
+        ),
+    )
+
+    result = manager.commit_if_verified("message", timeout_sec=5)
+
+    assert result["sha"] == "abc123"
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    active_tx = tx_state["active_tx"]
+    assert active_tx["verify_state"]["status"] == "passed"
+    assert active_tx["commit_state"]["status"] == "passed"
+    assert active_tx["status"] == "committed"
+    assert active_tx["phase"] == "committed"
+    assert tx_state["last_applied_seq"] == 5
+
+
+def test_repo_commit_run_verify_synchronizes_verify_state_before_commit(
+    tmp_path, monkeypatch
+):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    state_store.tx_event_append(
+        tx_id="tx-1",
+        ticket_id="p4-t3",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="commit",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "p4-t3", "ticket_title": "p4-t3"},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+    _write_tx_state(state_store)
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"}),
+        state_store,
+        state_rebuilder,
+    )
+    original_run = subprocess.run
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: (
+            None
+            if args and args[0][:2] == ["git", "commit"]
+            else original_run(*args, **kwargs)
+        ),
+    )
+
+    result = manager.repo_commit(message="message", run_verify=True)
+
+    assert result["ok"] is True
+    assert result["sha"] == "abc123"
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert [event["event_type"] for event in events] == [
+        "tx.begin",
+        "tx.verify.start",
+        "tx.verify.pass",
+        "tx.commit.start",
+        "tx.commit.done",
+    ]
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    active_tx = tx_state["active_tx"]
+    assert active_tx["verify_state"]["status"] == "passed"
+    assert active_tx["commit_state"]["status"] == "passed"
+    assert active_tx["status"] == "committed"
+    assert active_tx["phase"] == "committed"
+
+
 def test_repo_commit_with_files_list_adds_specific_paths(monkeypatch):
     manager, git_repo, *_ = _build_manager(status_lines=[" M file.txt"])
     monkeypatch.setattr(manager, "_run_git_commit", lambda msg: ("sha", "summary"))

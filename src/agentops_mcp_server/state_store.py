@@ -489,6 +489,95 @@ class StateStore:
         state: Dict[str, Any],
         event_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+        next_state = json.loads(json.dumps(state, ensure_ascii=False))
+        active_tx = next_state.get("active_tx")
+        if not isinstance(active_tx, dict):
+            raise ValueError("state.active_tx is required")
+        active_tx["tx_id"] = tx_id
+        active_tx["ticket_id"] = ticket_id
+        active_tx["status"] = phase
+        active_tx["phase"] = phase
+        active_tx["current_step"] = step_id
+        active_tx["session_id"] = session_id
+
+        if event_type == "tx.begin":
+            active_tx["last_completed_step"] = ""
+            active_tx["user_intent"] = None
+            active_tx["verify_state"] = {
+                "status": "not_started",
+                "last_result": None,
+            }
+            active_tx["commit_state"] = {
+                "status": "not_started",
+                "last_result": None,
+            }
+            if not isinstance(active_tx.get("file_intents"), list):
+                active_tx["file_intents"] = []
+            active_tx["next_action"] = "tx.verify.start"
+        elif event_type == "tx.step.enter":
+            description = payload.get("description")
+            if isinstance(description, str) and description.strip():
+                active_tx["semantic_summary"] = f"Entered step {step_id}"
+            if phase == "checking":
+                active_tx["next_action"] = "tx.verify.start"
+            elif phase == "verified":
+                active_tx["next_action"] = "tx.commit.start"
+            elif phase == "committed":
+                active_tx["next_action"] = "tx.end.done"
+            elif phase == "blocked":
+                active_tx["next_action"] = "tx.end.blocked"
+            elif phase == "done":
+                active_tx["next_action"] = "tx.end.done"
+            else:
+                active_tx["next_action"] = "tx.verify.start"
+        elif event_type == "tx.verify.start":
+            active_tx["verify_state"] = {"status": "running", "last_result": payload}
+            active_tx["next_action"] = "tx.verify.pass"
+        elif event_type == "tx.verify.pass":
+            active_tx["verify_state"] = {"status": "passed", "last_result": payload}
+            active_tx["semantic_summary"] = "Verification passed"
+            active_tx["next_action"] = "tx.commit.start"
+        elif event_type == "tx.verify.fail":
+            active_tx["verify_state"] = {"status": "failed", "last_result": payload}
+            active_tx["semantic_summary"] = "Verification failed"
+            active_tx["next_action"] = "fix and re-verify"
+        elif event_type == "tx.commit.start":
+            active_tx["commit_state"] = {"status": "running", "last_result": payload}
+            active_tx["next_action"] = "tx.commit.done"
+        elif event_type == "tx.commit.done":
+            active_tx["commit_state"] = {"status": "passed", "last_result": payload}
+            active_tx["semantic_summary"] = "Commit completed"
+            active_tx["next_action"] = "tx.end.done"
+        elif event_type == "tx.commit.fail":
+            active_tx["commit_state"] = {"status": "failed", "last_result": payload}
+            active_tx["semantic_summary"] = "Commit failed"
+            active_tx["next_action"] = "tx.commit.start"
+        elif event_type == "tx.user_intent.set":
+            user_intent = payload.get("user_intent")
+            if isinstance(user_intent, str):
+                active_tx["user_intent"] = user_intent
+            if not isinstance(active_tx.get("next_action"), str) or not active_tx.get(
+                "next_action"
+            ):
+                active_tx["next_action"] = "tx.verify.start"
+        elif event_type == "tx.end.done":
+            active_tx["semantic_summary"] = "Transaction ended"
+            active_tx["next_action"] = "tx.end.done"
+        elif event_type == "tx.end.blocked":
+            active_tx["semantic_summary"] = "Transaction ended"
+            active_tx["next_action"] = "tx.end.blocked"
+
+        if not isinstance(active_tx.get("semantic_summary"), str) or not active_tx.get(
+            "semantic_summary"
+        ):
+            active_tx["semantic_summary"] = f"Updated transaction {ticket_id}"
+        if not isinstance(active_tx.get("next_action"), str) or not active_tx.get(
+            "next_action"
+        ):
+            active_tx["next_action"] = "tx.verify.start"
+        if not isinstance(active_tx.get("file_intents"), list):
+            active_tx["file_intents"] = []
+
         event_result = self.tx_event_append(
             tx_id=tx_id,
             ticket_id=ticket_id,
@@ -500,8 +589,10 @@ class StateStore:
             payload=payload,
             event_id=event_id,
         )
-        next_state = dict(state)
         next_state["last_applied_seq"] = event_result["seq"]
+        integrity = next_state.get("integrity")
+        if isinstance(integrity, dict):
+            integrity["rebuilt_from_seq"] = event_result["seq"]
         self.tx_state_save(next_state)
         return {
             "ok": True,

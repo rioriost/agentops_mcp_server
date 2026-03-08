@@ -2,7 +2,7 @@
   "id": "p2-t02",
   "title": "Implement canonical event-to-state synchronization for transaction progression",
   "priority": "P1",
-  "status": "planned",
+  "status": "done",
   "summary": "Implement the Phase 2 runtime changes for v0.4.12 so canonical transaction events and materialized transaction state stay synchronized throughout execution. The work should ensure that event append, tx_state updates, and guarded workflow behavior remain aligned for tx.begin, verify, commit, and terminal transitions, preventing valid follow-up operations from failing against stale or incomplete state.",
   "inputs": [
     "docs/draft_0.4.12.md",
@@ -43,6 +43,7 @@
     "This ticket is the implementation counterpart to the Phase 1 contract for canonical synchronization.",
     "Do not weaken workflow guards to mask synchronization bugs; fix the underlying state progression instead.",
     "Treat event append and tx_state persistence as one canonical progression path wherever possible.",
-    "Use the observed 0.4.11 failure patterns as concrete guidance for what must no longer be possible after this ticket."
+    "Use the observed 0.4.11 failure patterns as concrete guidance for what must no longer be possible after this ticket.",
+    "Implemented synchronized event append and tx_state persistence paths in commit_manager, ops_tools, and state_store so tx.begin, verify, and commit transitions materialize canonical state before guarded follow-up operations run. Added regression tests covering verify-state synchronization and task begin materialization."
   ]
 }

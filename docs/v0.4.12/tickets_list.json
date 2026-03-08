@@ -13,7 +13,7 @@
       "id": "p2-t02",
       "priority": "P1",
       "title": "Fix event-log and tx-state synchronization across workflow transitions",
-      "status": "planned",
+      "status": "done",
       "file": "v0.4.12/p2-t02.json"
     },
     {

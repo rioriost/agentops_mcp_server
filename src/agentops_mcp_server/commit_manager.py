@@ -124,6 +124,31 @@ class CommitManager:
         phase = phase_override or context["phase"]
         step_id = step_id_override or context["step_id"]
         actor = {"tool": "commit_manager"}
+        rebuild_fn = getattr(self.state_rebuilder, "rebuild_tx_state", None)
+        if callable(rebuild_fn):
+            rebuild = rebuild_fn()
+            if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
+                state = rebuild["state"]
+                active_tx = state.get("active_tx")
+                if isinstance(active_tx, dict):
+                    active_tx["tx_id"] = context["tx_id"]
+                    active_tx["ticket_id"] = context["ticket_id"]
+                    active_tx["status"] = phase
+                    active_tx["phase"] = phase
+                    active_tx["current_step"] = step_id
+                    if isinstance(context.get("session_id"), str):
+                        active_tx["session_id"] = context["session_id"]
+                return self.state_store.tx_event_append_and_state_save(
+                    tx_id=context["tx_id"],
+                    ticket_id=context["ticket_id"],
+                    event_type=event_type,
+                    phase=phase,
+                    step_id=step_id,
+                    actor=actor,
+                    session_id=context["session_id"],
+                    payload=payload,
+                    state=state,
+                )
         event = self.state_store.tx_event_append(
             tx_id=context["tx_id"],
             ticket_id=context["ticket_id"],

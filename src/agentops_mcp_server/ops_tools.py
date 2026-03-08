@@ -334,6 +334,29 @@ class OpsTools:
         if isinstance(agent_id, str) and agent_id.strip():
             actor["agent_id"] = agent_id.strip()
 
+        rebuild = self.state_rebuilder.rebuild_tx_state()
+        if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
+            state = rebuild["state"]
+            active_tx = state.get("active_tx")
+            if isinstance(active_tx, dict):
+                active_tx["tx_id"] = tx_id
+                active_tx["ticket_id"] = ticket_id
+                active_tx["status"] = phase
+                active_tx["phase"] = phase
+                active_tx["current_step"] = step_id
+                active_tx["session_id"] = resolved_session_id
+            return self.state_store.tx_event_append_and_state_save(
+                tx_id=tx_id,
+                ticket_id=ticket_id,
+                event_type=event_type,
+                phase=phase,
+                step_id=step_id,
+                actor=actor,
+                session_id=resolved_session_id,
+                payload=payload,
+                state=state,
+            )
+
         event = self.state_store.tx_event_append(
             tx_id=tx_id,
             ticket_id=ticket_id,

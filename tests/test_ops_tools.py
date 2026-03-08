@@ -36,7 +36,11 @@ def _tx_event_types(repo_context):
 def _begin_tx(
     state_store, state_rebuilder, tx_id="t-1", session_id="s1", title="Build"
 ):
-    state_store.tx_event_append(
+    state_store.repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    state_store.repo_context.tx_event_log.write_text("", encoding="utf-8")
+    rebuild = state_rebuilder.rebuild_tx_state()
+    assert rebuild["ok"] is True
+    state_store.tx_event_append_and_state_save(
         tx_id=tx_id,
         ticket_id=tx_id,
         event_type="tx.begin",
@@ -45,10 +49,8 @@ def _begin_tx(
         actor={"tool": "test"},
         session_id=session_id,
         payload={"ticket_id": tx_id, "ticket_title": title},
+        state=rebuild["state"],
     )
-    rebuild = state_rebuilder.rebuild_tx_state()
-    assert rebuild["ok"] is True
-    state_store.tx_state_save(rebuild["state"])
 
 
 def test_ops_compact_context_updates_journal(
@@ -131,6 +133,16 @@ def test_ops_start_task_records_step_after_prior_tx_begin(
     assert step_event["payload"]["step_id"] == "t-1"
     assert step_event["payload"]["description"] == "task started"
 
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    active_tx = tx_state["active_tx"]
+    assert active_tx["tx_id"] == "t-1"
+    assert active_tx["ticket_id"] == "t-1"
+    assert active_tx["status"] == "in-progress"
+    assert active_tx["phase"] == "in-progress"
+    assert active_tx["current_step"] == "t-1"
+    assert active_tx["session_id"] == "s1"
+    assert tx_state["last_applied_seq"] == events[-1]["seq"]
+
 
 def test_ops_update_task_requires_prior_tx_begin(
     repo_context, state_store, state_rebuilder
@@ -171,6 +183,14 @@ def test_ops_update_task_falls_back_to_active_tx_id(
     assert update_events
     assert update_events[-1]["tx_id"] == "t-1"
     assert update_events[-1]["session_id"] == "s1"
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    active_tx = tx_state["active_tx"]
+    assert active_tx["tx_id"] == "t-1"
+    assert active_tx["status"] == "in-progress"
+    assert active_tx["phase"] == "in-progress"
+    assert active_tx["current_step"] == "blocked"
+    assert active_tx["next_action"] == "tx.verify.start"
 
 
 def test_ops_update_task_rejects_mismatched_task_id(
