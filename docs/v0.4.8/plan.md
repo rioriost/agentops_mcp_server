@@ -126,3 +126,14 @@ These errors indicate a mismatch between:
 - Keep changes minimal and focused on startup correctness.
 - Prefer contract-preserving fixes over broad lifecycle redesign.
 - Treat `.agent/handoff.json` as derived output and canonical transaction files as the source of truth.
+
+## Completion Summary
+- `p1-t01` completed the contract-definition work for zero-event startup by documenting how an empty canonical event log must be treated, how no-active-transaction startup behaves, how the first task may bootstrap through `tx.begin`, and how derived state should fall back to a safe startup `next_action`.
+- `p2-t02` confirmed and documented the Python runtime behavior that implements the startup contract: first-task bootstrap is limited to the explicit initial baseline case, while state capture and handoff export now tolerate an initial no-active-work state.
+- `p2-t03` confirmed and documented that the checked-in `.rules` file and the `zed-agentops-init.sh` rule template are aligned with the same startup contract, canonical/derived artifact split, and strict ordering model used by runtime code.
+- `p3-t04` confirmed the regression coverage expected by the draft and measured repository coverage at 95%, exceeding the release target of 90%.
+
+## Final Outcome
+- Startup from a freshly initialized zero-event `.agent` baseline is covered by the documented contract, aligned runtime behavior, aligned initialization guidance, and regression tests.
+- The reported startup failures in `docs/draft.md` are addressed by the combined contract, runtime, script/rules, and verification work tracked in this plan.
+- Release verification completed successfully, with 294 passing tests and total coverage above the required threshold.
