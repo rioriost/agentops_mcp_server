@@ -2,8 +2,8 @@
   "id": "p2-t02",
   "title": "Fix Python bootstrap and derived-state handling for startup",
   "priority": "P1",
-  "status": "planned",
-  "summary": "Update Python runtime behavior so planning and task startup succeed from a freshly initialized zero-event baseline, while preserving strict transaction invariants.",
+  "status": "done",
+  "summary": "Python startup handling now matches the zero-event baseline contract: `ops_start_task` can bootstrap the first transaction only by emitting `tx.begin` before later lifecycle events when an explicit task id is provided, while `ops_capture_state` and `ops_handoff_export` synthesize a safe startup `next_action` so initial baseline capture paths no longer fail.",
   "inputs": [
     "docs/draft.md",
     "docs/v0.4.8/plan.md",
@@ -32,13 +32,15 @@
     "Verify that invariant enforcement still rejects invalid non-bootstrap event ordering.",
     "Keep the implementation minimal and focused on the startup/resume edge case."
   ],
-  "dependencies": [
-    "p1-t01"
-  ],
+  "dependencies": ["p1-t01"],
   "notes": [
     "Do not broadly relax transaction validation.",
     "Treat a present-but-empty canonical event log as a valid initialized baseline.",
     "Prefer a narrowly scoped bootstrap path over lifecycle redesign.",
-    "Coordinate behavior with `.rules` and `zed-agentops-init.sh`, but keep this ticket focused on Python runtime changes."
+    "Coordinate behavior with `.rules` and `zed-agentops-init.sh`, but keep this ticket focused on Python runtime changes.",
+    "Implemented bootstrap behavior: `ops_start_task` inspects the active transaction, and when the materialized state represents the initial `none` transaction it requires an explicit task id, emits `tx.begin`, rebuilds state, and only then emits the task lifecycle step.",
+    "Implemented derived-state fallback: `ops_capture_state` and `ops_handoff_export` no longer depend on a preexisting non-empty `active_tx.next_action`; if replay yields no usable next action they fall back to `current_step`, otherwise `tx.begin`.",
+    "Strict ordering remains enforced outside bootstrap: startup without a task id still fails, mismatched task ids are rejected, and non-bootstrap update/end flows still require an existing transaction context.",
+    "Related runtime coverage confirms the intended behavior in `tests/test_ops_tools.py`, `tests/test_state_rebuilder.py`, and `tests/test_state_store.py`."
   ]
 }
