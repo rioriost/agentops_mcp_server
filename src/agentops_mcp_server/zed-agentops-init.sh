@@ -175,18 +175,19 @@ cat <<'RULES' > "$SOURCE_RULES"
 - Identify active ticket (status != done) and resume it.
 - Root-dependent tools must not run before workspace initialization completes successfully.
 
-## Planning flow (mandatory)
-- User provides docs/draft.md.
-- Generate docs/__version__/plan.md with phases.
-- Split phases into tasks and generate:
+## Planning flow (convention)
+- User may provide docs/draft.md to guide ticket-oriented execution.
+- Clients may maintain docs/__version__/plan.md with phases.
+- Clients may also maintain derived planning artifacts such as:
   - docs/__version__/tickets_list.json (metadata)
   - docs/__version__/pX-tY.json (full ticket with status/inputs/outputs/deps)
-- Ticket status enum: planned, in-progress, checking, verified, committed, done, blocked.
-- Ticket status persistence is mandatory throughout execution, not optional bookkeeping.
-- Every ticket status change must be persisted to both:
-  - the per-ticket JSON file, and
-  - docs/__version__/tickets_list.json.
-- The per-ticket JSON file and docs/__version__/tickets_list.json must stay synchronized with each other for the same ticket.
+- Suggested ticket status enum for client-managed artifacts: planned, in-progress, checking, verified, committed, done, blocked.
+- Ticket artifacts are client-managed workflow convention, not mandatory server protocol.
+- MCP clients must not assume the server generates, persists, synchronizes, or validates:
+  - docs/__version__/plan.md
+  - docs/__version__/tickets_list.json
+  - docs/__version__/pX-tY.json
+- If a client chooses to maintain ticket artifacts, keeping per-ticket JSON and docs/__version__/tickets_list.json synchronized is recommended operating practice.
 
 ## Work loop (mandatory)
 - Tickets are the only unit of work.
@@ -197,24 +198,25 @@ cat <<'RULES' > "$SOURCE_RULES"
   - file intent updates require a previously registered file intent for the same path
   - commit operations require a valid verify sequence and existing transaction context
 - For any code change:
-  1) Set status -> in-progress (emit tx.begin if new)
-     - Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json when work begins.
+  1) Set runtime work status -> in-progress (emit tx.begin if new)
+     - If a client maintains ticket artifacts, it may also persist the matching ticket status in its own planning files when work begins.
   2) Register file intents before mutation
   3) Implement smallest safe change
   4) Update semantic_summary (required) and user_intent only on explicit user resume intent; persist tx_state after mutation
   5) Run `repo_verify` (runs `.zed/scripts/verify`)
      - If fails: fix and repeat (update semantic summary)
-  6) Set status -> checking
-     - Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json.
-     - Compare acceptance_criteria AND plan.md to avoid omissions
-  7) Set status -> verified
-     - Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json.
+  6) Set runtime work status -> checking
+     - If a client maintains ticket artifacts, it may also update them.
+     - Compare acceptance_criteria AND plan.md when those planning artifacts are being used by the client workflow
+  7) Set runtime work status -> verified
+     - If a client maintains ticket artifacts, it may also update them.
   8) Commit changes (emit tx.commit.start/done|fail)
-  9) Set status -> committed
-     - Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json.
-  10) Set status -> done (emit tx.end.done|blocked)
-     - Persist the terminal ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json.
-- Runtime transaction status/phase and persisted ticket-document status must stay synchronized at each ticket lifecycle transition and must not be reconciled later as optional follow-up bookkeeping.
+  9) Set runtime work status -> committed
+     - If a client maintains ticket artifacts, it may also update them.
+  10) Set runtime work status -> done (emit tx.end.done|blocked)
+     - If a client maintains ticket artifacts, it may also persist terminal status there.
+- Runtime transaction status/phase is canonical for server behavior.
+- Client ticket-document status, when maintained, is derived workflow bookkeeping and may be synchronized by the client as a convention.
 
 ## Persistence & logging (mandatory)
 - Always record events for plan/task/progress/verify/commit.

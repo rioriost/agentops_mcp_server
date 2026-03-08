@@ -2,7 +2,7 @@
   "id": "p1-t03",
   "title": "Implement or revise ticket persistence requirements to match the chosen protocol model",
   "priority": "P1",
-  "status": "planned",
+  "status": "verified",
   "summary": "Execute the 0.5.0 follow-up work required after the ticket-persistence boundary decision so the documented workflow, generated rules, and server-supported behavior describe the same reality. Depending on the Phase 1 decision, this ticket must either implement first-class ticket persistence support with synchronized planning artifacts and status updates, or revise the rules and bootstrap contract so ticket persistence is clearly treated as external convention rather than mandatory protocol.",
   "inputs": [
     "docs/draft_0.5.0.md",
@@ -39,10 +39,7 @@
     "Align any lifecycle or status references so ticket-related state progression does not conflict with the broader 0.5.0 workflow status model.",
     "Document the final ownership boundary for creating, updating, synchronizing, and validating planning and ticket artifacts so clients can follow the contract safely."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02"
-  ],
+  "dependencies": ["p1-t01", "p1-t02"],
   "notes": [
     "This ticket is the execution ticket for the decision made in p1-t02; it should not reopen the protocol-boundary debate unless implementation findings force a documented change.",
     "The central goal is to eliminate the worst current state: rules that sound mandatory while server support remains incomplete or undefined.",
