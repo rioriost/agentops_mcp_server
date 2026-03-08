@@ -1,4 +1,4 @@
-# Draft for 0.4.7: bug fixes
+# Draft for 0.4.8: bug fixes
 
 ## Background
 - initial-dot-agent/に、zed-agentops-init.shを実行し、Zedでプロジェクトディレクトリを開いた直後の、journal.jsonl、tx_event_log.jsonl、tx_state.jsonを置きました。

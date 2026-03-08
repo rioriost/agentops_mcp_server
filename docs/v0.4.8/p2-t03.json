@@ -1,0 +1,41 @@
+{
+  "id": "p2-t03",
+  "title": "Align .rules and zed-agentops-init.sh with startup contract",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Update the rule template and initialization script so the generated startup guidance and initialized artifacts match the zero-event baseline contract used by runtime code.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.8/plan.md",
+    ".rules",
+    "src/agentops_mcp_server/zed-agentops-init.sh"
+  ],
+  "outputs": [
+    "Updated .rules startup guidance",
+    "Updated zed-agentops-init.sh embedded rule template",
+    "Consistent initialization behavior for zero-event baseline startup"
+  ],
+  "acceptance_criteria": [
+    "The generated .rules content clearly documents that an empty canonical event log is a valid initialized baseline.",
+    "The generated .rules content remains consistent with strict transaction ordering while describing how initial planning work may bootstrap correctly.",
+    "zed-agentops-init.sh creates or preserves initialization artifacts in a way that matches the documented startup contract.",
+    "The initialization script and the checked-in .rules file do not contradict Python runtime assumptions about startup, restore order, or derived artifacts.",
+    "Changes are covered by regression tests that exercise script-content expectations and startup contract alignment."
+  ],
+  "tasks": [
+    "Review the checked-in .rules file and the rule template embedded in zed-agentops-init.sh for startup-contract drift.",
+    "Update startup, restore-order, and task-lifecycle guidance so the initial zero-event baseline is described precisely.",
+    "Ensure the script-generated rules text matches the canonical repository .rules content for the relevant startup behavior.",
+    "Verify that initialization behavior for canonical and derived .agent artifacts matches runtime expectations.",
+    "Add or update tests that lock the alignment between script content, rule content, and startup contract language."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p2-t02"
+  ],
+  "notes": [
+    "Do not weaken strict transaction ordering globally; only clarify and align bootstrap behavior for the initial baseline.",
+    "Treat .agent/handoff.json as derived-only and keep canonical transaction files as the source of truth.",
+    "Keep the script and rule text concise, explicit, and stable enough for automated planning and resume flows."
+  ]
+}

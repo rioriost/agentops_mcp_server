@@ -1,0 +1,45 @@
+{
+  "id": "p3-t04",
+  "title": "Add regression tests and verify 90 percent coverage",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Add regression coverage for the reported startup failures and verify that the release satisfies the draft coverage target.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.8/plan.md",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    ".rules"
+  ],
+  "outputs": [
+    "Regression tests covering zero-event baseline startup behavior",
+    "Verification results showing tests pass",
+    "Coverage results at or above 90 percent"
+  ],
+  "acceptance_criteria": [
+    "Tests cover startup from a freshly initialized zero-event baseline.",
+    "Tests cover first planning task bootstrap behavior.",
+    "Tests cover state capture and handoff export behavior on the initial baseline.",
+    "Tests cover initialization script and rule-contract expectations related to startup behavior.",
+    "Full verification passes.",
+    "Total test coverage is at least 90 percent."
+  ],
+  "tasks": [
+    "Add or extend regression tests for initial startup failures reported in the draft.",
+    "Cover tx.begin bootstrap behavior for the first planning/task-start flow.",
+    "Cover derived-state defaults required by state capture and handoff export.",
+    "Cover initialization contract expectations reflected in the setup script and rule template.",
+    "Run the full verification flow and record the result.",
+    "Run coverage measurement and confirm the threshold is satisfied."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p2-t02",
+    "p2-t03"
+  ],
+  "notes": [
+    "Prefer targeted regression tests over broad unrelated test changes.",
+    "Keep the coverage work aligned to the startup contract defined in the plan.",
+    "Use the draft acceptance criteria as the final verification gate."
+  ]
+}

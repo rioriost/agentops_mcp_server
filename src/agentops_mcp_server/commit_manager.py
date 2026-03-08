@@ -22,6 +22,7 @@ class CommitManager:
         self.state_store = state_store
         self.state_rebuilder = state_rebuilder
         self.repo_context = state_store.repo_context
+        self._verify_started_in_call = False
 
     def _load_tx_context(self) -> Optional[Dict[str, str]]:
         tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
@@ -87,10 +88,27 @@ class CommitManager:
             if isinstance(active_tx.get("verify_state"), dict)
             else {}
         )
-        if verify_state.get("status") != "running":
+        if verify_state.get("status") == "running":
+            return
+        if self._verify_started_in_call:
+            rebuild = self.state_rebuilder.rebuild_tx_state()
+            if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
+                self.state_store.tx_state_save(rebuild["state"])
+                refreshed_active_tx = rebuild["state"].get("active_tx")
+                if isinstance(refreshed_active_tx, dict):
+                    refreshed_verify_state = (
+                        refreshed_active_tx.get("verify_state")
+                        if isinstance(refreshed_active_tx.get("verify_state"), dict)
+                        else {}
+                    )
+                    if refreshed_verify_state.get("status") == "running":
+                        return
             raise RuntimeError(
-                "verify.start not recorded; tx.begin required before verify results"
+                "verify.start emitted but tx_state was not updated to running"
             )
+        raise RuntimeError(
+            "verify.start not recorded; tx.begin required before verify results"
+        )
 
     def _emit_tx_event(
         self,
@@ -187,12 +205,14 @@ class CommitManager:
     def commit_if_verified(
         self, message: str, timeout_sec: Optional[int] = None
     ) -> Dict[str, str]:
+        self._verify_started_in_call = False
         self._ensure_tx_begin()
         self._emit_tx_event(
             event_type="tx.verify.start",
             payload={"command": str(self.repo_context.verify)},
             phase_override="checking",
         )
+        self._verify_started_in_call = True
         self._ensure_verify_started()
         verify_result = self.verify_runner.run_verify(timeout_sec=timeout_sec)
         if not verify_result["ok"]:
@@ -245,12 +265,15 @@ class CommitManager:
         run_verify: Optional[bool] = None,
         timeout_sec: Optional[int] = None,
     ) -> Dict[str, Any]:
+        self._verify_started_in_call = False
         if run_verify:
             self._emit_tx_event(
                 event_type="tx.verify.start",
                 payload={"command": str(self.repo_context.verify)},
                 phase_override="checking",
             )
+            self._verify_started_in_call = True
+            self._ensure_verify_started()
             verify_result = self.verify_runner.run_verify(timeout_sec=timeout_sec)
             if not verify_result["ok"]:
                 stderr = (verify_result.get("stderr") or "").strip()

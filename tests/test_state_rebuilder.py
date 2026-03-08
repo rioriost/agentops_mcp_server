@@ -67,6 +67,7 @@ def test_rebuild_tx_state_accepts_empty_event_log(repo_context, state_rebuilder)
     assert active_tx["current_step"] == "none"
     assert active_tx["next_action"] == ""
     assert active_tx["semantic_summary"] == ""
+    assert active_tx["session_id"] == ""
     assert active_tx["verify_state"]["status"] == "not_started"
     assert active_tx["commit_state"]["status"] == "not_started"
     assert active_tx["file_intents"] == []
@@ -210,6 +211,27 @@ def test_rebuild_tx_state_reconstructs_file_intent_next_action(
     assert rebuild["ok"] is True
     active_tx = rebuild["state"]["active_tx"]
     assert active_tx["next_action"] == "continue file intents"
+
+
+def test_rebuild_tx_state_preserves_session_id_in_active_tx(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(state_store)
+    _append_tx_event(
+        state_store,
+        event_type="tx.step.enter",
+        step_id="p4-t2-s1",
+        payload={"step_id": "p4-t2-s1", "description": "task started"},
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    active_tx = rebuild["state"]["active_tx"]
+    assert active_tx["tx_id"] == "tx-1"
+    assert active_tx["ticket_id"] == "p4-t2"
+    assert active_tx["session_id"] == "s1"
+    assert active_tx["current_step"] == "p4-t2-s1"
 
 
 def test_rebuild_tx_state_committed_next_action(

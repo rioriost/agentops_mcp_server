@@ -73,13 +73,21 @@ def test_ops_handoff_export_writes_json(repo_context, state_store, state_rebuild
     assert "compact_context" in handoff_payload
 
 
-def test_ops_start_task_requires_prior_tx_begin(
+def test_ops_start_task_bootstraps_tx_on_zero_event_baseline(
     repo_context, state_store, state_rebuilder
 ):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
 
-    with pytest.raises(ValueError, match="tx.begin required before other events"):
-        ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    result = ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    event_types = [event["event_type"] for event in events]
+    assert event_types == ["tx.begin", "tx.step.enter"]
+    assert events[0]["payload"]["ticket_id"] == "t-1"
+    assert events[0]["payload"]["ticket_title"] == "Build"
+    assert events[1]["payload"]["step_id"] == "t-1"
+    assert events[1]["payload"]["description"] == "task started"
 
 
 def test_ops_start_task_requires_session_id(repo_context, state_store, state_rebuilder):
@@ -300,6 +308,28 @@ def test_ops_capture_state_updates_tx_state(repo_context, state_store, state_reb
     assert tx_state["last_applied_seq"] == last_seq
 
 
+def test_ops_capture_state_returns_error_without_canonical_event_log(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_capture_state(session_id="s1")
+
+    assert result["ok"] is False
+    assert result["reason"] == "tx_event_log missing"
+
+
+def test_ops_handoff_export_defaults_to_tx_begin_without_canonical_event_log(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_handoff_export()
+
+    assert result["ok"] is True
+    assert result["handoff"]["next_step"] == "tx.begin"
+
+
 def test_truncate_text_variants():
     assert truncate_text(None) is None
     assert truncate_text("x", limit=0) == ""
@@ -323,6 +353,15 @@ def test_ops_start_task_requires_title(repo_context, state_store, state_rebuilde
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
     with pytest.raises(ValueError, match="title is required"):
         ops.ops_start_task(title="  ")
+
+
+def test_ops_start_task_zero_event_baseline_requires_task_id_for_bootstrap(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    with pytest.raises(ValueError, match="tx.begin required before other events"):
+        ops.ops_start_task(title="Build", session_id="s1")
 
 
 def test_ops_update_task_requires_status_or_note(

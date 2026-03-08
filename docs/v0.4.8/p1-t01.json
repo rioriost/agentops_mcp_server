@@ -1,0 +1,42 @@
+{
+  "id": "p1-t01",
+  "title": "Define initial-state startup contract for zero-event baseline",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Analyze the startup failure path from a freshly initialized .agent baseline and define the canonical contract that should govern zero-event startup, first-task bootstrap, and derived-state generation.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.8/plan.md",
+    ".rules",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/state_store.py",
+    "initial-dot-agent/"
+  ],
+  "outputs": [
+    "Documented startup contract for zero-event baseline",
+    "List of mismatches between .rules, init script, and runtime expectations",
+    "Implementation guidance for bootstrap-safe planning startup"
+  ],
+  "acceptance_criteria": [
+    "The ticket defines how a present-but-empty canonical event log must be interpreted.",
+    "The ticket specifies expected behavior when there is no active transaction yet.",
+    "The ticket defines how the first planning or task-start action establishes valid transaction context.",
+    "The ticket defines valid derived-state defaults for handoff and state capture before work begins.",
+    "The ticket identifies which fixes belong to runtime code versus initialization/rules updates."
+  ],
+  "tasks": [
+    "Review the draft and extract the exact reported startup failures.",
+    "Map current expectations from .rules, initialization output, and Python runtime checks.",
+    "Define the canonical startup contract for zero-event baseline behavior.",
+    "Identify mismatches and assign them to runtime, script, or rule-layer fixes.",
+    "Record constraints needed to preserve strict transaction ordering."
+  ],
+  "dependencies": [],
+  "notes": [
+    "Do not weaken global transaction invariants beyond what is necessary for initial bootstrap.",
+    "Treat canonical transaction files as the source of truth and derived artifacts as secondary outputs.",
+    "Use this contract as the basis for the implementation and regression-test tickets."
+  ]
+}

@@ -70,3 +70,8 @@ def test_init_script_contains_canonical_artifacts_and_rules():
     assert "work-in-progress.md" not in content
     assert "Treat `.agent/handoff.json` as derived-only" in content
     assert "workspace_root" not in content
+    assert "- `tx.begin` before task lifecycle events" in content
+    assert "- task lifecycle tools" in content
+    assert "- do not call task start/update/end before `tx.begin`" in content
+    assert "- semantic_summary is required for non-terminal tx" in content
+    assert "active_tx.next_action is required" not in content

@@ -132,6 +132,7 @@ class StateRebuilder:
             "next_action": "",
             "semantic_summary": "",
             "user_intent": None,
+            "session_id": "",
             "verify_state": {"status": "not_started", "last_result": None},
             "commit_state": {"status": "not_started", "last_result": None},
             "file_intents": [],
@@ -422,10 +423,14 @@ class StateRebuilder:
         phase = event.get("phase")
         step_id = event.get("step_id")
         seq = event.get("seq")
+        session_id = event.get("session_id")
 
         if isinstance(phase, str):
             active_tx["status"] = phase
             active_tx["phase"] = phase
+
+        if isinstance(session_id, str) and session_id.strip():
+            active_tx["session_id"] = session_id.strip()
 
         if isinstance(step_id, str) and event_type == "tx.step.enter":
             active_tx["current_step"] = step_id

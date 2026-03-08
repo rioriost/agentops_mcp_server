@@ -156,9 +156,22 @@ class OpsTools:
     def ops_handoff_export(self) -> Dict[str, Any]:
         rebuild = self.state_rebuilder.rebuild_tx_state()
         if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
-            self.state_store.tx_state_save(rebuild["state"])
-            rebuilt_active = rebuild["state"].get("active_tx")
-            active_tx = rebuilt_active if isinstance(rebuilt_active, dict) else {}
+            rebuilt_state = rebuild["state"]
+            rebuilt_active = (
+                rebuilt_state.get("active_tx")
+                if isinstance(rebuilt_state.get("active_tx"), dict)
+                else {}
+            )
+            next_action = rebuilt_active.get("next_action")
+            current_step = rebuilt_active.get("current_step")
+            if not isinstance(next_action, str) or not next_action.strip():
+                rebuilt_active["next_action"] = (
+                    current_step.strip()
+                    if isinstance(current_step, str) and current_step.strip()
+                    else "tx.begin"
+                )
+            self.state_store.tx_state_save(rebuilt_state)
+            active_tx = rebuilt_active
         else:
             active_tx = self._active_tx()
         verify_state = (
@@ -173,7 +186,9 @@ class OpsTools:
         )
         last_error = self._extract_last_error(verify_state, commit_state)
         last_commit = self._extract_last_commit(commit_state)
-        next_step = active_tx.get("next_action") or active_tx.get("current_step") or ""
+        next_step = (
+            active_tx.get("next_action") or active_tx.get("current_step") or "tx.begin"
+        )
 
         handoff = {
             "ts": now_iso(),
@@ -298,6 +313,28 @@ class OpsTools:
         )
         active_tx = self._active_tx()
         active_tx_id = active_tx.get("tx_id")
+        resolved_task_id = (
+            task_id.strip() if isinstance(task_id, str) and task_id.strip() else ""
+        )
+        if (
+            not isinstance(active_tx_id, str)
+            or not active_tx_id.strip()
+            or active_tx_id.strip() == "none"
+        ):
+            if not resolved_task_id:
+                raise ValueError("tx.begin required before other events")
+            self._emit_tx_event(
+                event_type="tx.begin",
+                payload={"ticket_id": resolved_task_id, "ticket_title": title.strip()},
+                title=resolved_task_id,
+                task_id=resolved_task_id,
+                phase=tx_phase,
+                step_id="none",
+                session_id=session_id,
+                agent_id=agent_id,
+            )
+            active_tx = self._active_tx()
+            active_tx_id = active_tx.get("tx_id")
         if (
             not isinstance(active_tx_id, str)
             or not active_tx_id.strip()
@@ -305,9 +342,6 @@ class OpsTools:
         ):
             raise ValueError("tx.begin required before other events")
         resolved_tx_id = active_tx_id.strip()
-        resolved_task_id = (
-            task_id.strip() if isinstance(task_id, str) and task_id.strip() else ""
-        )
         if resolved_task_id and resolved_task_id != resolved_tx_id:
             raise ValueError("tx_id does not match active transaction")
         self._emit_tx_event(
@@ -445,6 +479,17 @@ class OpsTools:
             return rebuild
 
         state = rebuild.get("state") or {}
+        active_tx = (
+            state.get("active_tx") if isinstance(state.get("active_tx"), dict) else {}
+        )
+        next_action = active_tx.get("next_action")
+        current_step = active_tx.get("current_step")
+        if not isinstance(next_action, str) or not next_action.strip():
+            active_tx["next_action"] = (
+                current_step.strip()
+                if isinstance(current_step, str) and current_step.strip()
+                else "tx.begin"
+            )
         save_result = self.state_store.tx_state_save(state)
         last_seq = state.get("last_applied_seq")
         last_seq_value = last_seq if isinstance(last_seq, int) else 0

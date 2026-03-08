@@ -160,7 +160,16 @@ def test_commit_if_verified_runs_verify(tmp_path, monkeypatch):
         state_store,
         state_rebuilder,
     )
-    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: None)
+    original_run = subprocess.run
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: (
+            None
+            if args and args[0][:2] == ["git", "commit"]
+            else original_run(*args, **kwargs)
+        ),
+    )
 
     result = manager.commit_if_verified("message", timeout_sec=5)
 
@@ -193,7 +202,16 @@ def test_commit_if_verified_emits_tx_commit_events(tmp_path, monkeypatch):
         state_store,
         state_rebuilder,
     )
-    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: None)
+    original_run = subprocess.run
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: (
+            None
+            if args and args[0][:2] == ["git", "commit"]
+            else original_run(*args, **kwargs)
+        ),
+    )
 
     result = manager.commit_if_verified("message", timeout_sec=5)
     assert result["sha"] == "abc123"
@@ -206,20 +224,38 @@ def test_commit_if_verified_emits_tx_commit_events(tmp_path, monkeypatch):
     event_types = [event["event_type"] for event in events]
     event_by_type = {event["event_type"]: event for event in events}
 
-    assert event_types == ["tx.begin", "tx.verify.start"]
+    assert event_types == [
+        "tx.begin",
+        "tx.verify.start",
+        "tx.verify.pass",
+        "tx.commit.start",
+        "tx.commit.done",
+    ]
 
     verify_start = event_by_type["tx.verify.start"]
 
     assert verify_start["phase"] == "checking"
     assert "command" in verify_start["payload"]
 
+    verify_pass = event_by_type["tx.verify.pass"]
+    assert verify_pass["phase"] == "verified"
+    assert verify_pass["payload"]["ok"] is True
+
+    commit_start = event_by_type["tx.commit.start"]
+    assert commit_start["phase"] == "verified"
+    assert commit_start["payload"]["message"] == "message"
+
+    commit_done = event_by_type["tx.commit.done"]
+    assert commit_done["phase"] == "committed"
+    assert commit_done["payload"]["sha"] == "abc123"
+
     tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
     active_tx = tx_state["active_tx"]
-    assert active_tx["verify_state"]["status"] == "running"
-    assert active_tx["commit_state"]["status"] == "not_started"
-    assert active_tx["status"] == "checking"
-    assert active_tx["phase"] == "checking"
-    assert active_tx["next_action"] in {"tx.verify.start", "tx.begin"}
+    assert active_tx["verify_state"]["status"] == "passed"
+    assert active_tx["commit_state"]["status"] == "passed"
+    assert active_tx["status"] == "committed"
+    assert active_tx["phase"] == "committed"
+    assert active_tx["next_action"] in {"tx.end.done", "tx.begin"}
 
 
 def test_commit_if_verified_backfills_tx_begin_when_log_empty(tmp_path, monkeypatch):
@@ -246,7 +282,16 @@ def test_commit_if_verified_backfills_tx_begin_when_log_empty(tmp_path, monkeypa
         state_store,
         state_rebuilder,
     )
-    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: None)
+    original_run = subprocess.run
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: (
+            None
+            if args and args[0][:2] == ["git", "commit"]
+            else original_run(*args, **kwargs)
+        ),
+    )
 
     result = manager.commit_if_verified("message", timeout_sec=5)
     assert result["sha"] == "abc123"
@@ -257,7 +302,13 @@ def test_commit_if_verified_backfills_tx_begin_when_log_empty(tmp_path, monkeypa
         if line.strip()
     ]
     event_types = [event["event_type"] for event in events]
-    assert event_types == ["tx.begin", "tx.verify.start"]
+    assert event_types == [
+        "tx.begin",
+        "tx.verify.start",
+        "tx.verify.pass",
+        "tx.commit.start",
+        "tx.commit.done",
+    ]
 
 
 def test_repo_commit_verify_failure_raises():
@@ -266,7 +317,9 @@ def test_repo_commit_verify_failure_raises():
         verify_result={"ok": False, "returncode": 1, "stderr": "nope", "stdout": ""},
     )
 
-    with pytest.raises(RuntimeError, match="verify failed"):
+    with pytest.raises(
+        RuntimeError, match="verify.start not recorded; tx_state missing"
+    ):
         manager.repo_commit(run_verify=True)
 
 
@@ -361,7 +414,56 @@ def test_commit_if_verified_verify_failure_emits_event(tmp_path):
     ]
     event_types = [event["event_type"] for event in events]
 
-    assert event_types == ["tx.begin", "tx.verify.start"]
+    assert event_types == ["tx.begin", "tx.verify.start", "tx.verify.fail"]
+
+
+def test_repo_commit_with_verify_updates_verify_state(tmp_path, monkeypatch):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    state_store.tx_event_append(
+        tx_id="tx-1",
+        ticket_id="p4-t3",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="commit",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "p4-t3", "ticket_title": "p4-t3"},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+    _write_tx_state(state_store, verify_state_status="not_started")
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"}),
+        state_store,
+        state_rebuilder,
+    )
+    monkeypatch.setattr(manager, "_run_git_commit", lambda msg: ("sha", "summary"))
+
+    result = manager.repo_commit(message="message", run_verify=True)
+
+    assert result["ok"] is True
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    event_types = [event["event_type"] for event in events]
+    assert event_types == [
+        "tx.begin",
+        "tx.verify.start",
+        "tx.verify.pass",
+        "tx.commit.start",
+    ]
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    active_tx = tx_state["active_tx"]
+    assert active_tx["verify_state"]["status"] == "passed"
+    assert active_tx["status"] == "verified"
 
 
 def test_diff_summary_handles_exception():

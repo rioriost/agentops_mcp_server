@@ -1,0 +1,44 @@
+{
+  "id": "p2-t02",
+  "title": "Fix Python bootstrap and derived-state handling for startup",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Update Python runtime behavior so planning and task startup succeed from a freshly initialized zero-event baseline, while preserving strict transaction invariants.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.8/plan.md",
+    "initial-dot-agent/",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/state_store.py"
+  ],
+  "outputs": [
+    "Python changes enabling safe startup from initial baseline",
+    "Valid derived next-step behavior for capture and handoff flows",
+    "Regression-safe transaction bootstrap handling"
+  ],
+  "acceptance_criteria": [
+    "Starting the first planning or task flow from a valid zero-event baseline does not fail with `tx.begin required before other events`.",
+    "State capture and handoff-related Python paths do not fail when no active transaction has started yet.",
+    "Derived transaction state includes a valid startup-safe next action when canonical state is otherwise empty or initial.",
+    "Changes preserve strict transaction ordering outside the explicit initial bootstrap case.",
+    "Existing Python behavior unrelated to startup remains stable."
+  ],
+  "tasks": [
+    "Inspect startup-related Python paths that read `active_tx`, enforce `tx.begin`, and derive `next_action`.",
+    "Define the minimal bootstrap rule that allows the first planning task to establish transaction context safely.",
+    "Update runtime logic so the initial task-start path can create or recognize valid transaction context on a zero-event baseline.",
+    "Update derived-state handling so capture and handoff flows produce valid startup-safe next actions when no active work exists.",
+    "Verify that invariant enforcement still rejects invalid non-bootstrap event ordering.",
+    "Keep the implementation minimal and focused on the startup/resume edge case."
+  ],
+  "dependencies": [
+    "p1-t01"
+  ],
+  "notes": [
+    "Do not broadly relax transaction validation.",
+    "Treat a present-but-empty canonical event log as a valid initialized baseline.",
+    "Prefer a narrowly scoped bootstrap path over lifecycle redesign.",
+    "Coordinate behavior with `.rules` and `zed-agentops-init.sh`, but keep this ticket focused on Python runtime changes."
+  ]
+}
