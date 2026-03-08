@@ -1,12 +1,18 @@
-# Draft for 0.4.6: multiple MCP servers with Zed
+# Draft for 0.4.7: bug fixes
 
 ## Background
-- 0.4.3で、CWDが"/"の場合はエラーとして扱う変更を行ったが、Zedは複数のプロジェクト（ディレクトリ）がある場合には、それぞれのプロジェクトでMCPサーバをforkして実行する際にCWDを"/"に設定したままにしてしまう不具合があるため（https://github.com/zed-industries/zed/pull/51002）、2つ目以降のプロジェクトでMCPサーバ（src/以下のPython実装、agentops_mcp_server）が起動しない。
-- 0.4.3での変更以前には、例えば、"/Users/rifujita/ownCloud/bin/my_project/.agent/"のartifactsをRead / Writeすべきところ、"/.agent/"としてパスを展開し、当然のことながらパーミッションエラーになる不具合が発生していた。
-- CWDが"/"の場合に、エラーとして扱うのではなく、プロジェクト（ディレクトリ）のファイルのRead/Writeを伴うtoolの実行時に、AIエージェントにCWDを渡す変更案が考えられる。Zedのバグに対するworkaroundなので、他に良い実装案がないかも検討したい。
+- initial-dot-agent/に、zed-agentops-init.shを実行し、Zedでプロジェクトディレクトリを開いた直後の、journal.jsonl、tx_event_log.jsonl、tx_state.jsonを置きました。
+- この状態から、AIエージェントを利用開始した場合、以下のエラーが出ます。
+
+{"ts": "2026-03-08T05:34:11.179215+00:00", "tool_name": "ops_start_task", "tool_input": {"title": "Generate v0.0.1 plan and ticket files from docs/draft.md", "task_id": "plan-v0.0.1", "session_id": "mnemis-plan-session", "agent_id": "gpt-5.4", "status": "in-progress", "truncate_limit": 4000}, "tool_output": {"error": "tx.begin required before other events"}}
+{"ts": "2026-03-08T05:34:11.180247+00:00", "tool_name": "ops_update_task", "tool_input": {"status": "in-progress", "note": "Starting planning flow from docs/draft.md per project rules. Resume brief indicates no active ticket; creating initial plan artifacts for versioned docs.", "task_id": "plan-v0.0.1", "session_id": "mnemis-plan-session", "agent_id": "gpt-5.4", "user_intent": "Start work following .rules using docs/draft.md as the planning source.", "truncate_limit": 4000}, "tool_output": {"error": "tx.begin required before other events"}}
+{"ts": "2026-03-08T05:35:39.704654+00:00", "tool_name": "ops_capture_state", "tool_input": {"session_id": "mnemis-plan-session", "truncate_limit": 4000}, "tool_output": {"error": "active_tx.next_action is required"}}
+{"ts": "2026-03-08T05:35:39.705625+00:00", "tool_name": "ops_handoff_export", "tool_input": {"truncate_limit": 4000}, "tool_output": {"error": "active_tx.next_action is required"}}
+
+- 原因を調査し、.rules、zed-agentops-init.sh、src/以下のPythonコードを修正する必要があります。
 
 ## Goal
-- Zedの複数のプロジェクトで同時にMCPサーバ（agentops_mcp_server）が起動すること。
+- 初期状態から作業を開始しても、エラーが発生しないこと。
 
 ## Acceptance criteria
 - カバレッジ90%以上

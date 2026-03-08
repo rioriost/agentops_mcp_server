@@ -7,3 +7,4 @@ __pycache__/
 .envrc
 .coverage
 coverage.xml
+initial-dot-agent/
