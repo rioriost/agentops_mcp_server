@@ -1,0 +1,51 @@
+{
+  "id": "p2-t5",
+  "phase": 2,
+  "title": "Update .rules and zed-agentops-init.sh heredoc to require workspace initialization before restore",
+  "status": "planned",
+  "summary": "Update the repository .rules file and the scaffolded .rules heredoc in zed-agentops-init.sh so startup requires a one-time workspace_initialize(cwd) call before tx_state, tx_event_log, or handoff restore, while keeping the generated scaffold aligned with the runtime contract for unresolved '/' startup cases.",
+  "inputs": [
+    "docs/v0.4.6/plan.md",
+    "docs/v0.4.6/p1-t2.json",
+    ".rules",
+    "src/agentops_mcp_server/zed-agentops-init.sh"
+  ],
+  "outputs": [
+    "docs/v0.4.6/p2-t5.json",
+    ".rules",
+    "src/agentops_mcp_server/zed-agentops-init.sh"
+  ],
+  "acceptance_criteria": [
+    "The root .rules file requires workspace_initialize(cwd) as the first mandatory startup step before any canonical state restore.",
+    "The startup order in .rules is updated to workspace_initialize(cwd) -> tx_state -> tx_event_log -> handoff.",
+    "The zed-agentops-init.sh embedded .rules heredoc matches the repository .rules contract for workspace initialization and root-dependent tool behavior.",
+    "The wording makes clear that workspace initialization happens once, same-root reinitialization is acceptable as a no-op, and root-dependent tools must not run before initialization completes.",
+    "The updated scaffold text remains aligned with the runtime safety goal of never resolving artifacts under /.agent."
+  ],
+  "deps": [
+    "p1-t2"
+  ],
+  "steps": [
+    {
+      "id": "p2-t5-s1",
+      "description": "Update the repository .rules Start section so workspace_initialize(cwd) is mandatory before reading tx_state, tx_event_log, or handoff."
+    },
+    {
+      "id": "p2-t5-s2",
+      "description": "Clarify in .rules that root-dependent tools must not run before initialization and that initialization is a one-time per-session bind."
+    },
+    {
+      "id": "p2-t5-s3",
+      "description": "Update the .rules heredoc inside zed-agentops-init.sh to mirror the repository .rules startup contract exactly."
+    },
+    {
+      "id": "p2-t5-s4",
+      "description": "Check the repository copy and scaffolded heredoc for wording drift so future initialized projects receive the same startup instructions."
+    }
+  ],
+  "notes": [
+    "Keep the repository .rules and scaffolded .rules text synchronized in the same change.",
+    "The contract should explicitly support the Zed multi-project case where the server can start unresolved because process CWD is '/'.",
+    "Do not weaken the safety guarantee that artifacts must never resolve under /.agent."
+  ]
+}

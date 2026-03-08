@@ -1,0 +1,87 @@
+{
+  "id": "p4-t2",
+  "phase": 4,
+  "title": "Validate final acceptance criteria and release readiness for v0.4.6",
+  "status": "done",
+  "summary": "Confirm that the v0.4.6 implementation resolves Zed multi-project startup failures caused by CWD='/', enforces one-time workspace root initialization through `workspace_initialize(cwd)`, preserves safety against `/.agent/` path expansion, persists failed tool executions to `.agent/errors.jsonl`, and satisfies the release coverage target.",
+  "inputs": [
+    "docs/v0.4.6/plan.md",
+    "docs/draft.md",
+    "docs/v0.4.6/p3-t4.json",
+    "docs/v0.4.6/p4-t1.json",
+    ".rules",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "src/agentops_mcp_server/main.py",
+    "src/agentops_mcp_server/repo_context.py",
+    "src/agentops_mcp_server/json_rpc_server.py",
+    "src/agentops_mcp_server/state_store.py"
+  ],
+  "outputs": ["docs/v0.4.6/p4-t2.json"],
+  "acceptance_criteria": [
+    "The MCP server can start under Zed multi-project scenarios even when the process working directory is '/'.",
+    "The server supports a one-time `workspace_initialize(cwd)` flow that binds the canonical project root for the session.",
+    "`workspace_initialize(cwd)` rejects '/' and rejects rebinding to a different project root, while allowing same-root reinitialization as a no-op success if implemented that way in the final design.",
+    "Root-dependent tool calls do not read from or write to `/.agent/`.",
+    "Root-dependent tool calls fail clearly before initialization when startup cwd is unresolved.",
+    "Failed tool executions are appended to `.agent/errors.jsonl` with tool name, input, and output/error details.",
+    "`.rules` and the `zed-agentops-init.sh` scaffolded heredoc both reflect the new startup contract requiring workspace initialization before canonical state restore.",
+    "Verification passes and reported test coverage remains at or above 90%."
+  ],
+  "deps": ["p3-t4", "p4-t1"],
+  "steps": [
+    {
+      "id": "p4-t2-s1",
+      "description": "Review the implemented startup flow against the v0.4.6 plan, confirming unresolved '/' startup is tolerated until `workspace_initialize(cwd)` binds the project root."
+    },
+    {
+      "id": "p4-t2-s2",
+      "description": "Confirm that repo/artifact operations remain protected against `/.agent/` resolution and that uninitialized root-dependent calls fail with explicit guidance."
+    },
+    {
+      "id": "p4-t2-s3",
+      "description": "Check that failed tool execution logging to `.agent/errors.jsonl` is implemented with the required fields and does not suppress the original client-facing error response."
+    },
+    {
+      "id": "p4-t2-s4",
+      "description": "Verify that `.rules`, the scaffolded `.rules` heredoc in `zed-agentops-init.sh`, and release-facing documentation are aligned with the final startup and error-logging contract."
+    },
+    {
+      "id": "p4-t2-s5",
+      "description": "Confirm that verification results and coverage output satisfy the release threshold and that no acceptance criterion from the plan or draft has been omitted."
+    }
+  ],
+  "notes": [
+    "Focus on final release acceptance, not on introducing additional implementation changes.",
+    "Acceptance review must cover both the workspace initialization contract and the new persistent tool error logging behavior.",
+    "Keep the final validation evidence concise and tied directly to the documented acceptance criteria.",
+    "README.md and README-jp.md remain unchanged for this ticket because they are general-user documentation rather than release-operator workflow documentation."
+  ],
+  "results": {
+    "release_readiness": "ready",
+    "startup_behavior": {
+      "status": "passed",
+      "summary": "The MCP server tolerates startup with CWD='/' in unresolved mode and binds the project root through workspace_initialize(cwd)."
+    },
+    "root_safety": {
+      "status": "passed",
+      "summary": "Root-dependent operations remain protected against /.agent/ resolution and fail clearly before initialization when the repo root is unresolved."
+    },
+    "error_logging": {
+      "status": "passed",
+      "summary": "Failed tool executions are recorded in .agent/errors.jsonl with tool context while preserving the original client-facing error."
+    },
+    "rules_alignment": {
+      "status": "passed",
+      "summary": ".rules and the scaffolded heredoc in zed-agentops-init.sh both require workspace_initialize(cwd) before canonical restore."
+    },
+    "verification": {
+      "status": "passed",
+      "summary": "pytest -q passed with 289 tests, repo_verify passed, and release coverage reached 95%."
+    },
+    "documentation": {
+      "status": "accepted",
+      "summary": "README changes were intentionally skipped because the README files are scoped to general users, not this release-readiness ticket."
+    },
+    "blockers": []
+  }
+}

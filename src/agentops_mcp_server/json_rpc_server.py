@@ -4,6 +4,7 @@ import json
 import sys
 from typing import Any, Dict, Optional
 
+from .ops_tools import summarize_result
 from .state_store import StateStore
 from .tool_router import ToolRouter
 
@@ -17,6 +18,31 @@ class JsonRpcServer:
     def __init__(self, tool_router: ToolRouter, state_store: StateStore) -> None:
         self.tool_router = tool_router
         self.state_store = state_store
+
+    def _log_tool_failure(
+        self,
+        tool_name: Optional[str],
+        tool_input: Any,
+        tool_output: Any,
+    ) -> None:
+        if not isinstance(tool_name, str) or not tool_name.strip():
+            return
+        if not self.state_store.repo_context.has_repo_root():
+            return
+
+        normalized_input = (
+            tool_input if isinstance(tool_input, dict) else {"raw_input": tool_input}
+        )
+        normalized_output = summarize_result(tool_output, limit=4000)
+
+        try:
+            self.state_store.log_tool_error(
+                tool_name=tool_name.strip(),
+                tool_input=normalized_input,
+                tool_output=normalized_output,
+            )
+        except Exception:
+            return
 
     def handle_request(self, req: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         method = req.get("method")
@@ -45,7 +71,15 @@ class JsonRpcServer:
                 raise ValueError("tools/call requires 'name' (string)")
             if not isinstance(arguments, dict):
                 raise ValueError("tools/call requires 'arguments' (object)")
-            result = self.tool_router.tools_call(name, arguments)
+            try:
+                result = self.tool_router.tools_call(name, arguments)
+            except Exception as exc:
+                self._log_tool_failure(
+                    tool_name=name,
+                    tool_input=arguments,
+                    tool_output={"error": str(exc)},
+                )
+                raise
         else:
             raise ValueError(f"Unknown method: {method}")
 

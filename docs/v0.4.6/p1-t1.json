@@ -1,0 +1,46 @@
+{
+  "id": "p1-t1",
+  "phase": 1,
+  "title": "Finalize workspace_initialize(cwd) startup contract and repo-root invariants",
+  "status": "planned",
+  "summary": "Define the one-time workspace initialization contract for v0.4.6 so the MCP server can start when process CWD is '/' under Zed multi-project launches, while preserving strict safety around project-root binding and artifact path resolution.",
+  "inputs": [
+    "docs/v0.4.6/plan.md",
+    "docs/draft.md",
+    "src/agentops_mcp_server/main.py",
+    "src/agentops_mcp_server/repo_context.py",
+    "src/agentops_mcp_server/json_rpc_server.py"
+  ],
+  "outputs": ["docs/v0.4.6/p1-t1.json"],
+  "acceptance_criteria": [
+    "Defines the startup contract for workspace_initialize(cwd) as the required first binding step when startup CWD is '/'.",
+    "Specifies repo-root lifecycle rules for unresolved startup, first successful bind, same-root reinitialization, and conflicting rebind rejection.",
+    "Clarifies backward-compatible behavior for normal non-root startup where the server can bind immediately from process CWD.",
+    "Preserves the safety invariant that '/' must never become the bound project root and that artifact paths must never resolve under '/.agent/'.",
+    "Identifies the runtime boundary where root-dependent tools must fail clearly until workspace initialization is complete."
+  ],
+  "deps": [],
+  "steps": [
+    {
+      "id": "p1-t1-s1",
+      "description": "Review current startup assumptions in main.py, RepoContext validation, and JSON-RPC tool execution flow."
+    },
+    {
+      "id": "p1-t1-s2",
+      "description": "Define the workspace_initialize(cwd) contract, including input validation, return shape, and no-op behavior for same-root reinitialization."
+    },
+    {
+      "id": "p1-t1-s3",
+      "description": "Specify repo-root state transitions and invariants for unresolved startup, successful bind, and conflicting rebind attempts."
+    },
+    {
+      "id": "p1-t1-s4",
+      "description": "Document how root-dependent tools behave before initialization and how normal single-project startup remains backward compatible."
+    }
+  ],
+  "notes": [
+    "This ticket is contract and design focused; it should not implement runtime changes directly.",
+    "The selected design assumes one MCP server instance corresponds to one stable Zed project directory for the duration of the session.",
+    "The contract should remain explicit enough that .rules can require workspace_initialize(cwd) before canonical state restore."
+  ]
+}

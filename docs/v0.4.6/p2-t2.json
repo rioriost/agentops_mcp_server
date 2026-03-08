@@ -1,0 +1,54 @@
+{
+  "id": "p2-t2",
+  "phase": 2,
+  "title": "Implement workspace_initialize(cwd) and register it in the tool layer",
+  "status": "planned",
+  "summary": "Add a dedicated `workspace_initialize(cwd)` tool that binds the canonical project root once per server session, supports Zed multi-project startup when process CWD is '/', and preserves the safety invariant that file-backed operations never resolve artifacts under '/.agent'.",
+  "inputs": [
+    "docs/v0.4.6/plan.md",
+    "docs/v0.4.6/p1-t1.json",
+    "src/agentops_mcp_server/main.py",
+    "src/agentops_mcp_server/tool_registry.py",
+    "src/agentops_mcp_server/tool_router.py",
+    "src/agentops_mcp_server/json_rpc_server.py",
+    "src/agentops_mcp_server/repo_context.py"
+  ],
+  "outputs": [
+    "docs/v0.4.6/p2-t2.json",
+    "src/agentops_mcp_server/main.py",
+    "src/agentops_mcp_server/tool_registry.py",
+    "src/agentops_mcp_server/tool_router.py",
+    "src/agentops_mcp_server/json_rpc_server.py",
+    "src/agentops_mcp_server/repo_context.py"
+  ],
+  "acceptance_criteria": [
+    "A new `workspace_initialize(cwd)` tool is exposed through the runtime tool layer.",
+    "`workspace_initialize(cwd)` validates the provided cwd, rejects '/' as invalid, and binds the repo root when no root is currently initialized.",
+    "Calling `workspace_initialize(cwd)` again with the same root succeeds as a no-op, while rebinding to a different root fails with a clear error.",
+    "The initialization flow integrates cleanly with startup/runtime behavior for both normal single-project launches and Zed multi-project launches that start with process CWD='/' ."
+  ],
+  "deps": ["p2-t1"],
+  "steps": [
+    {
+      "id": "p2-t2-s1",
+      "description": "Define the tool contract for `workspace_initialize(cwd)`, including success shape, same-root reinitialization behavior, and conflicting-root rejection."
+    },
+    {
+      "id": "p2-t2-s2",
+      "description": "Implement runtime binding logic that routes `workspace_initialize(cwd)` to the repo-context initialization path."
+    },
+    {
+      "id": "p2-t2-s3",
+      "description": "Register the new tool in the exposed tool list and ensure it is callable through the JSON-RPC tool execution flow."
+    },
+    {
+      "id": "p2-t2-s4",
+      "description": "Verify that normal non-root startup remains backward compatible while unresolved '/' startup can be recovered by the new initialization tool."
+    }
+  ],
+  "notes": [
+    "This ticket focuses on the initialization tool itself, not on updating every root-dependent operation.",
+    "The implementation must keep the one-server-one-project invariant explicit and enforceable.",
+    "Prefer keeping initialization semantics centralized rather than duplicating bind logic across unrelated components."
+  ]
+}

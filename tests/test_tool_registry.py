@@ -7,6 +7,7 @@ def _dummy(**_kwargs):
 
 def test_build_tool_registry_includes_expected_keys():
     registry = build_tool_registry(
+        workspace_initialize=_dummy,
         commit_if_verified=_dummy,
         tx_event_append=_dummy,
         tx_state_save=_dummy,
@@ -30,6 +31,7 @@ def test_build_tool_registry_includes_expected_keys():
     )
 
     expected_keys = {
+        "workspace_initialize",
         "commit_if_verified",
         "tx_event_append",
         "tx_state_save",
@@ -57,6 +59,7 @@ def test_build_tool_registry_includes_expected_keys():
 
 def test_registry_entries_include_schema_and_handler():
     registry = build_tool_registry(
+        workspace_initialize=_dummy,
         commit_if_verified=_dummy,
         tx_event_append=_dummy,
         tx_state_save=_dummy,
@@ -78,6 +81,11 @@ def test_registry_entries_include_schema_and_handler():
         ops_task_summary=_dummy,
         ops_observability_summary=_dummy,
     )
+
+    workspace_initialize = registry["workspace_initialize"]
+    assert workspace_initialize["handler"] is _dummy
+    assert workspace_initialize["input_schema"]["required"] == ["cwd"]
+    assert workspace_initialize["input_schema"]["properties"]["cwd"]["type"] == "string"
 
     tx_event = registry["tx_event_append"]
     assert tx_event["handler"] is _dummy

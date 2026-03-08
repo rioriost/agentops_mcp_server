@@ -1,0 +1,43 @@
+{
+  "id": "p1-t2",
+  "phase": 1,
+  "title": "Align .rules and zed-agentops-init.sh startup contract with workspace initialization",
+  "status": "planned",
+  "summary": "Define the required changes to the repository .rules file and the scaffolded .rules heredoc in zed-agentops-init.sh so startup mandates a one-time workspace_initialize(cwd) call before any canonical state restore or other root-dependent work begins.",
+  "inputs": [
+    "docs/v0.4.6/plan.md",
+    ".rules",
+    "src/agentops_mcp_server/zed-agentops-init.sh"
+  ],
+  "outputs": ["docs/v0.4.6/p1-t2.json"],
+  "acceptance_criteria": [
+    "Specifies that `workspace_initialize(cwd)` must be the first mandatory startup step before reading `tx_state`, `tx_event_log`, or `handoff`.",
+    "Defines consistent wording updates for both the repository `.rules` file and the scaffolded `.rules` heredoc in `zed-agentops-init.sh`.",
+    "Clarifies that root-dependent tools must not run before workspace initialization completes successfully.",
+    "Keeps the startup contract aligned with the one-project-per-server invariant and the safety rule that `/.agent/` must never be used as the artifact root."
+  ],
+  "deps": ["p1-t1"],
+  "steps": [
+    {
+      "id": "p1-t2-s1",
+      "description": "Review the current Start (mandatory) wording in the repository .rules file and in the zed-agentops-init.sh heredoc."
+    },
+    {
+      "id": "p1-t2-s2",
+      "description": "Define the new startup order so workspace_initialize(cwd) runs exactly once before canonical state restore."
+    },
+    {
+      "id": "p1-t2-s3",
+      "description": "Document required wording for initialization, no-op same-root reinitialization, and rejection of root-dependent work before initialization."
+    },
+    {
+      "id": "p1-t2-s4",
+      "description": "Record the alignment requirements so the repository .rules file and scaffold output remain synchronized."
+    }
+  ],
+  "notes": [
+    "This ticket is contract/spec alignment only; it does not implement runtime changes by itself.",
+    "The startup wording should support AI-agent compliance, but runtime enforcement remains necessary for safety.",
+    "The scaffolded heredoc and repository .rules file must be updated together to avoid drift."
+  ]
+}

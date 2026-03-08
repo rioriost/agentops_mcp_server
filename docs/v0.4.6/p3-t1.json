@@ -1,0 +1,53 @@
+{
+  "id": "p3-t1",
+  "phase": 3,
+  "title": "Add tests for unresolved startup and workspace_initialize(cwd) binding semantics",
+  "status": "planned",
+  "summary": "Add focused tests covering unresolved startup when process CWD is '/', one-time workspace initialization binding, same-root reinitialization as a no-op, and conflicting rebind rejection for the v0.4.6 startup contract.",
+  "inputs": [
+    "docs/v0.4.6/plan.md",
+    "docs/v0.4.6/p2-t1.json",
+    "docs/v0.4.6/p2-t2.json",
+    "src/agentops_mcp_server/main.py",
+    "src/agentops_mcp_server/repo_context.py",
+    "src/agentops_mcp_server/tool_router.py",
+    "src/agentops_mcp_server/json_rpc_server.py"
+  ],
+  "outputs": [
+    "tests/test_main_wrappers.py",
+    "tests/test_repo_context.py",
+    "tests/test_tool_router.py",
+    "tests/test_json_rpc_server.py"
+  ],
+  "acceptance_criteria": [
+    "Tests cover server startup behavior when process CWD is '/' and the repo context begins unresolved instead of failing immediately.",
+    "Tests verify workspace_initialize(cwd) successfully binds a validated non-root project directory.",
+    "Tests verify calling workspace_initialize(cwd) again with the same root succeeds as a no-op.",
+    "Tests verify calling workspace_initialize(cwd) with '/' or with a different root after binding fails with clear errors.",
+    "Coverage contribution helps keep total project coverage at or above 90%."
+  ],
+  "deps": ["p2-t1", "p2-t2"],
+  "steps": [
+    {
+      "id": "p3-t1-s1",
+      "description": "Identify the new startup and binding branches introduced by unresolved RepoContext initialization and workspace_initialize(cwd)."
+    },
+    {
+      "id": "p3-t1-s2",
+      "description": "Add RepoContext tests covering unresolved startup state, initial bind, same-root rebind no-op, and different-root rebind rejection."
+    },
+    {
+      "id": "p3-t1-s3",
+      "description": "Add entrypoint/router or JSON-RPC tests confirming workspace_initialize(cwd) is exposed and enforces the expected binding semantics."
+    },
+    {
+      "id": "p3-t1-s4",
+      "description": "Run targeted tests to confirm the initialization-binding contract is protected by deterministic regression coverage."
+    }
+  ],
+  "notes": [
+    "Keep tests hermetic and filesystem-local; do not rely on a real Zed process.",
+    "Prefer direct assertions on initialization state transitions and error messages over broad integration scaffolding.",
+    "This ticket focuses on initialization binding semantics; failed-tool logging is covered by p3-t3."
+  ]
+}

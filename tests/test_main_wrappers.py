@@ -3,7 +3,13 @@ import agentops_mcp_server.main as main
 
 def test_main_wrapper_delegates(monkeypatch):
     class DummyRepoContext:
-        pass
+        def bind_repo_root(self, root):
+            return {
+                "ok": True,
+                "repo_root": str(root),
+                "initialized": True,
+                "changed": True,
+            }
 
     class DummyStore:
         pass
@@ -99,6 +105,10 @@ def test_main_wrapper_delegates(monkeypatch):
     monkeypatch.setattr(main, "_OPS_TOOLS", DummyOpsTools())
     monkeypatch.setattr(main, "_TOOL_ROUTER", DummyToolRouter())
     monkeypatch.setattr(main, "_RPC_SERVER", dummy_rpc)
+
+    init_result = main.workspace_initialize("/tmp/project")
+    assert init_result["ok"] is True
+    assert init_result["repo_root"] == "/tmp/project"
 
     assert main.run_verify(timeout_sec=3)["verify"] == 3
     assert main.commit_if_verified("msg", timeout_sec=2)["commit_if_verified"] == "msg"

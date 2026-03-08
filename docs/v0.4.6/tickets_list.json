@@ -1,0 +1,255 @@
+{
+  "version": "0.4.6",
+  "title": "Multiple MCP servers with Zed",
+  "tickets": [
+    {
+      "id": "p1-t1",
+      "phase": 1,
+      "title": "Finalize workspace_initialize(cwd) startup contract and repo-root invariants",
+      "status": "planned",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        "docs/draft.md",
+        "src/agentops_mcp_server/main.py",
+        "src/agentops_mcp_server/repo_context.py",
+        "src/agentops_mcp_server/json_rpc_server.py"
+      ],
+      "outputs": ["docs/v0.4.6/p1-t1.json"],
+      "deps": []
+    },
+    {
+      "id": "p1-t2",
+      "phase": 1,
+      "title": "Align .rules and zed-agentops-init.sh startup contract with workspace initialization",
+      "status": "planned",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        ".rules",
+        "src/agentops_mcp_server/zed-agentops-init.sh"
+      ],
+      "outputs": ["docs/v0.4.6/p1-t2.json"],
+      "deps": ["p1-t1"]
+    },
+    {
+      "id": "p2-t1",
+      "phase": 2,
+      "title": "Refactor RepoContext and startup wiring for unresolved startup and one-time root binding",
+      "status": "planned",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        "docs/v0.4.6/p1-t1.json",
+        "src/agentops_mcp_server/main.py",
+        "src/agentops_mcp_server/repo_context.py"
+      ],
+      "outputs": [
+        "docs/v0.4.6/p2-t1.json",
+        "src/agentops_mcp_server/main.py",
+        "src/agentops_mcp_server/repo_context.py"
+      ],
+      "deps": ["p1-t1"]
+    },
+    {
+      "id": "p2-t2",
+      "phase": 2,
+      "title": "Implement workspace_initialize(cwd) and register it in the tool layer",
+      "status": "planned",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        "docs/v0.4.6/p1-t1.json",
+        "src/agentops_mcp_server/main.py",
+        "src/agentops_mcp_server/tool_registry.py",
+        "src/agentops_mcp_server/tool_router.py",
+        "src/agentops_mcp_server/json_rpc_server.py",
+        "src/agentops_mcp_server/repo_context.py"
+      ],
+      "outputs": [
+        "docs/v0.4.6/p2-t2.json",
+        "src/agentops_mcp_server/main.py",
+        "src/agentops_mcp_server/tool_registry.py",
+        "src/agentops_mcp_server/tool_router.py",
+        "src/agentops_mcp_server/json_rpc_server.py",
+        "src/agentops_mcp_server/repo_context.py"
+      ],
+      "deps": ["p2-t1"]
+    },
+    {
+      "id": "p2-t3",
+      "phase": 2,
+      "title": "Require initialized root for file-backed operations and preserve /.agent safety",
+      "status": "planned",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        "docs/v0.4.6/p1-t1.json",
+        "src/agentops_mcp_server/state_store.py",
+        "src/agentops_mcp_server/state_rebuilder.py",
+        "src/agentops_mcp_server/repo_tools.py",
+        "src/agentops_mcp_server/verify_runner.py",
+        "src/agentops_mcp_server/git_repo.py",
+        "src/agentops_mcp_server/commit_manager.py",
+        "src/agentops_mcp_server/ops_tools.py",
+        "src/agentops_mcp_server/tool_router.py"
+      ],
+      "outputs": [
+        "docs/v0.4.6/p2-t3.json",
+        "src/agentops_mcp_server/state_store.py",
+        "src/agentops_mcp_server/state_rebuilder.py",
+        "src/agentops_mcp_server/repo_tools.py",
+        "src/agentops_mcp_server/verify_runner.py",
+        "src/agentops_mcp_server/git_repo.py",
+        "src/agentops_mcp_server/commit_manager.py",
+        "src/agentops_mcp_server/ops_tools.py",
+        "src/agentops_mcp_server/tool_router.py"
+      ],
+      "deps": ["p2-t2"]
+    },
+    {
+      "id": "p2-t4",
+      "phase": 2,
+      "title": "Implement persistent .agent/errors.jsonl logging for failed tool executions",
+      "status": "planned",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        "src/agentops_mcp_server/json_rpc_server.py",
+        "src/agentops_mcp_server/state_store.py",
+        "src/agentops_mcp_server/repo_context.py"
+      ],
+      "outputs": [
+        "docs/v0.4.6/p2-t4.json",
+        "src/agentops_mcp_server/json_rpc_server.py",
+        "src/agentops_mcp_server/state_store.py",
+        "src/agentops_mcp_server/repo_context.py"
+      ],
+      "deps": ["p2-t1"]
+    },
+    {
+      "id": "p2-t5",
+      "phase": 2,
+      "title": "Update .rules and zed-agentops-init.sh heredoc to require workspace initialization before restore",
+      "status": "planned",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        "docs/v0.4.6/p1-t2.json",
+        ".rules",
+        "src/agentops_mcp_server/zed-agentops-init.sh"
+      ],
+      "outputs": [
+        "docs/v0.4.6/p2-t5.json",
+        ".rules",
+        "src/agentops_mcp_server/zed-agentops-init.sh"
+      ],
+      "deps": ["p1-t2"]
+    },
+    {
+      "id": "p3-t1",
+      "phase": 3,
+      "title": "Add tests for unresolved startup and workspace_initialize(cwd) binding semantics",
+      "status": "planned",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        "docs/v0.4.6/p2-t1.json",
+        "docs/v0.4.6/p2-t2.json",
+        "src/agentops_mcp_server/main.py",
+        "src/agentops_mcp_server/repo_context.py",
+        "tests/test_main_wrappers.py",
+        "tests/test_repo_context.py",
+        "tests/test_tool_router.py",
+        "tests/test_json_rpc_server.py"
+      ],
+      "outputs": [
+        "docs/v0.4.6/p3-t1.json",
+        "tests/test_main_wrappers.py",
+        "tests/test_repo_context.py",
+        "tests/test_tool_router.py",
+        "tests/test_json_rpc_server.py"
+      ],
+      "deps": ["p2-t2"]
+    },
+    {
+      "id": "p3-t2",
+      "phase": 3,
+      "title": "Add tests for root-dependent tool behavior before and after initialization",
+      "status": "planned",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        "docs/v0.4.6/p2-t3.json",
+        "src/agentops_mcp_server/state_store.py",
+        "src/agentops_mcp_server/ops_tools.py",
+        "src/agentops_mcp_server/repo_tools.py",
+        "tests/test_state_store.py",
+        "tests/test_ops_tools.py",
+        "tests/test_repo_tools.py",
+        "tests/test_commit_manager.py"
+      ],
+      "outputs": [
+        "docs/v0.4.6/p3-t2.json",
+        "tests/test_state_store.py",
+        "tests/test_ops_tools.py",
+        "tests/test_repo_tools.py",
+        "tests/test_commit_manager.py"
+      ],
+      "deps": ["p2-t3"]
+    },
+    {
+      "id": "p3-t3",
+      "phase": 3,
+      "title": "Add tests for failed tool execution logging into .agent/errors.jsonl",
+      "status": "planned",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        "docs/v0.4.6/p2-t4.json",
+        "src/agentops_mcp_server/json_rpc_server.py",
+        "src/agentops_mcp_server/state_store.py",
+        "tests/test_json_rpc_server.py",
+        "tests/test_state_store.py"
+      ],
+      "outputs": [
+        "docs/v0.4.6/p3-t3.json",
+        "tests/test_json_rpc_server.py",
+        "tests/test_state_store.py"
+      ],
+      "deps": ["p2-t4"]
+    },
+    {
+      "id": "p3-t4",
+      "phase": 3,
+      "title": "Run coverage-focused verification and confirm >= 90%",
+      "status": "done",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        "docs/v0.4.6/p3-t1.json",
+        "docs/v0.4.6/p3-t2.json",
+        "docs/v0.4.6/p3-t3.json"
+      ],
+      "outputs": ["docs/v0.4.6/p3-t4.json"],
+      "deps": ["p3-t1", "p3-t2", "p3-t3"]
+    },
+    {
+      "id": "p4-t1",
+      "phase": 4,
+      "title": "Update documentation for workspace initialization and local error-log artifacts",
+      "status": "planned",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        "docs/v0.4.6/p1-t2.json",
+        "README.md",
+        "README-jp.md"
+      ],
+      "outputs": ["docs/v0.4.6/p4-t1.json", "README.md", "README-jp.md"],
+      "deps": ["p2-t5"]
+    },
+    {
+      "id": "p4-t2",
+      "phase": 4,
+      "title": "Validate acceptance criteria and release readiness for v0.4.6",
+      "status": "done",
+      "inputs": [
+        "docs/v0.4.6/plan.md",
+        "docs/draft.md",
+        "docs/v0.4.6/p3-t4.json",
+        "docs/v0.4.6/p4-t1.json"
+      ],
+      "outputs": ["docs/v0.4.6/p4-t2.json"],
+      "deps": ["p3-t4", "p4-t1"]
+    }
+  ]
+}

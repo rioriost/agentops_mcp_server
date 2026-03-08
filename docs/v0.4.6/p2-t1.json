@@ -1,0 +1,48 @@
+{
+  "id": "p2-t1",
+  "phase": 2,
+  "title": "Refactor RepoContext and startup wiring for unresolved startup and one-time root binding",
+  "status": "planned",
+  "summary": "Refactor startup and repo-context handling so the MCP server can boot even when process CWD is '/' and then bind a validated project root exactly once for the session, preserving the 0.4.3 safety guarantee against resolving artifacts under '/.agent'.",
+  "inputs": [
+    "docs/v0.4.6/plan.md",
+    "docs/v0.4.6/p1-t1.json",
+    "src/agentops_mcp_server/main.py",
+    "src/agentops_mcp_server/repo_context.py"
+  ],
+  "outputs": [
+    "docs/v0.4.6/p2-t1.json",
+    "src/agentops_mcp_server/main.py",
+    "src/agentops_mcp_server/repo_context.py"
+  ],
+  "acceptance_criteria": [
+    "RepoContext can represent an unresolved startup state when process CWD resolves to '/'.",
+    "Normal non-'/' startup still binds the project root immediately for backward compatibility.",
+    "RepoContext exposes explicit one-time binding semantics for workspace initialization, including same-root no-op behavior and different-root rebind rejection.",
+    "Artifact path helpers and repo-root access continue to reject unsafe usage that would otherwise resolve to '/.agent'."
+  ],
+  "deps": ["p1-t1"],
+  "steps": [
+    {
+      "id": "p2-t1-s1",
+      "description": "Refactor RepoContext so startup may begin without a validated repo root while preserving explicit validation for any bound root."
+    },
+    {
+      "id": "p2-t1-s2",
+      "description": "Introduce one-time root-binding behavior and invariants for unresolved -> resolved transition, same-root rebind no-op, and different-root rebind failure."
+    },
+    {
+      "id": "p2-t1-s3",
+      "description": "Update main.py startup wiring so non-'/' CWD still binds immediately, but '/' starts in unresolved mode without crashing the server."
+    },
+    {
+      "id": "p2-t1-s4",
+      "description": "Ensure root accessors and artifact path construction fail clearly when root is unresolved or unsafe."
+    }
+  ],
+  "notes": [
+    "This ticket establishes the runtime foundation for workspace_initialize(cwd) but does not itself expose the new tool contract.",
+    "Keep the change narrow: unresolved startup is allowed, but filesystem-backed behavior must still require a validated non-root project directory.",
+    "Preserve backward compatibility for ordinary single-project launches that already start from the project directory."
+  ]
+}

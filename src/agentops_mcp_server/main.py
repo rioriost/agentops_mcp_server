@@ -51,7 +51,8 @@ from .tool_registry import build_tool_registry
 from .tool_router import ToolRouter
 from .verify_runner import VerifyRunner
 
-_REPO_CONTEXT = RepoContext(Path.cwd().resolve())
+_INITIAL_CWD = Path.cwd().resolve()
+_REPO_CONTEXT = RepoContext(_INITIAL_CWD if _INITIAL_CWD != Path("/") else None)
 _STATE_STORE = StateStore(_REPO_CONTEXT)
 _STATE_REBUILDER = StateRebuilder(_REPO_CONTEXT, _STATE_STORE)
 _GIT_REPO = GitRepo(_REPO_CONTEXT)
@@ -63,7 +64,15 @@ _REPO_TOOLS = RepoTools(_GIT_REPO, _VERIFY_RUNNER)
 _TEST_SUGGESTER = TestSuggester(_GIT_REPO, _REPO_CONTEXT)
 _OPS_TOOLS = OpsTools(_REPO_CONTEXT, _STATE_STORE, _STATE_REBUILDER, _GIT_REPO)
 
+
+def workspace_initialize(cwd: str) -> Dict[str, Any]:
+    if not isinstance(cwd, str) or not cwd.strip():
+        raise ValueError("cwd is required")
+    return _REPO_CONTEXT.bind_repo_root(Path(cwd.strip()))
+
+
 TOOL_REGISTRY = build_tool_registry(
+    workspace_initialize=workspace_initialize,
     commit_if_verified=_COMMIT_MANAGER.commit_if_verified,
     tx_event_append=_STATE_STORE.tx_event_append,
     tx_state_save=_STATE_STORE.tx_state_save,
@@ -129,6 +138,18 @@ def tx_state_rebuild(
         end_seq=end_seq,
         tx_state_path=tx_state_path,
         event_log_path=event_log_path,
+    )
+
+
+def log_tool_error(
+    tool_name: str,
+    tool_input: Dict[str, Any],
+    tool_output: Any,
+) -> Dict[str, Any]:
+    return _STATE_STORE.log_tool_error(
+        tool_name=tool_name,
+        tool_input=tool_input,
+        tool_output=tool_output,
     )
 
 

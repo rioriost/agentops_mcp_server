@@ -1,0 +1,53 @@
+{
+  "id": "p2-t4",
+  "phase": 2,
+  "title": "Implement persistent .agent/errors.jsonl logging for failed tool executions",
+  "status": "planned",
+  "summary": "Add a persistent local error log for failed tool executions so tool errors are not only shown in the Zed agent panel but also appended to `.agent/errors.jsonl` with structured context including tool name, input, output/error, and timestamp.",
+  "inputs": [
+    "docs/v0.4.6/plan.md",
+    "docs/draft.md",
+    "src/agentops_mcp_server/json_rpc_server.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/repo_context.py"
+  ],
+  "outputs": [
+    "docs/v0.4.6/p2-t4.json",
+    "src/agentops_mcp_server/json_rpc_server.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/repo_context.py"
+  ],
+  "acceptance_criteria": [
+    "Failed tool executions append one structured JSON line to `.agent/errors.jsonl`.",
+    "Each error record includes at least timestamp, tool name, tool input, and tool output/error details.",
+    "Error logging occurs at the tool execution boundary so both validation failures and runtime failures are captured.",
+    "Failure to append the error log does not suppress or replace the original tool error returned to the client.",
+    "Error logging never writes to `/.agent/errors.jsonl`; it must use the initialized and validated project root."
+  ],
+  "deps": [
+    "p2-t1"
+  ],
+  "steps": [
+    {
+      "id": "p2-t4-s1",
+      "description": "Define the structured record schema for `.agent/errors.jsonl`, keeping it minimal but actionable."
+    },
+    {
+      "id": "p2-t4-s2",
+      "description": "Add repo-context support for resolving the error-log artifact path under the initialized project root."
+    },
+    {
+      "id": "p2-t4-s3",
+      "description": "Capture failed tool execution context in the JSON-RPC tool-call path and append it to `.agent/errors.jsonl`."
+    },
+    {
+      "id": "p2-t4-s4",
+      "description": "Ensure error logging is best-effort so logging failures do not mask the original client-facing error."
+    }
+  ],
+  "notes": [
+    "Prefer JSONL append-only logging to keep the artifact easy to inspect and robust under repeated failures.",
+    "Do not over-capture unrelated request data; focus on tool name, tool input, output/error, and timestamp.",
+    "This ticket is about runtime error observability and should align with the workspace initialization/root safety model."
+  ]
+}

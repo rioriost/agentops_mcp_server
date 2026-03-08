@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict
 
 def build_tool_registry(
     *,
+    workspace_initialize: Callable[..., Any],
     commit_if_verified: Callable[..., Any],
     tx_event_append: Callable[..., Any],
     tx_state_save: Callable[..., Any],
@@ -27,6 +28,15 @@ def build_tool_registry(
     ops_observability_summary: Callable[..., Any],
 ) -> Dict[str, Any]:
     return {
+        "workspace_initialize": {
+            "description": "Bind workspace root for this MCP server session",
+            "input_schema": {
+                "type": "object",
+                "properties": {"cwd": {"type": "string"}},
+                "required": ["cwd"],
+            },
+            "handler": workspace_initialize,
+        },
         "commit_if_verified": {
             "description": "Verify then commit",
             "input_schema": {

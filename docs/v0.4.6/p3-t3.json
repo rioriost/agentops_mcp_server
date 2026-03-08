@@ -1,0 +1,54 @@
+{
+  "id": "p3-t3",
+  "phase": 3,
+  "title": "Add tests for failed tool execution logging into .agent/errors.jsonl",
+  "status": "planned",
+  "summary": "Add deterministic tests that verify failed tool executions are appended to `.agent/errors.jsonl` with the required structured fields, while ensuring the original client-facing error response remains unchanged.",
+  "inputs": [
+    "docs/v0.4.6/plan.md",
+    "docs/v0.4.6/p2-t4.json",
+    "src/agentops_mcp_server/json_rpc_server.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/repo_context.py",
+    "tests/test_json_rpc_server.py",
+    "tests/test_state_store.py"
+  ],
+  "outputs": [
+    "docs/v0.4.6/p3-t3.json",
+    "tests/test_json_rpc_server.py",
+    "tests/test_state_store.py"
+  ],
+  "acceptance_criteria": [
+    "Tests verify that a failed tool execution appends one JSONL record to `.agent/errors.jsonl`.",
+    "Tests verify the error log record includes tool name, tool input, tool output/error, and timestamp.",
+    "Tests verify error logging is best-effort and does not mask or replace the original tool error returned to the client.",
+    "Tests verify error-log writes do not resolve to `/.agent/errors.jsonl` and respect the initialized project root invariant.",
+    "Updated tests contribute to keeping overall project coverage at or above 90%."
+  ],
+  "deps": [
+    "p2-t4"
+  ],
+  "steps": [
+    {
+      "id": "p3-t3-s1",
+      "description": "Identify the JSON-RPC error path and the helper boundaries where failed tool execution records are appended to `.agent/errors.jsonl`."
+    },
+    {
+      "id": "p3-t3-s2",
+      "description": "Add tests that trigger representative tool failures and assert a structured JSONL record is written with tool name, input, output/error, and timestamp."
+    },
+    {
+      "id": "p3-t3-s3",
+      "description": "Add tests confirming the client still receives the original error response even if error logging is enabled."
+    },
+    {
+      "id": "p3-t3-s4",
+      "description": "Add negative-path assertions ensuring the error log uses the initialized project root and never falls back to `/.agent/errors.jsonl`."
+    }
+  ],
+  "notes": [
+    "Keep tests hermetic and filesystem-local using temporary directories.",
+    "Prefer assertions on structured JSON content over broad text matching.",
+    "Focus on failed tool execution logging only; do not mix unrelated runtime behavior into this ticket."
+  ]
+}

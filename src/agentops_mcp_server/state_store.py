@@ -55,6 +55,27 @@ class StateStore:
         self.ensure_parent(path)
         path.write_text(content, encoding="utf-8")
 
+    def append_json_line(self, path: Path, payload: Dict[str, Any]) -> None:
+        self.ensure_parent(path)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+    def log_tool_error(
+        self,
+        tool_name: str,
+        tool_input: Dict[str, Any],
+        tool_output: Any,
+    ) -> Dict[str, Any]:
+        path = self.repo_context.state_artifact_path("errors")
+        record = {
+            "ts": now_iso(),
+            "tool_name": tool_name,
+            "tool_input": tool_input,
+            "tool_output": tool_output,
+        }
+        self.append_json_line(path, record)
+        return {"ok": True, "path": str(path)}
+
     def read_json_file(self, path: Path) -> Optional[Dict[str, Any]]:
         if not path.exists():
             return None

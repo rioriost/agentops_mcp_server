@@ -1,0 +1,63 @@
+{
+  "id": "p3-t2",
+  "phase": 3,
+  "title": "Add tests for root-dependent tool behavior before and after initialization",
+  "status": "planned",
+  "summary": "Add deterministic tests that verify root-dependent runtime components fail clearly before workspace initialization when startup cwd is '/', then succeed with the bound project root after `workspace_initialize(cwd)` is performed, while preserving the safety invariant that no artifact path resolves under '/.agent'.",
+  "inputs": [
+    "docs/v0.4.6/plan.md",
+    "docs/v0.4.6/p2-t3.json",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "src/agentops_mcp_server/verify_runner.py",
+    "src/agentops_mcp_server/git_repo.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "tests/test_state_store.py",
+    "tests/test_ops_tools.py",
+    "tests/test_repo_tools.py",
+    "tests/test_commit_manager.py"
+  ],
+  "outputs": [
+    "tests/test_state_store.py",
+    "tests/test_ops_tools.py",
+    "tests/test_repo_tools.py",
+    "tests/test_commit_manager.py"
+  ],
+  "acceptance_criteria": [
+    "Tests verify that root-dependent operations fail with actionable errors before initialization when the server starts with cwd='/' and no repo root is bound.",
+    "Tests verify that the same root-dependent operations succeed after `workspace_initialize(cwd)` binds a valid project root.",
+    "Tests verify that runtime components consistently use the initialized root for `.agent` artifacts, repo commands, and verify-script execution.",
+    "Tests preserve the safety invariant that runtime behavior never resolves canonical or derived artifacts under '/.agent'.",
+    "Added tests contribute to keeping overall project coverage at or above 90%."
+  ],
+  "deps": ["p2-t3"],
+  "steps": [
+    {
+      "id": "p3-t2-s1",
+      "description": "Identify root-dependent runtime paths that should reject execution before initialization, including state persistence, ops helpers, repo helpers, verify execution, and commit flow."
+    },
+    {
+      "id": "p3-t2-s2",
+      "description": "Add tests that assert clear failure behavior when these operations run while repo root is unresolved after cwd='/' startup."
+    },
+    {
+      "id": "p3-t2-s3",
+      "description": "Add tests that bind a valid project root through the new initialization flow and verify the same operations succeed using that bound root."
+    },
+    {
+      "id": "p3-t2-s4",
+      "description": "Add negative safety assertions confirming that no tested path can fall back to '/.agent' or otherwise bypass initialized-root validation."
+    },
+    {
+      "id": "p3-t2-s5",
+      "description": "Run targeted test coverage for the affected runtime components and confirm the new regression tests protect the initialized-root contract."
+    }
+  ],
+  "notes": [
+    "Keep tests hermetic and based on temporary directories; do not rely on a real Zed process.",
+    "Prefer direct assertions on raised error messages, resolved paths, and bound-root behavior over broad end-to-end scaffolding.",
+    "This ticket is test-focused and should not introduce unrelated runtime behavior changes."
+  ]
+}

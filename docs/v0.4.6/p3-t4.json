@@ -1,0 +1,66 @@
+{
+  "id": "p3-t4",
+  "phase": 3,
+  "title": "Run coverage-focused verification and confirm >= 90%",
+  "status": "done",
+  "summary": "Run the verification and coverage workflow for v0.4.6 after workspace initialization, root-safety, and error-log changes are implemented, and confirm total project coverage remains at or above 90%.",
+  "inputs": [
+    "docs/v0.4.6/plan.md",
+    "docs/v0.4.6/p3-t1.json",
+    "docs/v0.4.6/p3-t2.json",
+    "docs/v0.4.6/p3-t3.json"
+  ],
+  "outputs": ["docs/v0.4.6/p3-t4.json"],
+  "acceptance_criteria": [
+    "Project verification completes successfully after the v0.4.6 implementation and test updates.",
+    "Reported test coverage is confirmed to be 90% or higher.",
+    "Verification covers unresolved startup, workspace_initialize(cwd) binding, root-dependent tool behavior, and failed tool execution logging.",
+    "Any failures found during verification are recorded and routed back to the relevant implementation or test ticket before release signoff."
+  ],
+  "deps": ["p3-t1", "p3-t2", "p3-t3"],
+  "steps": [
+    {
+      "id": "p3-t4-s1",
+      "description": "Run the standard verification workflow after implementation and test updates are complete."
+    },
+    {
+      "id": "p3-t4-s2",
+      "description": "Check coverage output and confirm the project remains at or above the 90% requirement."
+    },
+    {
+      "id": "p3-t4-s3",
+      "description": "Review test results to ensure the v0.4.6 regression scenarios are covered, including startup under '/' and .agent/errors.jsonl logging."
+    },
+    {
+      "id": "p3-t4-s4",
+      "description": "If verification fails, feed the failures back into the relevant implementation or test ticket and rerun verification."
+    }
+  ],
+  "notes": [
+    "Keep verification focused on the 0.4.6 scope: one-time workspace initialization, safe artifact-path handling, and failed tool execution logging.",
+    "Prefer concise verification evidence: pass/fail status, coverage result, and any remaining blockers.",
+    "This ticket is verification-only and should not introduce unrelated runtime changes."
+  ],
+  "results": {
+    "pytest_q": {
+      "status": "passed",
+      "summary": "289 passed"
+    },
+    "coverage": {
+      "status": "passed",
+      "total_percent": 95,
+      "summary": "pytest --cov completed successfully and total coverage remained above the 90% release threshold."
+    },
+    "repo_verify": {
+      "status": "passed",
+      "summary": "repo_verify completed successfully for the work-loop verification path."
+    },
+    "regression_scope": [
+      "unresolved startup under '/'",
+      "workspace_initialize(cwd) binding behavior",
+      "root-dependent tool behavior before and after initialization",
+      "failed tool execution logging to .agent/errors.jsonl"
+    ],
+    "blockers": []
+  }
+}

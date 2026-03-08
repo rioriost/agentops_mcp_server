@@ -1,0 +1,64 @@
+{
+  "id": "p2-t3",
+  "phase": 2,
+  "title": "Require initialized root for file-backed operations and preserve /.agent safety",
+  "status": "planned",
+  "summary": "Update all root-dependent runtime components so they require an initialized project root before performing filesystem, repo, verification, or artifact operations, while preserving the safety invariant that no path may resolve under '/.agent'.",
+  "inputs": [
+    "docs/v0.4.6/plan.md",
+    "docs/v0.4.6/p1-t1.json",
+    "docs/v0.4.6/p2-t1.json",
+    "docs/v0.4.6/p2-t2.json",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "src/agentops_mcp_server/verify_runner.py",
+    "src/agentops_mcp_server/git_repo.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/tool_router.py",
+    "src/agentops_mcp_server/repo_context.py"
+  ],
+  "outputs": [
+    "docs/v0.4.6/p2-t3.json",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "src/agentops_mcp_server/verify_runner.py",
+    "src/agentops_mcp_server/git_repo.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/tool_router.py",
+    "src/agentops_mcp_server/repo_context.py"
+  ],
+  "acceptance_criteria": [
+    "All file-backed operations require an initialized project root before they proceed.",
+    "When startup occurs with unresolved root state, root-dependent operations fail with clear guidance to run workspace_initialize(cwd) first.",
+    "No root-dependent path may resolve to '/.agent/...', including canonical, derived, and helper artifact paths.",
+    "Existing normal launches that start with a valid non-root cwd continue to work without behavior regression."
+  ],
+  "deps": ["p2-t1", "p2-t2"],
+  "steps": [
+    {
+      "id": "p2-t3-s1",
+      "description": "Identify every runtime component that reads or writes repo files, .agent artifacts, .zed verification scripts, or git state through the repo context."
+    },
+    {
+      "id": "p2-t3-s2",
+      "description": "Replace implicit assumptions that repo_root is always available with explicit initialized-root checks at the boundaries of file-backed operations."
+    },
+    {
+      "id": "p2-t3-s3",
+      "description": "Ensure unresolved-root failures are actionable and consistently instruct the caller to run workspace_initialize(cwd) before retrying."
+    },
+    {
+      "id": "p2-t3-s4",
+      "description": "Verify that safety guards still reject any attempt to derive artifact paths from '/' and that normal non-root startup remains compatible."
+    }
+  ],
+  "notes": [
+    "This ticket is about enforcement of initialized-root requirements across existing runtime code paths, not about adding the workspace_initialize(cwd) tool itself.",
+    "Prefer centralized helper checks where practical so error behavior stays consistent across repo, verify, state, and ops flows.",
+    "Do not weaken the 0.4.3 safety intent while making unresolved startup workable."
+  ]
+}

@@ -141,7 +141,13 @@ cat <<'RULES' > "$SOURCE_RULES"
 # Goal: Maximize resumability and stable execution under session interruption.
 
 ## Start (mandatory)
-- Read/restore in this order:
+- Before any canonical restore or file-backed tool execution, call `workspace_initialize(cwd)` exactly once for the current project directory.
+- `workspace_initialize(cwd)` rules:
+  - `cwd` must be the project directory for this MCP server session
+  - `cwd` must not be `/`
+  - same-root reinitialization is allowed as a no-op
+  - rebinding to a different root is invalid
+- Read/restore in this order after successful workspace initialization:
   1) tx_state (materialized transaction state)
   2) tx_event_log (transaction event log replay if needed)
   3) handoff (derived-only, never canonical)
@@ -154,6 +160,7 @@ cat <<'RULES' > "$SOURCE_RULES"
 - If resume state is incomplete:
   - run ops_resume_brief (or equivalent) and emit a short brief
 - Identify active ticket (status != done) and resume it.
+- Root-dependent tools must not run before workspace initialization completes successfully.
 
 ## Planning flow (mandatory)
 - User provides docs/draft.md.
@@ -191,6 +198,12 @@ cat <<'RULES' > "$SOURCE_RULES"
 - semantic_summary is required for non-terminal tx; user_intent is only set on explicit user resume intent.
 - Keep log outputs short (summaries over full diffs).
 - Prefer diff stats over full diffs.
+- Failed tool executions should be persisted to `.agent/errors.jsonl` when runtime support is available.
+- Error records should include at least:
+  - tool name
+  - tool input
+  - tool output or error
+  - timestamp
 
 ## Handoff & session safety (mandatory)
 - When a tool execution adds/modifies files:
@@ -201,6 +214,9 @@ cat <<'RULES' > "$SOURCE_RULES"
 ## Tooling (mandatory)
 - Prefer MCP tools if available.
 - Required input contracts:
+  - `workspace_initialize`
+    - `cwd` is required and must be a project directory path
+    - `cwd` must not be `/`
   - `tx_event_append`
     - `actor` is required and must be an object
     - `payload` is required and must be an object
@@ -214,6 +230,7 @@ cat <<'RULES' > "$SOURCE_RULES"
     - supported `timezone` values are `utc` or `local` only
 - Prefer MCP tools if available.
 - Use:
+  - workspace_initialize
   - commit_if_verified
   - tx_event_append
   - tx_state_save

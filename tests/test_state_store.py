@@ -1,9 +1,12 @@
 import json
+from pathlib import Path
 
 import pytest
 
 from agentops_mcp_server.commit_manager import CommitManager
+from agentops_mcp_server.repo_context import RepoContext
 from agentops_mcp_server.state_rebuilder import StateRebuilder
+from agentops_mcp_server.state_store import StateStore
 
 
 def _valid_tx_state():
@@ -227,6 +230,64 @@ def test_write_text_creates_parent(state_store, tmp_path):
     target = tmp_path / "nested" / "file.txt"
     state_store.write_text(target, "ok")
     assert target.read_text(encoding="utf-8") == "ok"
+
+
+def test_append_json_line_appends_record(state_store, tmp_path):
+    target = tmp_path / "nested" / "errors.jsonl"
+
+    state_store.append_json_line(target, {"ok": False, "error": "boom"})
+    state_store.append_json_line(target, {"ok": False, "error": "still boom"})
+
+    lines = [
+        json.loads(line)
+        for line in target.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert lines == [
+        {"ok": False, "error": "boom"},
+        {"ok": False, "error": "still boom"},
+    ]
+
+
+def test_log_tool_error_writes_errors_jsonl(tmp_path):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+
+    result = state_store.log_tool_error(
+        tool_name="repo_verify",
+        tool_input={"timeout_sec": 30},
+        tool_output={"error": "verify failed"},
+    )
+
+    assert result["ok"] is True
+    assert result["path"] == str(tmp_path / ".agent" / "errors.jsonl")
+
+    lines = [
+        json.loads(line)
+        for line in repo_context.errors.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(lines) == 1
+    assert lines[0]["tool_name"] == "repo_verify"
+    assert lines[0]["tool_input"] == {"timeout_sec": 30}
+    assert lines[0]["tool_output"] == {"error": "verify failed"}
+    assert isinstance(lines[0]["ts"], str)
+    assert lines[0]["ts"]
+
+
+def test_log_tool_error_requires_initialized_root(tmp_path):
+    repo_context = RepoContext(Path("/"))
+    state_store = StateStore(repo_context)
+
+    with pytest.raises(
+        ValueError,
+        match="project root is not initialized; call workspace_initialize\\(cwd\\)",
+    ):
+        state_store.log_tool_error(
+            tool_name="repo_verify",
+            tool_input={"timeout_sec": 30},
+            tool_output={"error": "verify failed"},
+        )
 
 
 def test_tx_state_save_requires_schema_version_value(state_store):

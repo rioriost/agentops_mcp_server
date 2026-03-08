@@ -19,6 +19,7 @@ class ToolRouter:
         self.repo_context = repo_context
         self.state_store = state_store
         self.alias_map = {
+            "workspace.initialize": "workspace_initialize",
             "tx.event_append": "tx_event_append",
             "tx.state_save": "tx_state_save",
             "tx.state_rebuild": "tx_state_rebuild",
@@ -88,6 +89,17 @@ class ToolRouter:
             if isinstance(raw_limit, int) and raw_limit > 0:
                 truncate_limit = raw_limit
             arguments = {k: v for k, v in arguments.items() if k != "truncate_limit"}
+
+        if (
+            resolved_name != "workspace_initialize"
+            and resolved_name in self.tool_registry
+            and resolved_name != "tests_suggest"
+            and resolved_name != "tests_suggest_from_failures"
+        ):
+            if not self.repo_context.has_repo_root():
+                raise ValueError(
+                    "project root is not initialized; call workspace_initialize(cwd) before using file-backed tools"
+                )
 
         handler = tool_spec["handler"]
         result = handler(**arguments) if arguments else handler()  # type: ignore[misc]
