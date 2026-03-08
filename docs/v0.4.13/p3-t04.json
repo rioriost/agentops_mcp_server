@@ -2,8 +2,8 @@
   "id": "p3-t04",
   "title": "Repair rebuild integrity handling and transaction violation diagnostics",
   "priority": "P1",
-  "status": "planned",
-  "summary": "Implement the Phase 3 changes for v0.4.13 so rebuild, capture, and recovery behavior enforce the explicit transaction state machine and surface specification violations directly. The work should ensure rebuild deterministically materializes the correct active transaction, rejects invalid sequences such as duplicate non-terminal begin without collapsing into misleading default state, and records diagnostics rich enough to explain why transaction-aware task execution became invalid.",
+  "status": "verified",
+  "summary": "Implement the Phase 3 changes for v0.4.13 so rebuild, capture, and recovery behavior enforce the explicit transaction state machine and surface specification violations directly. Integrated diagnostics coverage now confirms that rebuild surfaces duplicate tx.begin and invalid ordering drift through rebuild_warning, rebuild_invalid_seq, rebuild_observed_mismatch, and .agent/errors.jsonl, while capture and handoff flows preserve safe none-state behavior and expose drift context instead of continuing from ambiguous rebuilt state.",
   "inputs": [
     "docs/draft_0.4.13.md",
     "docs/v0.4.13/plan.md",
@@ -37,10 +37,7 @@
     "Update capture and handoff-facing behavior so integrity failures are preserved diagnostically rather than masked by default empty transaction state.",
     "Document any helper boundaries or invariants needed to keep rebuild authoritative for transaction correctness and diagnostics."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p2-t02"
-  ],
+  "dependencies": ["p1-t01", "p2-t02"],
   "notes": [
     "This ticket focuses on rebuild integrity, recovery safety, and observability rather than runtime transition emission itself.",
     "Do not weaken transaction validation in order to make rebuild succeed on invalid history; preserve strict correctness and improve diagnostics instead.",

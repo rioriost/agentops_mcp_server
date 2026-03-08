@@ -27,7 +27,7 @@
       "id": "p3-t04",
       "priority": "P1",
       "title": "Repair rebuild integrity handling and transaction violation diagnostics",
-      "status": "planned",
+      "status": "verified",
       "file": "v0.4.13/p3-t04.json"
     },
     {

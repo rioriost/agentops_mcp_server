@@ -668,11 +668,20 @@ class OpsTools:
             state.get("integrity") if isinstance(state.get("integrity"), dict) else {}
         )
         if integrity.get("drift_detected") is True:
+            active_tx = (
+                state.get("active_tx")
+                if isinstance(state.get("active_tx"), dict)
+                else {}
+            )
             return {
                 "ok": False,
                 "reason": "rebuild integrity drift detected",
                 "last_applied_seq": state.get("last_applied_seq"),
                 "integrity": integrity,
+                "rebuild_warning": state.get("rebuild_warning"),
+                "rebuild_invalid_seq": state.get("rebuild_invalid_seq"),
+                "rebuild_observed_mismatch": state.get("rebuild_observed_mismatch"),
+                "active_tx": active_tx,
             }
 
         active_tx = (

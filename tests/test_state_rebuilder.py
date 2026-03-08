@@ -648,6 +648,66 @@ def test_rebuild_tx_state_logs_observed_mismatch_for_invalid_ordering(
     assert rebuild["state"]["active_tx"]["current_step"] == "none"
 
 
+def test_rebuild_tx_state_logs_observed_mismatch_for_duplicate_begin(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(state_store, tx_id="tx-1", ticket_id="p2-t3")
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-duplicate-begin",
+            "tx_id": "tx-1",
+            "ticket_id": "p2-t3",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"ticket_id": "p2-t3", "ticket_title": "duplicate begin"},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 1
+    assert rebuild["state"]["integrity"]["drift_detected"] is True
+    assert rebuild["state"]["rebuild_warning"] == "duplicate tx.begin"
+    assert rebuild["state"]["rebuild_invalid_seq"] == 1
+
+    observed = rebuild["state"]["rebuild_observed_mismatch"]
+    assert observed["drift_reason"] == "duplicate tx.begin"
+    assert observed["last_applied_seq"] == 1
+    assert observed["active_tx_id"] == "none"
+    assert observed["active_ticket_id"] == "none"
+    assert observed["invalid_reason"] == "duplicate tx.begin"
+    assert observed["invalid_event"]["seq"] == 2
+    assert observed["invalid_event"]["event_type"] == "tx.begin"
+    assert observed["invalid_event"]["tx_id"] == "tx-1"
+    assert observed["event_log_path"] == str(repo_context.tx_event_log)
+
+    error_lines = [
+        json.loads(line)
+        for line in repo_context.errors.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(error_lines) == 1
+    assert error_lines[0]["tool_name"] == "rebuild_tx_state"
+    assert error_lines[0]["tool_output"]["error"] == "duplicate tx.begin"
+    assert (
+        error_lines[0]["tool_output"]["observed_mismatch"]["invalid_event"][
+            "event_type"
+        ]
+        == "tx.begin"
+    )
+    assert (
+        error_lines[0]["tool_output"]["observed_mismatch"]["invalid_event"]["seq"] == 2
+    )
+    assert rebuild["state"]["active_tx"]["status"] == "planned"
+    assert rebuild["state"]["active_tx"]["current_step"] == "none"
+
+
 def test_rebuild_tx_state_allows_tx_begin_after_terminal_for_same_tx(
     repo_context, state_store, state_rebuilder
 ):

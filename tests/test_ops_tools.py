@@ -193,6 +193,70 @@ def test_ops_handoff_export_does_not_materialize_drifted_rebuild(
     assert after == before
 
 
+def test_ops_handoff_export_defaults_to_safe_begin_when_only_drifted_rebuild_exists(
+    repo_context, state_store, state_rebuilder
+):
+    class DriftingRebuilder:
+        def rebuild_tx_state(self):
+            return {
+                "ok": True,
+                "state": {
+                    "schema_version": "0.4.0",
+                    "active_tx": {
+                        "tx_id": "tx-drift",
+                        "ticket_id": "p3-t04",
+                        "status": "checking",
+                        "phase": "checking",
+                        "current_step": "p3-t04",
+                        "last_completed_step": "",
+                        "next_action": "tx.commit.start",
+                        "semantic_summary": "Drifted rebuild should not drive handoff.",
+                        "user_intent": None,
+                        "session_id": "s1",
+                        "verify_state": {
+                            "status": "passed",
+                            "last_result": {"ok": True},
+                        },
+                        "commit_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "file_intents": [],
+                    },
+                    "last_applied_seq": 2,
+                    "integrity": {
+                        "state_hash": "test-hash",
+                        "rebuilt_from_seq": 2,
+                        "drift_detected": True,
+                        "active_tx_source": "active_candidate",
+                    },
+                    "rebuild_warning": "duplicate tx.begin",
+                    "rebuild_invalid_seq": 1,
+                    "rebuild_observed_mismatch": {
+                        "drift_reason": "duplicate tx.begin",
+                        "last_applied_seq": 1,
+                        "active_tx_id": "none",
+                        "active_ticket_id": "none",
+                    },
+                    "updated_at": "2026-03-08T00:00:00+00:00",
+                },
+            }
+
+    repo_context.tx_state.unlink(missing_ok=True)
+    ops = _build_ops_tools(repo_context, state_store, DriftingRebuilder())
+
+    result = ops.ops_handoff_export()
+
+    assert result["ok"] is True
+    handoff = result["handoff"]
+    assert handoff["current_task"] == ""
+    assert handoff["last_action"] == ""
+    assert handoff["next_step"] == "tx.begin"
+    assert handoff["compact_context"] == ""
+
+    assert repo_context.tx_state.exists() is False
+
+
 def test_ops_start_task_bootstraps_tx_on_zero_event_baseline(
     repo_context, state_store, state_rebuilder
 ):
@@ -889,16 +953,16 @@ def test_ops_capture_state_refuses_rebuild_with_integrity_drift(
                 "state": {
                     "schema_version": "0.4.0",
                     "active_tx": {
-                        "tx_id": "t-1",
-                        "ticket_id": "t-1",
-                        "status": "in-progress",
-                        "phase": "in-progress",
-                        "current_step": "task",
+                        "tx_id": "none",
+                        "ticket_id": "none",
+                        "status": "planned",
+                        "phase": "planned",
+                        "current_step": "none",
                         "last_completed_step": "",
-                        "next_action": "tx.verify.start",
-                        "semantic_summary": "Rebuilt state from tx event log.",
+                        "next_action": "tx.begin",
+                        "semantic_summary": "No active transaction.",
                         "user_intent": None,
-                        "session_id": "s1",
+                        "session_id": "",
                         "verify_state": {
                             "status": "not_started",
                             "last_result": None,
@@ -914,7 +978,22 @@ def test_ops_capture_state_refuses_rebuild_with_integrity_drift(
                         "state_hash": "test-hash",
                         "rebuilt_from_seq": 1,
                         "drift_detected": True,
-                        "active_tx_source": "active_candidate",
+                        "active_tx_source": "none",
+                    },
+                    "rebuild_warning": "duplicate tx.begin",
+                    "rebuild_invalid_seq": 1,
+                    "rebuild_observed_mismatch": {
+                        "drift_reason": "duplicate tx.begin",
+                        "last_applied_seq": 1,
+                        "active_tx_id": "none",
+                        "active_ticket_id": "none",
+                        "invalid_reason": "duplicate tx.begin",
+                        "invalid_event": {
+                            "seq": 2,
+                            "event_type": "tx.begin",
+                            "tx_id": "t-1",
+                            "ticket_id": "t-1",
+                        },
                     },
                     "updated_at": "2026-03-08T00:00:00+00:00",
                 },
@@ -928,6 +1007,15 @@ def test_ops_capture_state_refuses_rebuild_with_integrity_drift(
     assert result["ok"] is False
     assert result["reason"] == "rebuild integrity drift detected"
     assert result["integrity"]["drift_detected"] is True
+    assert result["rebuild_warning"] == "duplicate tx.begin"
+    assert result["rebuild_invalid_seq"] == 1
+    assert result["rebuild_observed_mismatch"]["drift_reason"] == "duplicate tx.begin"
+    assert (
+        result["rebuild_observed_mismatch"]["invalid_event"]["event_type"] == "tx.begin"
+    )
+    assert result["active_tx"]["tx_id"] == "none"
+    assert result["active_tx"]["ticket_id"] == "none"
+    assert result["active_tx"]["next_action"] == "tx.begin"
 
 
 def test_ops_handoff_export_defaults_to_tx_begin_without_canonical_event_log(
