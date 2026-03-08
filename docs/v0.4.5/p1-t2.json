@@ -1,35 +1,223 @@
 {
   "id": "p1-t2",
   "phase": 1,
-  "title": "Draft initialization handling plan and tool input alignment",
-  "status": "in-progress",
-  "summary": "Plan: treat an empty tx_event_log.jsonl as “no events yet,” derive baseline tx_state via rebuild without requiring manual tx_event_append, and align tool input expectations by requiring actor (object), payload (object with required fields), and non-empty session_id for tx_event_append plus state for tx_state_save (typically from rebuild/ops_capture_state).",
-  "inputs": ["docs/draft.md", "docs/v0.4.5/p1-t1.json", "docs/v0.4.5/plan.md"],
+  "priority": "P1",
+  "title": "Define the corrected behavior contract for initialization, validation, ordering, and state transitions",
+  "status": "done",
+  "summary": "Phase 1 contract definition completed. The corrected 0.4.5 contract defines empty `tx_event_log.jsonl` as a valid initialized zero-event baseline, preserves strict validation for malformed inputs and invalid state snapshots, requires canonical event-first transaction sequencing, and distinguishes implementation responsibilities between initialization handling, input validation, helper orchestration, ordering enforcement, and state persistence. The contract also records where current helper behavior and seeded init artifacts diverge from the desired strict workflow so later implementation tickets can resolve those mismatches explicitly.",
+  "inputs": ["docs/draft.md", "docs/v0.4.5/plan.md", "docs/v0.4.5/p1-t1.json"],
   "outputs": ["docs/v0.4.5/p1-t2.json"],
   "acceptance_criteria": [
-    "Initialization behavior for empty tx_event_log.jsonl is defined with expected state outcomes.",
-    "Required inputs for tx_event_append and tx_state_save are specified for init scenarios.",
-    "Any defaults or improved error messaging are scoped to initialization paths.",
-    ".rules updates needed for tool input requirements are enumerated."
+    "The expected behavior for missing, empty, and malformed tx_event_log.jsonl is explicitly defined.",
+    "The initialized baseline expected from zed-agentops-init.sh is described for empty-log startup and rebuild flows.",
+    "Required input contracts are defined for transaction-related operations, including actor, payload, session_id, state, and timezone.",
+    "Canonical ordering requirements are defined for tx.begin, task lifecycle events, tx.verify.start, tx.verify.pass/fail, file intent verification, and commit gating.",
+    "State consistency rules are defined for phase, status, verify_state, commit_state, and file_intent transitions.",
+    "Implementation/spec mismatches identified in the updated draft are translated into concrete contract updates that later tickets can implement and test."
   ],
   "deps": ["p1-t1"],
   "steps": [
     {
       "id": "p1-t2-s1",
-      "description": "Draft the initialization flow for empty tx_event_log.jsonl, including baseline state behavior."
+      "description": "Define the expected initialization contract for tx_event_log handling, including missing, empty, malformed, and rebuilt-state scenarios.",
+      "status": "done",
+      "contract": {
+        "missing_event_log": {
+          "expected_behavior": "A missing `tx_event_log.jsonl` is treated as a missing canonical artifact, not as a valid initialized state.",
+          "allowed_outcome": "Rebuild/load paths may return a clear missing-artifact error until initialization creates the canonical file.",
+          "rationale": "The initialized baseline defined by `zed-agentops-init.sh` includes a touched event log file, so a missing file represents an uninitialized or damaged workspace rather than a normal zero-event state."
+        },
+        "empty_event_log": {
+          "expected_behavior": "A present-but-empty `tx_event_log.jsonl` is treated as a valid zero-event canonical baseline.",
+          "allowed_outcome": "Startup, rebuild, and helper flows must not fail solely because the file contains no events.",
+          "rationale": "This is the expected state immediately after `zed-agentops-init.sh` creates the file with `touch`."
+        },
+        "malformed_event_log": {
+          "expected_behavior": "Malformed lines or invalid event shapes remain strict failures for replay integrity, with deterministic truncation or explicit error reporting as implemented by canonical rebuild logic.",
+          "allowed_outcome": "Malformed content must never be treated the same as a valid empty file.",
+          "rationale": "Init-safe empty-log handling must not weaken torn-log or corrupted-log detection."
+        },
+        "rebuilt_state_behavior": {
+          "expected_behavior": "When replaying zero valid events from an existing empty log, rebuild returns a zero-event state baseline rather than a missing-log error.",
+          "required_properties": [
+            "schema_version remains `0.4.0`",
+            "integrity and sequence fields remain consistent with a zero-event rebuild",
+            "no synthetic noncanonical events are required merely to make rebuild succeed"
+          ]
+        },
+        "init_baseline_alignment": {
+          "expected_behavior": "The seeded init baseline from `zed-agentops-init.sh` and the zero-event rebuilt baseline must be logically equivalent for startup purposes.",
+          "known_mismatch_to_fix": "Current seeded `tx_state.json` is intentionally sparse, while later `tx_state_save()` validation expects a stricter active transaction shape. Later implementation tickets must decide whether to normalize the seeded baseline, relax save validation only for true zero-event baseline states, or ensure rebuild-derived normalization occurs before persistence."
+        }
+      }
     },
     {
       "id": "p1-t2-s2",
-      "description": "Document required inputs and any defaults for tx_event_append/tx_state_save in init flows."
+      "description": "Define the required input validation contract and expected error behavior for transaction-related operations and supported timezone values.",
+      "status": "done",
+      "contract": {
+        "tx_event_append": {
+          "required_inputs": {
+            "tx_id": "required non-empty string",
+            "ticket_id": "required non-empty string",
+            "event_type": "required non-empty string from defined taxonomy",
+            "phase": "required non-empty string",
+            "step_id": "required non-empty string",
+            "actor": "required object-like structure",
+            "session_id": "required non-empty string",
+            "payload": "required object"
+          },
+          "error_contract": {
+            "missing_or_empty_required_fields": "must fail fast with explicit required-field errors",
+            "actor_shape": "must reject non-object actor values",
+            "payload_shape": "must reject non-object payload values",
+            "session_id": "must not be silently omitted by the public contract"
+          },
+          "clarification": "Helper layers may currently backfill placeholder values such as `unknown`, but the corrected contract is that the external workflow must provide a meaningful non-empty session identifier when the server/tool boundary requires one."
+        },
+        "tx_state_save": {
+          "required_inputs": {
+            "state": "required object"
+          },
+          "validation_requirements": [
+            "schema_version must be valid",
+            "status and phase must be valid enum values",
+            "phase/status relationships must satisfy the canonical state contract",
+            "verify_state and commit_state must use supported enum values",
+            "semantic_summary is required for nonterminal persisted states",
+            "integrity fields must remain structurally valid"
+          ],
+          "error_contract": "Invalid snapshots must be rejected explicitly rather than partially accepted."
+        },
+        "ops_start_task_and_task_helpers": {
+          "external_contract": "Task lifecycle helpers must not obscure canonical transaction prerequisites in documentation or planning artifacts.",
+          "corrected_rule": "Canonical sequencing requires `tx.begin` before task lifecycle progress/update/end events.",
+          "current_mismatch": "Current helper implementation auto-emits `tx.begin`; this is an implementation convenience, not the canonical contract to document in `.rules`.",
+          "followup_expectation": "Later implementation/docs work must choose one consistent behavior: either explicit prerequisite-only flow, or helper-managed begin flow documented as such. The corrected 0.4.5 contract prefers explicit canonical sequencing."
+        },
+        "timezone": {
+          "contract": "Supported timezone values are `utc` or `local` only.",
+          "note": "This requirement is currently treated as an integration contract because no project-local implementation was identified during Phase 1 analysis.",
+          "error_contract": "Unsupported timezone strings should fail with a clear enum/value error."
+        }
+      }
     },
     {
       "id": "p1-t2-s3",
-      "description": "List .rules updates needed to enforce tool input requirements."
+      "description": "Define the canonical event ordering contract for begin, verify, file intent, task lifecycle, and commit prerequisites.",
+      "status": "done",
+      "contract": {
+        "canonical_sequence": [
+          "tx.begin establishes the active transaction",
+          "task/step lifecycle events occur within that active transaction",
+          "file intents are registered before file mutation state advances",
+          "verify.start occurs only after required intents are applied",
+          "verify.pass or verify.fail occurs only after verify.start",
+          "file intents may move to verified only after verify.pass",
+          "commit.start occurs only after verify.pass",
+          "commit.done or commit.fail occurs only after commit.start",
+          "terminal end events occur only after the transaction has reached its terminal outcome"
+        ],
+        "ordering_rules": [
+          {
+            "rule": "tx.begin before other events",
+            "required_behavior": "No non-begin transaction event is canonical without an established active transaction."
+          },
+          {
+            "rule": "task lifecycle events must follow canonical transaction start",
+            "required_behavior": "Start/update/end task operations must not be documented as bypassing transaction start requirements."
+          },
+          {
+            "rule": "file_intent.add before file_intent.update or file_intent.complete",
+            "required_behavior": "State changes for a file path require a previously registered intent for that same path."
+          },
+          {
+            "rule": "verify.start before verify.pass or verify.fail",
+            "required_behavior": "Verification result events are never canonical without a matching verification start."
+          },
+          {
+            "rule": "verify.pass before file_intent verified",
+            "required_behavior": "No file intent may reach `verified` before successful verification."
+          },
+          {
+            "rule": "commit.start after verify.pass",
+            "required_behavior": "Commit gating depends on a successful canonical verification sequence, not on direct tx_state mutation."
+          },
+          {
+            "rule": "commit result after commit.start",
+            "required_behavior": "Commit outcome events require an active commit phase."
+          }
+        ],
+        "helper_behavior_clause": "If helper methods auto-emit prerequisite events, that behavior must still preserve the same canonical sequence and be documented accurately instead of creating a separate hidden workflow."
+      }
+    },
+    {
+      "id": "p1-t2-s4",
+      "description": "Define state transition and schema consistency rules so persisted snapshots remain valid and reconstructable from canonical events.",
+      "status": "done",
+      "contract": {
+        "state_model_principle": "Persisted tx_state is a materialized view of canonical events and must remain reconstructable from tx_event_log without semantic drift.",
+        "status_phase_rules": [
+          "status and phase must remain aligned according to the chosen canonical state model",
+          "phase/status combinations must not be hand-mutated into states that cannot be produced by valid event flow"
+        ],
+        "verify_state_rules": [
+          "`not_started` before verification begins",
+          "`running` only after `tx.verify.start`",
+          "`passed` only after `tx.verify.pass`",
+          "`failed` only after `tx.verify.fail`"
+        ],
+        "commit_state_rules": [
+          "`not_started` before commit begins",
+          "`running` only after `tx.commit.start`",
+          "`passed` only after `tx.commit.done`",
+          "`failed` only after `tx.commit.fail`"
+        ],
+        "file_intent_rules": [
+          "file intent state must be monotonic",
+          "`verified` requires a prior successful verification outcome",
+          "applied/verified transitions must correspond to an existing registered intent"
+        ],
+        "semantic_summary_rule": "Nonterminal persisted states require a meaningful semantic summary for resumability.",
+        "user_intent_rule": "user_intent is optional/null unless explicitly set by user resume intent flows.",
+        "baseline_exception_rule": "Zero-event initialized baselines may need special handling so init-created canonical artifacts are not treated as invalid active work snapshots.",
+        "derived_from_events_preference": "When possible, later implementation should normalize persisted state from replayed canonical events instead of allowing direct invalid snapshot writes."
+      }
+    },
+    {
+      "id": "p1-t2-s5",
+      "description": "Enumerate the .rules and planning-artifact updates required to keep documentation aligned with the corrected behavior contract.",
+      "status": "done",
+      "contract_updates": {
+        "rules_updates_needed": [
+          "Document that a touched-but-empty `tx_event_log.jsonl` is a valid initialized baseline.",
+          "Differentiate missing, empty, and malformed transaction event logs.",
+          "Document required external contracts for actor, payload, session_id, state, and timezone values.",
+          "Document canonical ordering explicitly: tx.begin → task/step work → verify.start → verify result → file_intent verified → commit.start → commit result → end.",
+          "Clarify that commit gating depends on successful verification, not on ad hoc tx_state edits.",
+          "Clarify that helper convenience behavior must not contradict or obscure the canonical transaction contract."
+        ],
+        "planning_artifact_updates_needed": [
+          "Implementation tickets must explicitly separate init handling, validation alignment, ordering enforcement, and state normalization.",
+          "Tests must cover missing vs empty vs malformed event logs.",
+          "Tests must cover strict state validation mismatches such as invalid verify_state values and phase/status mismatches.",
+          "Rules/docs tickets must explicitly resolve whether helper APIs auto-create transaction prerequisites or require explicit prior events."
+        ],
+        "implementation_mapping": {
+          "p2-t1": "Handle empty-log-safe initialization and rebuild alignment.",
+          "p2-t2": "Align validation and error messaging for required inputs and integration contracts.",
+          "p2-t3": "Align and tighten canonical ordering plus helper orchestration behavior.",
+          "p2-t4": "Normalize and enforce state transition/schema consistency.",
+          "p3-t1": "Update `.rules` for init-safe baselines and strict input contracts.",
+          "p3-t2": "Update `.rules` for canonical sequencing and commit gating expectations."
+        }
+      }
     }
   ],
   "notes": [
-    "Init flow: empty log == no events; rebuild should return _init_tx_state and ops_capture_state can persist it.",
-    "Tool inputs: tx_event_append requires actor object, payload object (with required fields per event_type), and non-empty session_id; tx_state_save requires a full state object.",
-    "Rules update: add explicit required inputs and init guidance without relaxing normal validation."
+    "Phase 1 contract conclusion: the corrected 0.4.5 behavior should be strict by default, with only one intentional permissive case — a present but empty canonical event log created by initialization.",
+    "The contract intentionally treats helper auto-emission behavior as secondary to canonical sequencing. Later tickets must either align helpers with the canonical flow or explicitly document helper-managed prerequisites without ambiguity.",
+    "The init baseline and tx_state schema contract must be reconciled in implementation; otherwise an initialized workspace can still look invalid to later persistence flows.",
+    "Timezone validation remains a documented integration contract item until a concrete local implementation surface is updated or confirmed."
   ]
 }

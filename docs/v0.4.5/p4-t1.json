@@ -1,33 +1,49 @@
 {
   "id": "p4-t1",
   "phase": 4,
-  "title": "Add unit/integration tests for empty log initialization",
+  "priority": "P1",
+  "title": "Add unit/integration tests for empty-log initialization and transaction validation failures",
   "status": "planned",
-  "summary": "Add tests that verify initialization succeeds when tx_event_log.jsonl is empty and that baseline state is derived consistently.",
-  "inputs": ["docs/v0.4.5/plan.md", "docs/v0.4.5/p2-t1.json", "docs/v0.4.5/p2-t2.json", "docs/v0.4.5/p2-t3.json"],
+  "summary": "Add focused tests covering startup from an initialized-but-empty tx_event_log.jsonl and validation failures for transaction-related operations so the 0.4.5 fixes are protected by regression coverage.",
+  "inputs": [
+    "docs/v0.4.5/plan.md",
+    "docs/draft.md",
+    "docs/v0.4.5/p1-t1.json",
+    "docs/v0.4.5/p1-t2.json",
+    "docs/v0.4.5/p2-t1.json",
+    "docs/v0.4.5/p2-t2.json"
+  ],
   "outputs": ["docs/v0.4.5/p4-t1.json"],
   "acceptance_criteria": [
-    "Tests cover empty tx_event_log.jsonl initialization behavior.",
-    "Tests validate baseline tx_state derivation without manual tx_event input.",
-    "Tests confirm tool input handling works in init scenarios."
+    "Tests cover startup and/or rebuild behavior when tx_event_log.jsonl exists and is empty.",
+    "Tests assert that an empty tx_event_log.jsonl is treated as a valid initialized baseline rather than a fatal error.",
+    "Tests distinguish missing, empty, and malformed tx_event_log.jsonl cases where the implementation exposes different behavior.",
+    "Tests cover required validation for transaction-related inputs including actor, payload, non-empty session_id, required state, and supported timezone values.",
+    "Validation failure assertions use explicit error messages aligned with the documented transaction workflow.",
+    "Added tests contribute toward maintaining total project coverage at or above 90%."
   ],
-  "deps": ["p3-t2"],
+  "deps": ["p2-t1", "p2-t2"],
   "steps": [
     {
       "id": "p4-t1-s1",
-      "description": "Identify test locations for initialization and tx_event_log handling."
+      "description": "Add tests for initialized empty-log handling in startup, load, and/or rebuild paths."
     },
     {
       "id": "p4-t1-s2",
-      "description": "Add unit tests for empty log initialization and baseline state derivation."
+      "description": "Add tests that compare empty-log behavior against missing-log and malformed-log behavior where applicable."
     },
     {
       "id": "p4-t1-s3",
-      "description": "Add integration tests for init flows involving tx_event_append/tx_state_save."
+      "description": "Add validation tests for transaction-related inputs such as actor, payload, session_id, state, and timezone."
+    },
+    {
+      "id": "p4-t1-s4",
+      "description": "Assert clear failure messages and review coverage impact for the new validation tests."
     }
   ],
   "notes": [
-    "Keep tests focused on initialization behavior.",
-    "Align assertions with expected tool input requirements."
+    "Keep tests focused on validation and initialization behavior; ordering/state-transition regressions are handled by later tickets.",
+    "Prefer small unit tests with explicit assertions over broad end-to-end fixtures unless integration coverage is required for empty-log startup behavior.",
+    "Use the updated draft error inventory as the source for regression scenarios."
   ]
 }

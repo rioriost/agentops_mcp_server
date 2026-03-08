@@ -20,6 +20,8 @@ def _build_ops_tools(repo_context, state_store, state_rebuilder):
 
 
 def _read_tx_events(repo_context):
+    if not repo_context.tx_event_log.exists():
+        return []
     return [
         json.loads(line)
         for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
@@ -29,6 +31,24 @@ def _read_tx_events(repo_context):
 
 def _tx_event_types(repo_context):
     return [event["event_type"] for event in _read_tx_events(repo_context)]
+
+
+def _begin_tx(
+    state_store, state_rebuilder, tx_id="t-1", session_id="s1", title="Build"
+):
+    state_store.tx_event_append(
+        tx_id=tx_id,
+        ticket_id=tx_id,
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="none",
+        actor={"tool": "test"},
+        session_id=session_id,
+        payload={"ticket_id": tx_id, "ticket_title": title},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    assert rebuild["ok"] is True
+    state_store.tx_state_save(rebuild["state"])
 
 
 def test_ops_compact_context_updates_journal(
@@ -53,9 +73,175 @@ def test_ops_handoff_export_writes_json(repo_context, state_store, state_rebuild
     assert "compact_context" in handoff_payload
 
 
-def test_ops_task_summary_emits_journal(repo_context, state_store, state_rebuilder):
+def test_ops_start_task_requires_prior_tx_begin(
+    repo_context, state_store, state_rebuilder
+):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
 
+    with pytest.raises(ValueError, match="tx.begin required before other events"):
+        ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+
+
+def test_ops_start_task_requires_session_id(repo_context, state_store, state_rebuilder):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    with pytest.raises(ValueError, match="session_id is required"):
+        ops.ops_start_task(title="Build", task_id="t-1", session_id="")
+
+
+def test_ops_start_task_rejects_mismatched_task_id(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    with pytest.raises(ValueError, match="tx_id does not match active transaction"):
+        ops.ops_start_task(title="Build", task_id="t-2", session_id="s1")
+
+
+def test_ops_start_task_records_step_after_prior_tx_begin(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    result = ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    event_types = [event["event_type"] for event in events]
+    assert event_types == ["tx.begin", "tx.step.enter"]
+    step_event = events[-1]
+    assert step_event["tx_id"] == "t-1"
+    assert step_event["session_id"] == "s1"
+    assert step_event["payload"]["step_id"] == "t-1"
+    assert step_event["payload"]["description"] == "task started"
+
+
+def test_ops_update_task_requires_prior_tx_begin(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    with pytest.raises(ValueError, match="tx.begin required before other events"):
+        ops.ops_update_task(status="checking", note="step", session_id="s1")
+
+
+def test_ops_update_task_requires_session_id(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    with pytest.raises(ValueError, match="session_id is required"):
+        ops.ops_update_task(
+            status="checking", note="step", task_id="t-1", session_id=""
+        )
+
+
+def test_ops_update_task_falls_back_to_active_tx_id(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    ops.ops_update_task(status="blocked", note="waiting", session_id="s1")
+
+    events = _read_tx_events(repo_context)
+    update_events = [
+        event
+        for event in events
+        if event["event_type"] == "tx.step.enter"
+        and event.get("payload", {}).get("description") == "waiting"
+    ]
+    assert update_events
+    assert update_events[-1]["tx_id"] == "t-1"
+    assert update_events[-1]["session_id"] == "s1"
+
+
+def test_ops_update_task_records_user_intent(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    result = ops.ops_update_task(
+        status="checking",
+        note="step",
+        task_id="t-1",
+        session_id="s1",
+        user_intent="continue",
+    )
+
+    assert result["ok"] is True
+
+    events = _read_tx_events(repo_context)
+    tx_events = [event["event_type"] for event in events]
+    assert tx_events == ["tx.begin", "tx.step.enter", "tx.user_intent.set"]
+    assert events[-1]["payload"]["user_intent"] == "continue"
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    active_tx = tx_state["active_tx"]
+    assert active_tx["user_intent"] == "continue"
+    assert active_tx["semantic_summary"].startswith("Entered step")
+    assert active_tx["status"] == "checking"
+    assert active_tx["phase"] == "checking"
+    assert active_tx["current_step"] == "t-1"
+    assert active_tx["next_action"] == "tx.verify.start"
+
+
+def test_ops_end_task_requires_prior_tx_begin(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    with pytest.raises(ValueError, match="tx.begin required before other events"):
+        ops.ops_end_task(summary="done", session_id="s1")
+
+
+def test_ops_end_task_requires_session_id(repo_context, state_store, state_rebuilder):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    with pytest.raises(ValueError, match="session_id is required"):
+        ops.ops_end_task(summary="done", task_id="t-1", session_id="")
+
+
+def test_ops_end_task_emits_terminal_event_and_updates_state(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    result = ops.ops_end_task(
+        summary="done",
+        next_action="next",
+        status="done",
+        task_id="t-1",
+        session_id="s1",
+    )
+
+    assert result["ok"] is True
+    tx_events = _tx_event_types(repo_context)
+    assert tx_events == ["tx.begin", "tx.step.enter", "tx.end.done"]
+
+    events = _read_tx_events(repo_context)
+    end_event = events[-1]
+    assert end_event["session_id"] == "s1"
+    assert end_event["payload"]["summary"] == "done"
+    assert end_event["payload"]["next_action"] == "next"
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    last_seq = max(event["seq"] for event in events)
+    assert tx_state["last_applied_seq"] == last_seq
+    assert tx_state["integrity"]["rebuilt_from_seq"] == last_seq
+
+
+def test_ops_task_summary_emits_journal(repo_context, state_store, state_rebuilder):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
     ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
 
     result = ops.ops_task_summary(session_id="s1", max_chars=40)
@@ -68,7 +254,7 @@ def test_ops_observability_summary_includes_artifacts(
     repo_context, state_store, state_rebuilder
 ):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
-
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
     ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
     ops.ops_update_task(
         status="blocked",
@@ -92,7 +278,7 @@ def test_ops_observability_summary_includes_artifacts(
 
 def test_ops_resume_brief_is_bounded(repo_context, state_store, state_rebuilder):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
-
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
     ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
 
     result = ops.ops_resume_brief(max_chars=20)
@@ -100,126 +286,9 @@ def test_ops_resume_brief_is_bounded(repo_context, state_store, state_rebuilder)
     assert len(result["brief"]) <= 20
 
 
-def test_ops_task_lifecycle_records_events(repo_context, state_store, state_rebuilder):
-    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
-
-    start = ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
-    update = ops.ops_update_task(status="blocked", note="waiting", session_id="s1")
-    end = ops.ops_end_task(summary="done", next_action="next", session_id="s1")
-
-    assert start["ok"] is True
-    assert update["ok"] is True
-    assert end["ok"] is True
-
-    tx_events = _tx_event_types(repo_context)
-    assert "tx.begin" in tx_events
-    assert "tx.step.enter" in tx_events
-    assert "tx.end.done" in tx_events
-
-
-def test_ops_start_task_rejects_when_active_tx_exists(
-    repo_context, state_store, state_rebuilder
-):
-    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
-
-    state = {
-        "schema_version": "0.4.0",
-        "active_tx": {
-            "tx_id": "t-1",
-            "ticket_id": "t-1",
-            "status": "in-progress",
-            "phase": "in-progress",
-            "current_step": "t-1",
-            "last_completed_step": "",
-            "next_action": "tx.verify.start",
-            "semantic_summary": "Active transaction",
-            "user_intent": None,
-            "verify_state": {"status": "not_started", "last_result": None},
-            "commit_state": {"status": "not_started", "last_result": None},
-            "file_intents": [],
-        },
-        "last_applied_seq": 1,
-        "integrity": {"state_hash": "hash", "rebuilt_from_seq": 1},
-    }
-    state_store.tx_state_save(state)
-    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
-    repo_context.tx_event_log.write_text(
-        json.dumps({"seq": 1}) + "\n", encoding="utf-8"
-    )
-
-    with pytest.raises(ValueError, match="active transaction already in progress"):
-        ops.ops_start_task(title="Build", task_id="t-2", session_id="s1")
-
-
-def test_ops_update_task_falls_back_to_active_tx_id(
-    repo_context, state_store, state_rebuilder
-):
-    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
-
-    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
-    ops.ops_update_task(status="blocked", note="waiting", session_id="s1")
-
-    events = _read_tx_events(repo_context)
-    update_events = [
-        event
-        for event in events
-        if event["event_type"] == "tx.step.enter"
-        and event.get("payload", {}).get("description") == "waiting"
-    ]
-    assert update_events
-    assert update_events[-1]["tx_id"] == "t-1"
-
-
-def test_ops_task_lifecycle_emits_tx_events_and_updates_state(
-    repo_context, state_store, state_rebuilder
-):
-    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
-
-    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
-    ops.ops_update_task(
-        status="checking",
-        note="step",
-        task_id="t-1",
-        session_id="s1",
-        user_intent="continue",
-    )
-
-    events = _read_tx_events(repo_context)
-    tx_events = [event["event_type"] for event in events]
-    assert "tx.begin" in tx_events
-    assert "tx.step.enter" in tx_events
-    assert "tx.user_intent.set" in tx_events
-    assert (
-        tx_events.index("tx.begin")
-        < tx_events.index("tx.step.enter")
-        < tx_events.index("tx.user_intent.set")
-    )
-
-    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
-    active_tx = tx_state["active_tx"]
-    assert active_tx["user_intent"] == "continue"
-    assert active_tx["semantic_summary"].startswith("Entered step")
-    assert active_tx["status"] == "checking"
-    assert active_tx["phase"] == "checking"
-    assert active_tx["current_step"] == "t-1"
-    assert active_tx["next_action"] == "tx.verify.start"
-    last_seq = max(event["seq"] for event in _read_tx_events(repo_context))
-    assert tx_state["last_applied_seq"] == last_seq
-
-    ops.ops_end_task(summary="done", next_action="next", status="done", task_id="t-1")
-    tx_events = _tx_event_types(repo_context)
-    assert "tx.end.done" in tx_events
-    assert tx_events.index("tx.user_intent.set") < tx_events.index("tx.end.done")
-
-    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
-    last_seq = max(event["seq"] for event in _read_tx_events(repo_context))
-    assert tx_state["last_applied_seq"] == last_seq
-    assert tx_state["integrity"]["rebuilt_from_seq"] == last_seq
-
-
 def test_ops_capture_state_updates_tx_state(repo_context, state_store, state_rebuilder):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
-
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
     ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
 
     result = ops.ops_capture_state(session_id="s1")

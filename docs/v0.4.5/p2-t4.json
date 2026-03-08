@@ -1,0 +1,63 @@
+{
+  "id": "p2-t4",
+  "phase": 2,
+  "priority": "P1",
+  "title": "Correct state transition and schema handling for verify, phase, and status consistency",
+  "status": "done",
+  "summary": "Phase 2 state/schema handling is complete. Repository-local state validation already enforced supported verify_state and commit_state enum values, matched phase/status pairs, and rejected invalid snapshots, while rebuild logic materialized canonical event-derived state using valid verify, commit, and file-intent transitions. Phase 2 also tightened rebuild recovery so stale terminal history or invalid duplicate begin events do not prevent selection of the latest valid active transaction, keeping persisted and rebuilt state aligned with canonical ordering expectations.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.5/plan.md",
+    "docs/v0.4.5/p1-t1.json",
+    "docs/v0.4.5/p1-t2.json"
+  ],
+  "outputs": ["docs/v0.4.5/p2-t4.json"],
+  "acceptance_criteria": [
+    "Persisted transaction state never uses unsupported verify_state.status values.",
+    "phase and status combinations satisfy the server's state validation rules.",
+    "State transitions to checking, verified, committed, done, and blocked are consistent with canonical transaction lifecycle expectations.",
+    "file_intent states cannot advance to applied or verified in ways that contradict registered intents or verify ordering.",
+    "tx_state_save rejects invalid state snapshots with clear errors, while valid event-derived snapshots are accepted.",
+    "State rebuilt from tx_event_log matches persisted state expectations for active transactions.",
+    "The invalid state examples listed in the updated draft are either prevented by implementation or normalized before persistence."
+  ],
+  "deps": ["p1-t2", "p2-t1", "p2-t2", "p2-t3"],
+  "steps": [
+    {
+      "id": "p2-t4-s1",
+      "description": "Audit current transaction state schema validation and identify allowed values and invariants for status, phase, verify_state, commit_state, and file_intent state.",
+      "status": "done",
+      "progress": "Audited repository-local state validation and confirmed that tx_state_save already enforces schema_version, valid active_tx.status values, phase/status equality, valid verify_state.status and commit_state.status enums, required semantic_summary, and list-based file_intents. Rebuild logic was also reviewed to confirm event-derived transitions produce running/passed/failed verify and commit states only from canonical event types."
+    },
+    {
+      "id": "p2-t4-s2",
+      "description": "Trace how state snapshots are mutated during begin, verify, checking, commit, and end flows and identify transitions that can bypass canonical event ordering.",
+      "status": "done",
+      "progress": "Traced state mutation through state_rebuilder, state_store, ops_tools, and commit_manager. Confirmed the main remaining risk was not unsupported enum mutation but rebuild selection drift caused by stale terminal history and invalid duplicate begin events, which could leave active_tx at the planned baseline despite later valid transaction activity."
+    },
+    {
+      "id": "p2-t4-s3",
+      "description": "Implement fixes so persisted state is either derived from valid events or normalized to satisfy schema and ordering invariants before save.",
+      "status": "done",
+      "progress": "Phase 2 implementation now relies on valid event-derived rebuild state for persistence, with rebuild tightened so terminal-followed same-tx re-begin is treated as a new canonical run while invalid stale transactions no longer suppress selection of a later valid active transaction. This keeps persisted state aligned with schema and ordering invariants before save."
+    },
+    {
+      "id": "p2-t4-s4",
+      "description": "Ensure file intent state changes remain consistent with registered intents and verify pass prerequisites.",
+      "status": "done",
+      "progress": "Repository-local enforcement already rejects file_intent updates for missing intents, non-monotonic regressions, verified-before-pass transitions, and invalid complete states. Phase 2 regression work preserved those constraints while improving rebuild behavior around mixed historical logs."
+    },
+    {
+      "id": "p2-t4-s5",
+      "description": "Add or update tests covering invalid verify_state.status, phase/status mismatch, invalid file intent transitions, and valid rebuilt state flows.",
+      "status": "done",
+      "progress": "Test coverage already included invalid verify_state.status, invalid commit_state.status, phase/status mismatch, missing file intents, verified-before-pass, commit-before-verify, and invalid snapshot rejection. Phase 2 added rebuild regression coverage for stale terminal-plus-duplicate-begin handling and valid re-begin-after-terminal flows, strengthening confidence that rebuilt state remains compatible with persisted-state expectations."
+    }
+  ],
+  "notes": [
+    "Do not weaken ordering enforcement to make invalid snapshots pass validation.",
+    "Prefer canonical event-driven state transitions over ad hoc direct state mutation.",
+    "Keep error messages explicit enough to help future plan and rules updates stay aligned with implementation.",
+    "Phase 2 conclusion: p2-t3 and p2-t4 together leave ordering and state/schema enforcement strict, with rebuild now recovering the latest valid active transaction instead of being derailed by stale terminal history."
+  ]
+}

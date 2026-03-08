@@ -249,11 +249,9 @@ class OpsTools:
         if not tx_id:
             return None
         ticket_id = tx_id
-        resolved_session_id = (
-            session_id.strip()
-            if isinstance(session_id, str) and session_id.strip()
-            else "unknown"
-        )
+        if not isinstance(session_id, str) or not session_id.strip():
+            raise ValueError("session_id is required")
+        resolved_session_id = session_id.strip()
         actor: Dict[str, Any] = {"tool": "ops_tools"}
         if isinstance(agent_id, str) and agent_id.strip():
             actor["agent_id"] = agent_id.strip()
@@ -298,21 +296,25 @@ class OpsTools:
         tx_step_id = (
             task_id.strip() if isinstance(task_id, str) and task_id.strip() else "task"
         )
-        self._emit_tx_event(
-            event_type="tx.begin",
-            payload={"ticket_id": task_id or title, "ticket_title": title.strip()},
-            title=title,
-            task_id=task_id,
-            phase=tx_phase,
-            step_id="none",
-            session_id=session_id,
-            agent_id=agent_id,
+        active_tx = self._active_tx()
+        active_tx_id = active_tx.get("tx_id")
+        if (
+            not isinstance(active_tx_id, str)
+            or not active_tx_id.strip()
+            or active_tx_id.strip() == "none"
+        ):
+            raise ValueError("tx.begin required before other events")
+        resolved_tx_id = active_tx_id.strip()
+        resolved_task_id = (
+            task_id.strip() if isinstance(task_id, str) and task_id.strip() else ""
         )
+        if resolved_task_id and resolved_task_id != resolved_tx_id:
+            raise ValueError("tx_id does not match active transaction")
         self._emit_tx_event(
             event_type="tx.step.enter",
             payload={"step_id": tx_step_id, "description": "task started"},
-            title=title,
-            task_id=task_id,
+            title=resolved_tx_id,
+            task_id=resolved_tx_id,
             phase=tx_phase,
             step_id=tx_step_id,
             session_id=session_id,

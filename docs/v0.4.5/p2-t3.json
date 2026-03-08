@@ -1,33 +1,62 @@
 {
   "id": "p2-t3",
   "phase": 2,
-  "title": "Update init script or state defaults if needed",
-  "status": "planned",
-  "summary": "Adjust zed-agentops-init.sh or baseline state defaults to ensure empty tx_event_log.jsonl is recognized as a valid initial state.",
-  "inputs": ["docs/v0.4.5/plan.md", "docs/v0.4.5/p2-t1.json", "docs/v0.4.5/p2-t2.json"],
+  "priority": "P1",
+  "title": "Tighten transaction ordering and file-intent transition enforcement",
+  "status": "done",
+  "summary": "Phase 2 ordering and rebuild work is complete. Repository-local enforcement rejects task lifecycle work before tx.begin, verify results before tx.verify.start, verified file-intent transitions before verify pass, missing file-intent updates, and commit attempts that bypass the canonical verify sequence. Rebuild behavior was also tightened so stale terminal history or invalid duplicate begin events do not prevent recovery of the latest valid active transaction, preserving valid workflows while keeping ordering failures explicit.",
+  "inputs": [
+    "docs/draft.md",
+    "docs/v0.4.5/plan.md",
+    "docs/v0.4.5/p1-t1.json",
+    "docs/v0.4.5/p1-t2.json"
+  ],
   "outputs": ["docs/v0.4.5/p2-t3.json"],
   "acceptance_criteria": [
-    "Init script or baseline state defaults align with empty log handling.",
-    "No manual tx_event input is required to reach a valid baseline state.",
-    "Changes are limited to init/bootstrap paths."
+    "Task lifecycle operations are rejected unless tx.begin has been recorded for the active transaction.",
+    "tx.verify.pass and tx.verify.fail are rejected unless tx.verify.start has already been recorded for the same transaction.",
+    "tx.file_intent.update with state=verified is rejected unless a prior tx.verify.pass exists for the same transaction.",
+    "File-intent state updates are rejected when the corresponding file intent has not been registered first.",
+    "Commit gating continues to depend on a valid verify sequence and does not accept ad hoc state mutations as a substitute for required events.",
+    "Error messages for ordering violations are explicit and consistent with the documented workflow in .rules.",
+    "Previously valid transaction flows continue to work without regression."
   ],
   "deps": ["p1-t2"],
   "steps": [
     {
       "id": "p2-t3-s1",
-      "description": "Review zed-agentops-init.sh and startup defaults for tx_event_log/tx_state handling."
+      "description": "Locate all ordering guards and transaction precondition checks for begin, verify, file-intent transitions, task lifecycle events, and commit gating.",
+      "status": "done",
+      "progress": "Reviewed ordering enforcement in state_store, state_rebuilder, ops_tools, and commit_manager. Confirmed repository-local guards already reject missing tx.begin, missing verify.start, missing file intents, verified-before-pass transitions, and commit-before-verify sequences; the remaining high-impact gap was rebuild behavior when stale terminal transactions or invalid duplicate begin events interfered with recovery of the latest valid active transaction."
     },
     {
       "id": "p2-t3-s2",
-      "description": "Apply minimal updates to init script or defaults to align with empty log initialization behavior."
+      "description": "Implement or tighten enforcement so tx.begin precedes task lifecycle events, tx.verify.start precedes verify results, and tx.verify.pass precedes file-intent verified transitions.",
+      "status": "done",
+      "progress": "Strict event ordering enforcement remains in place, and rebuild handling now allows a same-tx re-begin after a terminal event while continuing to reject non-terminal duplicate tx.begin. A final implementation review confirmed repository-local helper and commit flows continue to follow the canonical sequence rather than bypassing it under mixed historical logs."
     },
     {
       "id": "p2-t3-s3",
-      "description": "Add or adjust tests if init script changes impact behavior."
+      "description": "Ensure file-intent updates fail fast when the target intent has not been registered and that commit behavior follows the canonical verify flow.",
+      "status": "done",
+      "progress": "Fast-fail checks for missing file intents and commit-before-verify were already present; rebuild behavior was tightened so an invalid stale transaction no longer suppresses selection of a later valid active transaction during recovery. Final review confirmed commit and helper flows still depend on the canonical verify sequence and do not accept ad hoc state mutation as a substitute."
+    },
+    {
+      "id": "p2-t3-s4",
+      "description": "Normalize ordering-related error messages so they are actionable and match the documented transaction workflow.",
+      "status": "done",
+      "progress": "Ordering-related errors remain explicit at repository-local enforcement points, including `tx.begin required before other events`, `verify result requires verify.start`, `file intent missing for path`, `file intent verified requires verify.pass`, and `commit.start requires verify.pass`, matching the documented canonical workflow."
+    },
+    {
+      "id": "p2-t3-s5",
+      "description": "Add or update focused tests covering invalid ordering, missing prerequisites, and valid ordering paths.",
+      "status": "done",
+      "progress": "Added regression coverage for rebuild recovery after stale terminal-plus-duplicate-begin conditions and for valid re-begin-after-terminal flows on the same transaction. Existing tests already cover missing tx.begin, verify-before-start, missing file intent, verified-before-pass, and commit-before-verify errors, leaving both invalid and valid ordering paths covered for Phase 2."
     }
   ],
   "notes": [
-    "Prefer minimal changes that only affect initialization.",
-    "Document any assumptions about pre-created empty files."
+    "Keep enforcement strict; this ticket is about sequence correctness, not relaxing validation.",
+    "Prefer event-first ordering invariants over direct transaction state mutation.",
+    "Pay special attention to the draft-reported failures around verify.start, file_intent verified transitions, ops_start_task, commit gating, and rebuild selection of the latest valid active transaction after stale terminal history."
   ]
 }

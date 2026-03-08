@@ -1,33 +1,50 @@
 {
   "id": "p3-t2",
   "phase": 3,
-  "title": "Add tests for rule-influenced expectations (if applicable)",
-  "status": "planned",
-  "summary": "Add targeted tests that validate behaviors influenced by updated .rules guidance for tx_event_append and tx_state_save inputs.",
-  "inputs": ["docs/v0.4.5/plan.md", "docs/v0.4.5/p3-t1.json"],
+  "priority": "P2",
+  "title": "Update .rules for canonical transaction ordering, task lifecycle prerequisites, and commit gating expectations",
+  "status": "done",
+  "summary": "Rules alignment is complete. `.rules` now documents a strict canonical-flow-only transaction model in which tx.begin precedes task lifecycle work, tx.verify.start precedes verify results, tx.verify.pass precedes verified file-intent transitions, file-intent updates require prior registration, and commit operations depend on a valid verification sequence and existing transaction context.",
+  "inputs": ["docs/draft.md", "docs/v0.4.5/plan.md", "docs/v0.4.5/p3-t1.json"],
   "outputs": ["docs/v0.4.5/p3-t2.json"],
   "acceptance_criteria": [
-    "Tests cover rule-influenced expectations for required tool inputs.",
-    "At least one test exercises an init scenario impacted by .rules guidance.",
-    "Tests align with tool schemas and initialization behavior."
+    ".rules explicitly documents that tx.begin must occur before task lifecycle events such as task start/update/end.",
+    ".rules explicitly documents that tx.verify.start must occur before tx.verify.pass or tx.verify.fail.",
+    ".rules explicitly documents that tx.verify.pass must occur before tx.file_intent.update can set state=verified.",
+    ".rules explicitly documents that file intent updates require a previously registered file intent for the same path.",
+    ".rules explicitly documents commit gating expectations so commit operations only occur after a valid verify sequence.",
+    "The documented ordering and commit expectations are consistent with the implementation and generated planning artifacts."
   ],
   "deps": ["p3-t1"],
   "steps": [
     {
       "id": "p3-t2-s1",
-      "description": "Identify behaviors that should be validated based on updated .rules."
+      "description": "Review current .rules wording for task lifecycle flow, verification ordering, file-intent transitions, and commit behavior.",
+      "status": "done",
+      "progress": "Reviewed the updated `.rules` wording alongside the 0.4.5 plan and Phase 2 implementation outcomes. Confirmed the key alignment targets are explicit tx.begin prerequisites for task lifecycle work, verify.start before verify results, verify.pass before verified file-intent transitions, and commit gating on the canonical verify sequence."
     },
     {
       "id": "p3-t2-s2",
-      "description": "Add or update tests that confirm required inputs for tx_event_append/tx_state_save."
+      "description": "Update .rules so canonical ordering requirements are explicit for tx.begin, verify events, and file-intent verified transitions.",
+      "status": "done",
+      "progress": "Updated `.rules` so canonical ordering requirements are explicit: tx.begin must occur before task lifecycle events, tx.verify.start must occur before tx.verify.pass/tx.verify.fail, tx.verify.pass must occur before tx.file_intent.update can set state=verified, and file-intent updates require a previously registered intent for the same path."
     },
     {
       "id": "p3-t2-s3",
-      "description": "Verify tests align with initialization handling and do not weaken validation."
+      "description": "Clarify .rules commit gating expectations so commit operations depend on a valid verification sequence and existing transaction context.",
+      "status": "done",
+      "progress": "Updated `.rules` to state that commit operations require a valid verify sequence and existing transaction context, matching repository-local enforcement that rejects commit attempts which bypass canonical verification ordering."
+    },
+    {
+      "id": "p3-t2-s4",
+      "description": "Cross-check the updated .rules wording against the 0.4.5 plan and ticket set to keep planning artifacts and implementation expectations aligned.",
+      "status": "done",
+      "progress": "Cross-checked the revised `.rules` wording against the 0.4.5 plan, ticket set, and Phase 2 implementation behavior. The final rules text now consistently treats the canonical transaction flow as the only documented operating model, without preserving helper-convenience exceptions in the rules."
     }
   ],
   "notes": [
-    "Keep tests minimal and focused on rule-influenced expectations.",
-    "If no executable rules validation exists, document rationale and skip with justification."
+    "Keep the rules strict; this ticket is about alignment and clarity, not relaxing ordering guarantees.",
+    "Prefer explicit sequencing language to avoid ambiguous operational guidance.",
+    "Make commit preconditions clear enough to prevent invalid commit attempts after incomplete or synthetic verification flows."
   ]
 }

@@ -1,87 +1,95 @@
 {
   "version": "0.4.5",
-  "title": "Bug fixes for tx_event_log initialization",
+  "title": "Bug fixes for tx event init alignment and transaction flow consistency",
+  "source": "docs/draft.md",
   "tickets": [
     {
       "id": "p1-t1",
       "phase": 1,
-      "title": "Inventory initialization and tx_event_log usage paths",
+      "priority": "P1",
+      "title": "Inventory empty-log init flow, validation touchpoints, and ordering enforcement paths",
       "status": "planned",
-      "inputs": ["docs/draft.md"],
-      "outputs": ["docs/v0.4.5/p1-t1.json"],
-      "deps": []
+      "file": "docs/v0.4.5/p1-t1.json"
     },
     {
       "id": "p1-t2",
       "phase": 1,
-      "title": "Draft initialization handling plan and tool input alignment",
+      "priority": "P1",
+      "title": "Define the corrected behavior contract for initialization, validation, ordering, and state transitions",
       "status": "planned",
-      "inputs": ["docs/draft.md", "docs/v0.4.5/p1-t1.json"],
-      "outputs": ["docs/v0.4.5/p1-t2.json"],
-      "deps": ["p1-t1"]
+      "file": "docs/v0.4.5/p1-t2.json"
     },
     {
       "id": "p2-t1",
       "phase": 2,
-      "title": "Implement empty-log initialization handling",
+      "priority": "P1",
+      "title": "Implement empty-log-safe initialization and rebuild behavior",
       "status": "planned",
-      "inputs": ["docs/v0.4.5/plan.md"],
-      "outputs": ["docs/v0.4.5/p2-t1.json"],
-      "deps": ["p1-t2"]
+      "file": "docs/v0.4.5/p2-t1.json"
     },
     {
       "id": "p2-t2",
       "phase": 2,
-      "title": "Align tool input handling for tx_event_append and tx_state_save",
+      "priority": "P1",
+      "title": "Align required input validation and error messaging for transaction-related operations",
       "status": "planned",
-      "inputs": ["docs/v0.4.5/plan.md"],
-      "outputs": ["docs/v0.4.5/p2-t2.json"],
-      "deps": ["p1-t2"]
+      "file": "docs/v0.4.5/p2-t2.json"
     },
     {
       "id": "p2-t3",
       "phase": 2,
-      "title": "Update init script or state defaults if needed",
+      "priority": "P1",
+      "title": "Tighten transaction ordering and file-intent transition enforcement",
       "status": "planned",
-      "inputs": ["docs/v0.4.5/plan.md"],
-      "outputs": ["docs/v0.4.5/p2-t3.json"],
-      "deps": ["p1-t2"]
+      "file": "docs/v0.4.5/p2-t3.json"
+    },
+    {
+      "id": "p2-t4",
+      "phase": 2,
+      "priority": "P1",
+      "title": "Correct state transition and schema handling for verify, phase, and status consistency",
+      "status": "planned",
+      "file": "docs/v0.4.5/p2-t4.json"
     },
     {
       "id": "p3-t1",
       "phase": 3,
-      "title": "Update .rules for tool input requirements",
+      "priority": "P2",
+      "title": "Update .rules for init-safe empty-log handling and required tool input contracts",
       "status": "planned",
-      "inputs": ["docs/v0.4.5/plan.md"],
-      "outputs": ["docs/v0.4.5/p3-t1.json"],
-      "deps": ["p2-t1", "p2-t2", "p2-t3"]
+      "file": "docs/v0.4.5/p3-t1.json"
     },
     {
       "id": "p3-t2",
       "phase": 3,
-      "title": "Add tests for rule-influenced expectations (if applicable)",
+      "priority": "P2",
+      "title": "Update .rules for canonical transaction ordering, task lifecycle prerequisites, and commit gating expectations",
       "status": "planned",
-      "inputs": ["docs/v0.4.5/plan.md"],
-      "outputs": ["docs/v0.4.5/p3-t2.json"],
-      "deps": ["p3-t1"]
+      "file": "docs/v0.4.5/p3-t2.json"
     },
     {
       "id": "p4-t1",
       "phase": 4,
-      "title": "Add unit/integration tests for empty log initialization",
+      "priority": "P1",
+      "title": "Add unit/integration tests for empty-log initialization and transaction validation failures",
       "status": "planned",
-      "inputs": ["docs/v0.4.5/plan.md"],
-      "outputs": ["docs/v0.4.5/p4-t1.json"],
-      "deps": ["p3-t2"]
+      "file": "docs/v0.4.5/p4-t1.json"
     },
     {
       "id": "p4-t2",
       "phase": 4,
-      "title": "Run verification suite and confirm coverage >= 90%",
+      "priority": "P1",
+      "title": "Add regression tests for ordering and state-transition invariants",
       "status": "planned",
-      "inputs": ["docs/v0.4.5/plan.md"],
-      "outputs": ["docs/v0.4.5/p4-t2.json"],
-      "deps": ["p4-t1"]
+      "file": "docs/v0.4.5/p4-t2.json"
+    },
+    {
+      "id": "p4-t3",
+      "phase": 4,
+      "priority": "P1",
+      "title": "Run verification and confirm coverage is at least 90%",
+      "status": "planned",
+      "file": "docs/v0.4.5/p4-t3.json"
     }
   ]
 }

@@ -2,6 +2,9 @@ import json
 
 import pytest
 
+from agentops_mcp_server.commit_manager import CommitManager
+from agentops_mcp_server.state_rebuilder import StateRebuilder
+
 
 def _valid_tx_state():
     return {
@@ -36,6 +39,39 @@ def _base_tx_event_args():
         "session_id": "s1",
         "payload": {"ticket_id": "p4-t1", "ticket_title": "p4-t1"},
     }
+
+
+class _DummyGitRepo:
+    def __init__(self, status_lines=None):
+        self.calls = []
+        self._status_lines = status_lines or []
+
+    def git(self, *args):
+        self.calls.append(args)
+        if args == ("rev-parse", "--abbrev-ref", "HEAD"):
+            return "main"
+        if args == ("rev-parse", "HEAD"):
+            return "abc123"
+        return ""
+
+    def status_porcelain(self):
+        return self._status_lines
+
+    def diff_stat(self):
+        return "diff"
+
+    def diff_stat_cached(self):
+        return "diff"
+
+
+class _DummyVerifyRunner:
+    def __init__(self, result):
+        self.result = result
+        self.calls = []
+
+    def run_verify(self, timeout_sec=None):
+        self.calls.append(timeout_sec)
+        return self.result
 
 
 def test_tx_event_append_writes_required_fields(state_store, repo_context):
@@ -118,6 +154,17 @@ def test_tx_state_save_writes_schema(state_store, repo_context):
     assert saved["active_tx"]["file_intents"] == []
     assert saved["active_tx"]["semantic_summary"] == "Valid state"
     assert "user_intent" in saved["active_tx"]
+
+
+def test_tx_state_save_preserves_active_tx_session_id(state_store, repo_context):
+    state = _valid_tx_state()
+    state["active_tx"]["session_id"] = "s1"
+
+    result = state_store.tx_state_save(state)
+
+    assert result["ok"] is True
+    saved = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    assert saved["active_tx"]["session_id"] == "s1"
 
 
 def test_tx_state_save_requires_semantic_summary(state_store):
@@ -235,6 +282,67 @@ def test_tx_state_save_requires_active_tx_core_fields(state_store, mutator, matc
     mutator(state)
     with pytest.raises(ValueError, match=match):
         state_store.tx_state_save(state)
+
+
+def test_commit_manager_uses_active_tx_session_id_for_events(tmp_path, monkeypatch):
+    from agentops_mcp_server.repo_context import RepoContext
+
+    repo_context = RepoContext(tmp_path)
+    state_store = state_store = __import__(
+        "agentops_mcp_server.state_store", fromlist=["StateStore"]
+    ).StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+
+    state_store.tx_event_append(**_base_tx_event_args())
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+
+    state = _valid_tx_state()
+    state["active_tx"]["session_id"] = "s1"
+    state["active_tx"]["verify_state"]["status"] = "running"
+    state_store.tx_state_save(state)
+
+    manager = CommitManager(
+        _DummyGitRepo(status_lines=[" M file.txt"]),
+        _DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"}),
+        state_store,
+        state_rebuilder,
+    )
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: None)
+
+    result = manager.commit_if_verified("message", timeout_sec=5)
+
+    assert result["sha"] == "abc123"
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    emitted = [event for event in events if event["event_type"] != "tx.begin"]
+    assert emitted
+    assert all(event["session_id"] == "s1" for event in emitted)
+
+
+def test_commit_manager_requires_active_tx_session_id_for_event_context(tmp_path):
+    from agentops_mcp_server.repo_context import RepoContext
+    from agentops_mcp_server.state_store import StateStore
+
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+
+    state = _valid_tx_state()
+    state["active_tx"]["session_id"] = ""
+    state_store.tx_state_save(state)
+
+    manager = CommitManager(
+        _DummyGitRepo(status_lines=[" M file.txt"]),
+        _DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"}),
+        state_store,
+        state_rebuilder,
+    )
+
+    assert manager._load_tx_context() is None
 
 
 def test_tx_event_append_rejects_unknown_event_type(state_store):

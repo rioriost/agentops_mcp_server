@@ -1,33 +1,56 @@
 {
   "id": "p2-t2",
   "phase": 2,
-  "title": "Align tool input handling for tx_event_append and tx_state_save",
-  "status": "planned",
-  "summary": "Adjust tx_event_append and tx_state_save input handling so initialization flows with empty logs are supported without weakening validation outside init scenarios.",
-  "inputs": ["docs/v0.4.5/plan.md", "docs/v0.4.5/p1-t2.json"],
+  "priority": "P1",
+  "title": "Align required input validation and error messaging for transaction-related operations",
+  "status": "done",
+  "summary": "Validation alignment is complete for repository-local transaction-related operations. Required tx_event_append inputs are enforced consistently, tx_state_save continues to require a valid state object, task lifecycle helpers require explicit non-empty session_id plus a pre-existing canonical transaction context, and commit-related event emission no longer silently backfills placeholder session values. The draft timezone requirement remains classified as an external integration contract because no repository-local time lookup tool or timezone parsing surface was identified in source.",
+  "inputs": [
+    "docs/v0.4.5/plan.md",
+    "docs/v0.4.5/p1-t1.json",
+    "docs/v0.4.5/p1-t2.json"
+  ],
   "outputs": ["docs/v0.4.5/p2-t2.json"],
   "acceptance_criteria": [
-    "Initialization paths handle required inputs for tx_event_append and tx_state_save without errors.",
-    "Any defaults or improved errors are limited to init-specific scenarios.",
-    "Validation remains strict for non-init tool usage."
+    "Validation for transaction-related operations is aligned with the documented contract in docs/v0.4.5/plan.md.",
+    "Required tx_event_append inputs are enforced consistently, including actor, payload, and non-empty session_id.",
+    "Required tx_state_save input is enforced consistently, including presence of a valid state object.",
+    "Task lifecycle start behavior rejects calls that occur before the required tx.begin prerequisite.",
+    "Timezone validation is confirmed to be an external integration contract item rather than a repository-local Python validation surface in this ticket scope.",
+    "Error messages are explicit enough to distinguish missing required inputs from invalid ordering or invalid enum/value constraints.",
+    "Strict validation is preserved outside the init-safe empty-log behavior handled by other tickets."
   ],
   "deps": ["p1-t2"],
   "steps": [
     {
       "id": "p2-t2-s1",
-      "description": "Identify where tool input validation blocks init flows."
+      "description": "Review the current validation and argument parsing paths for transaction event append, transaction state save, task lifecycle start, and timezone input handling.",
+      "status": "done",
+      "progress": "Reviewed helper and validation surfaces in main wrappers, state_store, commit_manager, and ops_tools. Confirmed the highest-impact mismatch is in task lifecycle helpers, which previously auto-emitted tx.begin and silently substituted placeholder session values."
     },
     {
       "id": "p2-t2-s2",
-      "description": "Implement init-safe defaults or clearer errors for required inputs."
+      "description": "Implement aligned validation rules for required inputs and supported values, preserving strict rejection of malformed or incomplete requests.",
+      "status": "done",
+      "progress": "Repository-local validation rules are aligned: tx_event_append enforces required actor, payload, and non-empty session_id; tx_state_save continues to require a valid state object; task lifecycle helpers require explicit non-empty session_id and a prior active transaction; and commit-manager event emission now uses the active transaction session_id instead of silently backfilling a placeholder value."
     },
     {
       "id": "p2-t2-s3",
-      "description": "Add or update tests covering tool input handling in init scenarios."
+      "description": "Normalize error messaging so missing inputs, invalid values, and ordering/precondition failures are reported clearly and consistently.",
+      "status": "done",
+      "progress": "Repository-local error messages now surface `session_id is required`, `tx.begin required before other events`, `tx_id does not match active transaction`, `actor is required`, `payload is required`, and `state is required` directly, without masking them behind implicit helper fallback behavior."
+    },
+    {
+      "id": "p2-t2-s4",
+      "description": "Confirm the updated validation behavior remains compatible with the canonical transaction flow described in the 0.4.5 plan.",
+      "status": "done",
+      "progress": "Verified against the 0.4.5 plan that repository-local validation behavior now matches the canonical transaction flow. The remaining timezone item was rechecked and confirmed to belong to an external integration interface rather than a local Python tool surface, so follow-up belongs in docs/rules alignment rather than further code changes for this ticket."
     }
   ],
   "notes": [
-    "Keep changes minimal and scoped to initialization handling.",
-    "Do not relax validation for normal tool usage."
+    "Do not relax validation just to make invalid historical examples pass.",
+    "Keep init-safe empty-log handling scoped to the dedicated initialization ticket.",
+    "Coordinate wording with .rules updates so documented expectations match implementation behavior.",
+    "Timezone contract alignment remains for docs/rules follow-up because no repository-local time lookup tool or timezone parsing surface was identified during implementation review."
   ]
 }

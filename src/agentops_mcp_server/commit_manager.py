@@ -44,11 +44,15 @@ class CommitManager:
         step_id = active_tx.get("current_step")
         if not isinstance(step_id, str) or not step_id.strip():
             step_id = "commit"
+        session_id = active_tx.get("session_id")
+        if not isinstance(session_id, str) or not session_id.strip():
+            return None
         return {
             "tx_id": tx_id,
             "ticket_id": ticket_id,
             "phase": phase,
             "step_id": step_id,
+            "session_id": session_id.strip(),
         }
 
     def _event_log_empty(self) -> bool:
@@ -109,12 +113,14 @@ class CommitManager:
             phase=phase,
             step_id=step_id,
             actor=actor,
-            session_id=context.get("session_id", "unknown"),
+            session_id=context["session_id"],
             payload=payload,
         )
-        rebuild = self.state_rebuilder.rebuild_tx_state()
-        if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
-            self.state_store.tx_state_save(rebuild["state"])
+        rebuild_fn = getattr(self.state_rebuilder, "rebuild_tx_state", None)
+        if callable(rebuild_fn):
+            rebuild = rebuild_fn()
+            if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
+                self.state_store.tx_state_save(rebuild["state"])
         return event
 
     def _commit_message_from_status(self, status_lines: List[str]) -> str:
@@ -209,7 +215,7 @@ class CommitManager:
                 "returncode": verify_result.get("returncode"),
                 "summary": verify_result.get("stdout") or "verify passed",
             },
-            phase_override="checking",
+            phase_override="verified",
         )
         commit_start_message = (
             self._normalize_commit_message(message) or "chore: update"
@@ -269,7 +275,7 @@ class CommitManager:
                     "returncode": verify_result.get("returncode"),
                     "summary": verify_result.get("stdout") or "verify passed",
                 },
-                phase_override="checking",
+                phase_override="verified",
             )
 
         status_lines = self.git_repo.status_porcelain()

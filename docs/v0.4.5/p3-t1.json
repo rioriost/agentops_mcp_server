@@ -1,33 +1,49 @@
 {
   "id": "p3-t1",
   "phase": 3,
-  "title": "Update .rules for tool input requirements",
-  "status": "planned",
-  "summary": "Revise .rules to require actor/payload/session_id for tx_event_append and state for tx_state_save, with guidance for initialization flows.",
-  "inputs": ["docs/v0.4.5/plan.md"],
+  "priority": "P2",
+  "title": "Update .rules for init-safe empty-log handling and required tool input contracts",
+  "status": "done",
+  "summary": "`.rules` alignment for initialization semantics and required input contracts is complete. The rules now describe missing vs empty vs malformed `tx_event_log.jsonl` handling, treat a touched-but-empty log as the valid initialized baseline from `zed-agentops-init.sh`, and document strict repository-local input requirements for `tx_event_append`, `tx_state_save`, task lifecycle prerequisites, and supported timezone values for time lookup.",
+  "inputs": ["docs/v0.4.5/plan.md", "docs/draft.md", ".rules"],
   "outputs": ["docs/v0.4.5/p3-t1.json"],
   "acceptance_criteria": [
-    ".rules explicitly lists required inputs for tx_event_append (actor, payload, session_id).",
-    ".rules explicitly lists required inputs for tx_state_save (state).",
-    "Rules guidance includes initialization-specific expectations without weakening validation elsewhere."
+    "`.rules` explicitly states that a touched-but-empty `tx_event_log.jsonl` is treated as a valid initialized baseline equivalent to `zed-agentops-init.sh` output.",
+    "`.rules` distinguishes missing, empty, and malformed transaction event log cases with clear expected handling.",
+    "`.rules` explicitly documents required input expectations for `tx_event_append`, including required `actor`, required object `payload`, and non-empty `session_id`.",
+    "`.rules` explicitly documents that `tx_state_save` requires a valid `state` object and must not be called with incomplete or invalid transaction state.",
+    "`.rules` documents supported timezone values for time lookup as `utc` or `local` only.",
+    "The resulting rules text is consistent with the implementation plan and does not weaken validation outside the init-safe empty-log case."
   ],
-  "deps": ["p2-t1", "p2-t2", "p2-t3"],
+  "deps": ["p2-t1", "p2-t2"],
   "steps": [
     {
       "id": "p3-t1-s1",
-      "description": "Identify tool input requirements and map them to .rules guidance."
+      "description": "Review the updated 0.4.5 plan and draft error inventory to identify rule text that must be corrected for initialization and input validation behavior.",
+      "status": "done",
+      "progress": "Reviewed the 0.4.5 plan, draft error inventory, and completed Phase 2 implementation outcomes to identify the required `.rules` updates for empty-log semantics, strict input validation, and the timezone integration contract."
     },
     {
       "id": "p3-t1-s2",
-      "description": "Update .rules with explicit required inputs and init flow notes."
+      "description": "Update `.rules` to define empty-log initialization semantics, including expected behavior for missing, empty, and malformed transaction logs.",
+      "status": "done",
+      "progress": "Updated `.rules` so missing `.agent/tx_event_log.jsonl` is treated as uninitialized or damaged, a present-but-empty log is treated as the valid initialized zero-event baseline from `zed-agentops-init.sh`, and malformed content remains a strict replay/integrity failure."
     },
     {
       "id": "p3-t1-s3",
-      "description": "Validate rules align with tool schemas and planned init behavior."
+      "description": "Update `.rules` to document required input contracts for transaction-related operations, including actor, payload, session_id, state, and timezone.",
+      "status": "done",
+      "progress": "Updated `.rules` to document required `tx_event_append` actor/payload/session_id inputs, `tx_state_save` state-object requirements, task lifecycle prerequisite expectations, and the documented timezone contract of `utc` or `local` for time lookup."
+    },
+    {
+      "id": "p3-t1-s4",
+      "description": "Cross-check the revised rules text against the plan so documentation and implementation expectations remain aligned.",
+      "status": "done",
+      "progress": "Cross-checked the updated `.rules` text against the 0.4.5 plan and current implementation behavior so the documentation now matches the init-safe empty-log case without weakening validation elsewhere."
     }
   ],
   "notes": [
-    "Keep changes minimal and focused on tool input requirements.",
-    "Avoid introducing ambiguous guidance that weakens validation."
+    "Keep this ticket focused on initialization semantics and input contract alignment only; ordering and commit-flow guidance belong in `p3-t2`.",
+    "Preserve strict validation and resumability requirements while clarifying the one intended exception: an initialized but empty event log."
   ]
 }

@@ -1,35 +1,283 @@
 {
   "id": "p1-t1",
   "phase": 1,
-  "title": "Inventory initialization and tx_event_log usage paths",
-  "status": "in-progress",
-  "summary": "Inventory findings: zed-agentops-init.sh touches .agent/tx_event_log.jsonl and seeds tx_state.json; RepoContext.set_repo_root wires tx_event_log paths; StateStore.tx_event_append/read_last_json_line/_tx_event_log_empty handle log IO; StateRebuilder.read_tx_event_log/read_recent_tx_events/_init_tx_state validate empty/missing logs; OpsTools._emit_tx_event rebuilds + tx_state_save; tool_registry requires actor/payload/session_id and tx_state_save requires state.",
+  "priority": "P1",
+  "title": "Inventory empty-log init flow, validation touchpoints, and ordering enforcement paths",
+  "status": "done",
+  "summary": "Phase 1 analysis completed. The current implementation already enforces many of the draft-reported constraints in `state_store.py` and `state_rebuilder.py`, but it also contains the key mismatch that an empty `tx_event_log.jsonl` file is treated inconsistently: append-side logic treats it like no prior events, while rebuild-side logic still returns `tx_event_log missing` only when the file is absent and otherwise rebuilds to a zero-event baseline. Additional mismatches were identified around task lifecycle helpers auto-emitting `tx.begin`, fallback session handling using `unknown`, and state snapshot validation being stricter than some documented/manual flows in the draft.",
   "inputs": ["docs/draft.md", "docs/v0.4.5/plan.md"],
   "outputs": ["docs/v0.4.5/p1-t1.json"],
   "acceptance_criteria": [
-    "All tx_event_log readers/writers and init entry points are listed with file locations.",
-    "Empty-log handling paths are identified, including rebuild and state defaults.",
-    "Tool input validation touchpoints (tx_event_append, tx_state_save) are mapped to init flows."
+    "All startup, rebuild, and initialization entry points related to tx_event_log handling are identified with concrete file/function references.",
+    "The behavior difference between missing, empty, and malformed tx_event_log.jsonl is documented.",
+    "Validation touchpoints are mapped for required transaction/tool inputs including actor, payload, session_id, state, and timezone.",
+    "Ordering enforcement paths are mapped for tx.begin before task lifecycle events, tx.verify.start before verify results, and tx.verify.pass before file intent verified transitions.",
+    "Each error example from the updated draft is traced to its current enforcing code path or identified mismatch."
   ],
   "deps": [],
   "steps": [
     {
       "id": "p1-t1-s1",
-      "description": "Locate tx_event_log read/write and initialization paths in src/."
+      "description": "Inventory all code paths that read, rebuild, initialize, or validate tx_event_log and related transaction state.",
+      "status": "done",
+      "findings": [
+        {
+          "area": "Canonical artifact paths",
+          "files": ["src/agentops_mcp_server/repo_context.py"],
+          "details": "Canonical artifact locations are defined in `RepoContext`: `.agent/tx_event_log.jsonl` and `.agent/tx_state.json` are treated as canonical state artifacts, while handoff and observability files are derived artifacts."
+        },
+        {
+          "area": "Init scaffold",
+          "files": [
+            "src/agentops_mcp_server/zed-agentops-init.sh",
+            "src/agentops_mcp_server/init.py"
+          ],
+          "details": "`zed-agentops-init.sh` creates `.agent/tx_event_log.jsonl` using `touch` and seeds `.agent/tx_state.json` with a planned baseline state. `init.py` only dispatches to the shell script and contains no extra state logic."
+        },
+        {
+          "area": "Event append / append-time invariants",
+          "files": ["src/agentops_mcp_server/state_store.py"],
+          "details": "`StateStore.tx_event_append()` validates required inputs, taxonomy, payload shape, and ordering invariants before appending to the JSONL event log. `read_last_json_line()` is used to determine the last valid event and also drives empty-log detection."
+        },
+        {
+          "area": "State rebuild / replay",
+          "files": ["src/agentops_mcp_server/state_rebuilder.py"],
+          "details": "`StateRebuilder.rebuild_tx_state()` rebuilds canonical state from `tx_event_log.jsonl`, validates each replayed event, truncates on invalid/torn events, derives next action, and computes integrity hashes."
+        },
+        {
+          "area": "Commit flow integration",
+          "files": ["src/agentops_mcp_server/commit_manager.py"],
+          "details": "`CommitManager` loads active transaction context from `tx_state.json`, detects an empty event log via `_event_log_empty()`, may backfill `tx.begin`, then emits verify/commit events and immediately rebuilds/saves tx_state after each event."
+        },
+        {
+          "area": "Ops lifecycle integration",
+          "files": ["src/agentops_mcp_server/ops_tools.py"],
+          "details": "`OpsTools` rebuilds state on read, emits tx events for task lifecycle helpers, and persists rebuilt state after event emission. These helpers are part of the current transaction orchestration surface relevant to the draft errors."
+        }
+      ]
     },
     {
       "id": "p1-t1-s2",
-      "description": "Document how empty or missing logs are handled in rebuild and state checks."
+      "description": "Document current handling for missing, empty, and malformed event log states, including behavior expected from zed-agentops-init.sh.",
+      "status": "done",
+      "findings": [
+        {
+          "case": "Missing tx_event_log.jsonl",
+          "current_behavior": "Rebuild returns `{ok: false, reason: \"tx_event_log missing\"}`.",
+          "enforcement_points": ["src/agentops_mcp_server/state_rebuilder.py"],
+          "details": "`rebuild_tx_state()` explicitly errors only when the event log path does not exist. This behavior is covered by `tests/test_state_rebuilder.py::test_rebuild_tx_state_requires_event_log`."
+        },
+        {
+          "case": "Empty tx_event_log.jsonl",
+          "current_behavior": "Append-side logic treats it as empty/no events; rebuild-side logic treats it as an existing log with zero replayable events and returns a zero-event rebuilt baseline instead of an error.",
+          "enforcement_points": [
+            "src/agentops_mcp_server/state_store.py",
+            "src/agentops_mcp_server/state_rebuilder.py",
+            "src/agentops_mcp_server/commit_manager.py"
+          ],
+          "details": "`StateStore.read_last_json_line()` returns `null` for an empty file, so `_tx_event_log_empty()` and `CommitManager._event_log_empty()` treat empty logs the same as missing-or-no-valid-last-line. `rebuild_tx_state()` does not error for an empty existing file because the file exists; it replays zero events and returns initialized state. `CommitManager._ensure_tx_begin()` specifically backfills `tx.begin` when the event log is empty."
+        },
+        {
+          "case": "Malformed / torn tx_event_log.jsonl",
+          "current_behavior": "Reader skips or counts invalid lines during log reads; rebuild truncates at the last valid event and records `rebuild_warning` / invalid event metadata.",
+          "enforcement_points": [
+            "src/agentops_mcp_server/state_rebuilder.py",
+            "src/agentops_mcp_server/state_store.py"
+          ],
+          "details": "`read_tx_event_log()` counts malformed lines, ignores blank lines, and only returns dict events with integer seq values. Replay stops at the first invalid event shape/payload/invariant failure and leaves state at the last valid sequence. This is covered by tests for invalid lines, torn events, missing file intents, and verified-before-pass violations."
+        },
+        {
+          "case": "Initialized baseline from zed-agentops-init.sh",
+          "current_behavior": "Init script creates a touched empty event log plus a planned tx_state baseline with empty tx_id/ticket_id, `current_step: none`, empty `next_action`, and `semantic_summary: Initialized transaction state`.",
+          "enforcement_points": [
+            "src/agentops_mcp_server/zed-agentops-init.sh"
+          ],
+          "details": "This baseline does not itself satisfy `StateStore.tx_state_save()` validation for later saves because append/save validation requires non-empty `active_tx.tx_id`, `ticket_id`, and `next_action`. That difference is central to the draft's initialization mismatch."
+        }
+      ]
     },
     {
       "id": "p1-t1-s3",
-      "description": "Map tool input validation requirements to init flows."
+      "description": "Map validation requirements and failure paths for transaction-related operations, task lifecycle starts, and time lookup inputs.",
+      "status": "done",
+      "findings": [
+        {
+          "tool_or_flow": "tx_event_append",
+          "files": [
+            "src/agentops_mcp_server/main.py",
+            "src/agentops_mcp_server/state_store.py",
+            "tests/test_state_store.py"
+          ],
+          "details": "The public wrapper requires `actor`, `session_id`, and `payload` in its function signature. `StateStore.tx_event_append()` then requires non-empty `tx_id`, `ticket_id`, `event_type`, `phase`, `step_id`, and `session_id`; rejects non-dict `actor` with `actor is required`; rejects non-dict `payload` with `payload is required`; validates taxonomy and payload fields by event type."
+        },
+        {
+          "tool_or_flow": "tx_state_save",
+          "files": [
+            "src/agentops_mcp_server/main.py",
+            "src/agentops_mcp_server/state_store.py",
+            "tests/test_state_store.py"
+          ],
+          "details": "The wrapper requires a `state` argument. `StateStore.tx_state_save()` rejects `null` with `state is required`, auto-fills `updated_at` if absent, then enforces strict schema constraints including status/phase enum membership, exact phase=status equality, non-empty next_action, required semantic_summary, verify_state / commit_state enums, and integrity fields."
+        },
+        {
+          "tool_or_flow": "ops_start_task / ops_update_task",
+          "files": [
+            "src/agentops_mcp_server/ops_tools.py",
+            "tests/test_ops_tools.py"
+          ],
+          "details": "Current implementation does not require the caller to record `tx.begin` first. `ops_start_task()` auto-emits `tx.begin` followed by `tx.step.enter`. This behavior conflicts with the draft error example claiming task start should fail until `tx.begin` is already present. A direct attempt to record progress without a prior transaction still fails at `StateStore` invariant level with `tx.begin required before other events`."
+        },
+        {
+          "tool_or_flow": "session_id handling",
+          "files": [
+            "src/agentops_mcp_server/state_store.py",
+            "src/agentops_mcp_server/ops_tools.py",
+            "src/agentops_mcp_server/commit_manager.py"
+          ],
+          "details": "`StateStore` requires a non-empty session_id. However, helper layers currently substitute fallback values like `unknown` instead of surfacing a missing-session error. This partly explains why some draft examples report server-side `session_id is required` while internal helpers may avoid that by injecting a fallback."
+        },
+        {
+          "tool_or_flow": "actor structure",
+          "files": [
+            "src/agentops_mcp_server/state_store.py",
+            "src/agentops_mcp_server/state_rebuilder.py"
+          ],
+          "details": "Append-time validation only checks that `actor` is a dict. Replay-time validation also only requires `actor` to be a dict. The draft examples show both scalar and object forms being attempted; current code expects an object-like mapping, but does not validate its inner schema beyond dict-ness."
+        },
+        {
+          "tool_or_flow": "timezone / now",
+          "files": ["src/agentops_mcp_server/main.py"],
+          "details": "No project-local implementation of a time lookup helper was found in source. The draft error about accepted timezone values (`utc` / `local`) refers to the external runtime interface rather than a repository function defined here. Phase 1 therefore records this as an integration contract to document, not a local Python validation path found in the repository."
+        }
+      ]
+    },
+    {
+      "id": "p1-t1-s4",
+      "description": "Map canonical ordering checks for begin, verify, file intent, and commit prerequisites, and tie them to the reported draft errors.",
+      "status": "done",
+      "findings": [
+        {
+          "ordering_rule": "tx.begin before other events",
+          "files": [
+            "src/agentops_mcp_server/state_store.py",
+            "src/agentops_mcp_server/state_rebuilder.py",
+            "src/agentops_mcp_server/ops_tools.py",
+            "tests/test_state_store.py",
+            "tests/test_ops_tools.py"
+          ],
+          "details": "Append-time invariant: if there is no active tx, every event except `tx.begin` fails with `tx.begin required before other events`. Replay-time invariant mirrors this with `tx.begin required`. `ops_start_task()` currently auto-satisfies this rule by emitting `tx.begin` itself."
+        },
+        {
+          "ordering_rule": "No second tx.begin while active transaction is in progress",
+          "files": [
+            "src/agentops_mcp_server/state_store.py",
+            "tests/test_state_store.py",
+            "tests/test_ops_tools.py"
+          ],
+          "details": "Append-time invariant rejects another `tx.begin` with `active transaction already in progress` unless the current state is terminal or the event log is empty. This empty-log escape hatch is relevant to the init mismatch."
+        },
+        {
+          "ordering_rule": "File intent must exist before update",
+          "files": [
+            "src/agentops_mcp_server/state_store.py",
+            "src/agentops_mcp_server/state_rebuilder.py",
+            "tests/test_state_store.py",
+            "tests/test_state_rebuilder.py"
+          ],
+          "details": "Both append-time and replay-time logic reject updates for unknown paths with `file intent missing for path`."
+        },
+        {
+          "ordering_rule": "verify.start requires applied intents",
+          "files": [
+            "src/agentops_mcp_server/state_store.py",
+            "src/agentops_mcp_server/state_rebuilder.py",
+            "tests/test_state_store.py"
+          ],
+          "details": "Append-time and replay-time logic both require all file intents for the current step to be at least `applied` before `tx.verify.start`; otherwise they fail with `verify.start requires applied intents`."
+        },
+        {
+          "ordering_rule": "verify.pass / verify.fail require verify.start",
+          "files": [
+            "src/agentops_mcp_server/state_store.py",
+            "src/agentops_mcp_server/state_rebuilder.py",
+            "src/agentops_mcp_server/commit_manager.py"
+          ],
+          "details": "Append-time invariant requires `active_tx.verify_state.status == running`, else `verify result requires verify.start`. Replay-time invariant requires the step to exist in `verify_started_steps`, producing the same message. `CommitManager._ensure_verify_started()` separately raises `verify.start not recorded; tx.begin required before verify results` when current tx_state does not show `verify_state.status == running`."
+        },
+        {
+          "ordering_rule": "file intent verified requires verify.pass",
+          "files": [
+            "src/agentops_mcp_server/state_store.py",
+            "src/agentops_mcp_server/state_rebuilder.py"
+          ],
+          "details": "Append-time invariant checks `active_tx.verify_state.status == passed`; replay-time invariant checks `verify_passed` in transaction context. Both fail with `file intent verified requires verify.pass`."
+        },
+        {
+          "ordering_rule": "commit.start requires verify.pass; commit result requires commit.start",
+          "files": [
+            "src/agentops_mcp_server/state_store.py",
+            "src/agentops_mcp_server/state_rebuilder.py",
+            "src/agentops_mcp_server/commit_manager.py"
+          ],
+          "details": "Append/replay invariants already enforce commit sequencing. `CommitManager.commit_if_verified()` emits `tx.verify.start`, then verify result, then `tx.commit.start`, then commit result in canonical order."
+        }
+      ],
+      "draft_error_traceability": [
+        {
+          "draft_error": "Missing required argument(s): actor, payload",
+          "trace": "Matches the public wrapper / schema contract for `tx_event_append` and append-time validation in `main.py` + `state_store.py`."
+        },
+        {
+          "draft_error": "Missing required argument(s): state",
+          "trace": "Matches the public wrapper / schema contract for `tx_state_save` and append-time `state is required` check in `state_store.py`."
+        },
+        {
+          "draft_error": "session_id is required",
+          "trace": "Matches `StateStore._require_str(session_id, \"session_id\")`. Internal helper code can currently mask this by substituting `unknown`."
+        },
+        {
+          "draft_error": "actor is required",
+          "trace": "Matches append-time `actor` must be a dict. The draft examples show both missing and potentially schema-mismatched values; current code only checks dict-ness."
+        },
+        {
+          "draft_error": "verify result requires verify.start",
+          "trace": "Directly enforced in both append-time and replay-time invariant validation."
+        },
+        {
+          "draft_error": "file intent verified requires verify.pass",
+          "trace": "Directly enforced in both append-time and replay-time invariant validation."
+        },
+        {
+          "draft_error": "tx.begin required before other events",
+          "trace": "Directly enforced in append-time invariants, but `ops_start_task()` currently auto-emits `tx.begin`, so the mismatch is at orchestration/documentation level rather than invariant absence."
+        },
+        {
+          "draft_error": "active transaction already in progress",
+          "trace": "Directly enforced when a non-terminal active transaction exists and the log is not considered empty."
+        },
+        {
+          "draft_error": "unknown variant `UTC`, expected `utc` or `local`",
+          "trace": "Not implemented in repository-local Python source found in Phase 1; treat as external integration contract to align in docs/rules and wrapper expectations."
+        },
+        {
+          "draft_error": "active_tx.verify_state.status is invalid",
+          "trace": "Directly enforced by `StateStore._validate_tx_state()` against `VERIFY_STATUS_VALUES = {not_started, running, passed, failed}`."
+        },
+        {
+          "draft_error": "active_tx.phase must match status",
+          "trace": "Directly enforced by `StateStore._validate_tx_state()` requiring exact equality between phase and status."
+        },
+        {
+          "draft_error": "verify.start not recorded; tx.begin required before verify results",
+          "trace": "Raised by `CommitManager._ensure_verify_started()` when tx_state does not currently show `verify_state.status == running`."
+        }
+      ]
     }
   ],
   "notes": [
-    "Key file: src/agentops_mcp_server/zed-agentops-init.sh (touches tx_event_log.jsonl, seeds tx_state.json).",
-    "RepoContext.set_repo_root wires tx_event_log; StateStore.tx_event_append/read_last_json_line/_tx_event_log_empty handle log IO.",
-    "StateRebuilder.read_tx_event_log/read_recent_tx_events/_init_tx_state/_validate_tx_event/_validate_tx_event_payload handle missing/empty logs and validation.",
-    "OpsTools._emit_tx_event performs tx_event_append + rebuild + tx_state_save; tool_registry enforces actor/payload/session_id/state."
+    "Phase 1 conclusion: most ordering rules already exist in code and tests; the main work for later phases is alignment across init behavior, helper orchestration, rules/docs, and strict state snapshot expectations.",
+    "The highest-priority implementation mismatch is that `zed-agentops-init.sh` seeds a baseline tx_state that is intentionally sparse, while later tx_state validation demands non-empty active transaction identifiers and next_action values.",
+    "The second major mismatch is orchestration semantics: current helper flows sometimes auto-create prerequisite events or fallback session values, while the updated draft expects stricter explicit sequencing and clearer error surfacing.",
+    "A local Python implementation for timezone parsing was not found during Phase 1; treat that requirement as an external interface/documentation alignment item unless later implementation review uncovers another layer."
   ]
 }

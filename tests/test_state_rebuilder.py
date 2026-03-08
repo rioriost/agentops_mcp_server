@@ -37,6 +37,85 @@ def test_rebuild_tx_state_requires_event_log(repo_context, state_rebuilder):
     assert result["reason"] == "tx_event_log missing"
 
 
+def test_rebuild_tx_state_accepts_empty_event_log(repo_context, state_rebuilder):
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_event_log.write_text("", encoding="utf-8")
+
+    result = state_rebuilder.rebuild_tx_state()
+
+    assert result["ok"] is True
+    assert result["source"] == "rebuild"
+    assert result["last_applied_seq"] == 0
+    assert result["rebuilt_from_seq"] == 0
+    assert result["invalid_lines"] == 0
+    assert result["dropped_events"] == 0
+    assert result["event_log_path"] == str(repo_context.tx_event_log)
+
+    state = result["state"]
+    assert state["schema_version"] == "0.4.0"
+    assert state["last_applied_seq"] == 0
+    assert state["integrity"]["rebuilt_from_seq"] == 0
+    assert isinstance(state["integrity"]["state_hash"], str)
+    assert state["integrity"]["state_hash"]
+    assert state["updated_at"]
+
+    active_tx = state["active_tx"]
+    assert active_tx["tx_id"] == "none"
+    assert active_tx["ticket_id"] == "none"
+    assert active_tx["status"] == "planned"
+    assert active_tx["phase"] == "planned"
+    assert active_tx["current_step"] == "none"
+    assert active_tx["next_action"] == ""
+    assert active_tx["semantic_summary"] == ""
+    assert active_tx["verify_state"]["status"] == "not_started"
+    assert active_tx["commit_state"]["status"] == "not_started"
+    assert active_tx["file_intents"] == []
+
+
+def test_rebuild_tx_state_empty_event_log_ignores_sparse_seeded_tx_state(
+    repo_context, state_store, state_rebuilder
+):
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_event_log.write_text("", encoding="utf-8")
+    repo_context.tx_state.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_state.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.4.0",
+                "updated_at": "2026-03-08T00:00:00Z",
+                "active_tx": {
+                    "tx_id": "",
+                    "ticket_id": "",
+                    "status": "planned",
+                    "phase": "planned",
+                    "current_step": "none",
+                    "last_completed_step": "",
+                    "next_action": "",
+                    "semantic_summary": "Initialized transaction state",
+                    "user_intent": None,
+                    "verify_state": {"status": "not_started", "last_result": None},
+                    "commit_state": {"status": "not_started", "last_result": None},
+                    "file_intents": [],
+                },
+                "last_applied_seq": 0,
+                "integrity": {"state_hash": "", "rebuilt_from_seq": 0},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = state_rebuilder.rebuild_tx_state()
+
+    assert result["ok"] is True
+    assert result["last_applied_seq"] == 0
+    active_tx = result["state"]["active_tx"]
+    assert active_tx["tx_id"] == "none"
+    assert active_tx["ticket_id"] == "none"
+    assert active_tx["next_action"] == ""
+    assert active_tx["semantic_summary"] == ""
+
+
 def test_read_tx_event_log_filters_seq(repo_context, state_store, state_rebuilder):
     _append_tx_event(state_store)
     _append_tx_event(
@@ -222,6 +301,156 @@ def test_rebuild_tx_state_missing_file_intent_truncates(
         == "tx.file_intent.update"
     )
     assert rebuild["state"]["active_tx"]["tx_id"] == "none"
+
+
+def test_rebuild_tx_state_recovers_latest_active_tx_after_stale_terminal_begin(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(
+        state_store,
+        tx_id="tx-old",
+        ticket_id="p4-t2",
+        step_id="none",
+        payload={"ticket_id": "p4-t2", "ticket_title": "old"},
+    )
+    _append_tx_event(
+        state_store,
+        tx_id="tx-old",
+        ticket_id="p4-t2",
+        event_type="tx.end.done",
+        phase="done",
+        step_id="p4-t2-s1",
+        payload={"summary": "done"},
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 3,
+            "event_id": "evt-stale-rebegin",
+            "tx_id": "tx-old",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"ticket_id": "p4-t2", "ticket_title": "old restart"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 4,
+            "event_id": "evt-new-begin",
+            "tx_id": "tx-new",
+            "ticket_id": "p2-t3",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"ticket_id": "p2-t3", "ticket_title": "new tx"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 5,
+            "event_id": "evt-new-step",
+            "tx_id": "tx-new",
+            "ticket_id": "p2-t3",
+            "event_type": "tx.step.enter",
+            "phase": "in-progress",
+            "step_id": "p2-t3",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"step_id": "p2-t3", "description": "task started"},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 5
+    assert "rebuild_warning" not in rebuild["state"]
+    assert "rebuild_invalid_seq" not in rebuild["state"]
+    assert rebuild["state"]["active_tx"]["tx_id"] == "tx-new"
+    assert rebuild["state"]["active_tx"]["ticket_id"] == "p2-t3"
+    assert rebuild["state"]["active_tx"]["status"] == "in-progress"
+    assert rebuild["state"]["active_tx"]["current_step"] == "p2-t3"
+
+
+def test_rebuild_tx_state_allows_tx_begin_after_terminal_for_same_tx(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(
+        state_store,
+        tx_id="tx-1",
+        ticket_id="p2-t3",
+        step_id="none",
+        payload={"ticket_id": "p2-t3", "ticket_title": "first run"},
+    )
+    _append_tx_event(
+        state_store,
+        tx_id="tx-1",
+        ticket_id="p2-t3",
+        event_type="tx.step.enter",
+        phase="in-progress",
+        step_id="p2-t3",
+        payload={"step_id": "p2-t3", "description": "task started"},
+    )
+    _append_tx_event(
+        state_store,
+        tx_id="tx-1",
+        ticket_id="p2-t3",
+        event_type="tx.end.done",
+        phase="done",
+        step_id="p2-t3",
+        payload={"summary": "done"},
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 4,
+            "event_id": "evt-rebegin",
+            "tx_id": "tx-1",
+            "ticket_id": "p2-t3",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"ticket_id": "p2-t3", "ticket_title": "second run"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 5,
+            "event_id": "evt-second-step",
+            "tx_id": "tx-1",
+            "ticket_id": "p2-t3",
+            "event_type": "tx.step.enter",
+            "phase": "in-progress",
+            "step_id": "p2-t3-second",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {
+                "step_id": "p2-t3-second",
+                "description": "task restarted",
+            },
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 5
+    assert "rebuild_warning" not in rebuild["state"]
+    assert rebuild["state"]["active_tx"]["tx_id"] == "none"
+    assert rebuild["state"]["active_tx"]["ticket_id"] == "none"
+    assert rebuild["state"]["active_tx"]["status"] == "planned"
+    assert rebuild["state"]["active_tx"]["current_step"] == "none"
 
 
 def test_rebuild_tx_state_preserves_user_intent(

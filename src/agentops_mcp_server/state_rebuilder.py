@@ -282,14 +282,22 @@ class StateRebuilder:
         payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
         step_id = event.get("step_id") if isinstance(event.get("step_id"), str) else ""
 
-        if context.get("terminal"):
-            return False, "event after terminal"
-
         if event_type == "tx.begin":
             if context.get("seen_begin"):
-                return False, "duplicate tx.begin"
+                if context.get("terminal"):
+                    context["terminal"] = False
+                    context["steps"] = set()
+                    context["intent_states"] = {}
+                    context["intent_steps"] = {}
+                    context["verify_started_steps"] = set()
+                    context["verify_passed"] = False
+                    context["commit_started"] = False
+                else:
+                    return False, "duplicate tx.begin"
             context["seen_begin"] = True
         else:
+            if context.get("terminal"):
+                return False, "event after terminal"
             if not context.get("seen_begin"):
                 return False, "tx.begin required"
 
@@ -593,6 +601,23 @@ class StateRebuilder:
                 "path": str(resolved_event_log),
             }
 
+        if resolved_event_log.stat().st_size == 0:
+            state = self._init_tx_state()
+            state["last_applied_seq"] = 0
+            state["integrity"]["rebuilt_from_seq"] = 0
+            state["updated_at"] = datetime.now(timezone.utc).isoformat()
+            state["integrity"]["state_hash"] = self._compute_state_hash(state)
+            return {
+                "ok": True,
+                "state": state,
+                "last_applied_seq": 0,
+                "rebuilt_from_seq": 0,
+                "invalid_lines": 0,
+                "dropped_events": 0,
+                "event_log_path": str(resolved_event_log),
+                "source": "rebuild",
+            }
+
         event_log = self.read_tx_event_log(
             start_seq=0, end_seq=end_seq, event_log_path=resolved_event_log
         )
@@ -711,15 +736,18 @@ class StateRebuilder:
         if invalid_reason:
             state["rebuild_warning"] = invalid_reason
             if isinstance(invalid_event, dict):
+                invalid_tx_id = invalid_event.get("tx_id")
+                if isinstance(invalid_tx_id, str) and invalid_tx_id in tx_states:
+                    tx_states.pop(invalid_tx_id, None)
+                    tx_contexts.pop(invalid_tx_id, None)
                 state["rebuild_invalid_event"] = invalid_event
                 if isinstance(invalid_event.get("seq"), int):
                     state["rebuild_invalid_seq"] = invalid_event.get("seq")
-        else:
-            candidates = [
-                tx
-                for tx in tx_states.values()
-                if isinstance(tx, dict) and not tx.get("_terminal")
-            ]
+        candidates = [
+            tx
+            for tx in tx_states.values()
+            if isinstance(tx, dict) and not tx.get("_terminal")
+        ]
         if candidates:
             active_tx = max(
                 candidates, key=lambda item: item.get("_last_event_seq", -1)

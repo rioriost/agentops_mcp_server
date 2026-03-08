@@ -1,33 +1,51 @@
 {
   "id": "p2-t1",
   "phase": 2,
-  "title": "Implement empty-log initialization handling",
-  "status": "planned",
-  "summary": "Ensure an empty tx_event_log.jsonl is treated as an initial state, allowing initialization to proceed without errors.",
-  "inputs": ["docs/v0.4.5/plan.md"],
+  "priority": "P1",
+  "title": "Implement empty-log-safe initialization and rebuild behavior",
+  "status": "in-progress",
+  "summary": "Implementation has started. The current change direction is to make rebuild treat a present-but-empty tx_event_log.jsonl as a valid zero-event canonical baseline, consistent with zed-agentops-init.sh, while preserving strict handling for missing and malformed log cases.",
+  "inputs": [
+    "docs/v0.4.5/plan.md",
+    "docs/v0.4.5/p1-t1.json",
+    "docs/v0.4.5/p1-t2.json"
+  ],
   "outputs": ["docs/v0.4.5/p2-t1.json"],
   "acceptance_criteria": [
-    "Initialization succeeds when tx_event_log.jsonl exists but is empty.",
-    "Empty log is treated equivalently to no events yet.",
-    "Baseline tx_state is derived consistently without manual tx_event input."
+    "Startup succeeds when tx_event_log.jsonl exists but contains zero events.",
+    "Empty tx_event_log.jsonl is interpreted as the same initialized baseline expected from zed-agentops-init.sh.",
+    "Rebuild and state-load paths treat an empty event log as 'no events yet' rather than as an error.",
+    "Missing, empty, and malformed tx_event_log.jsonl cases are handled distinctly with clear behavior and error messaging.",
+    "The implementation does not relax validation for malformed event log contents or invalid event structures."
   ],
   "deps": ["p1-t2"],
   "steps": [
     {
       "id": "p2-t1-s1",
-      "description": "Identify code paths that treat empty logs differently from missing logs."
+      "description": "Update initialization, load, and rebuild paths so a present-but-empty tx_event_log.jsonl is accepted as a valid zero-event baseline.",
+      "status": "in-progress",
+      "progress": "Rebuild logic has been identified as the first implementation point. The intended change is to return a zero-event rebuilt state when the canonical event log exists but has size 0."
     },
     {
       "id": "p2-t1-s2",
-      "description": "Implement init-safe handling for empty tx_event_log.jsonl."
+      "description": "Ensure the baseline state derived from an empty log matches the initialized state expected from zed-agentops-init.sh.",
+      "status": "planned"
     },
     {
       "id": "p2-t1-s3",
-      "description": "Add minimal tests for empty-log initialization behavior."
+      "description": "Preserve strict differentiation between missing log files, empty log files, and malformed log contents, including clear error behavior.",
+      "status": "planned"
+    },
+    {
+      "id": "p2-t1-s4",
+      "description": "Add focused tests covering empty-log startup, rebuild behavior, and baseline-state equivalence.",
+      "status": "planned"
     }
   ],
   "notes": [
-    "Keep changes minimal and focused on init handling.",
-    "Avoid weakening validation outside initialization scenarios."
+    "Keep this ticket narrowly focused on empty-log initialization and rebuild behavior.",
+    "Do not weaken schema or parse validation for non-empty malformed logs.",
+    "Prefer canonical zero-event behavior over special-case state mutation.",
+    "Current implementation progress is limited to the rebuild-path contract; initialization baseline alignment and regression tests still remain."
   ]
 }
