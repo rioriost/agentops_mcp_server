@@ -27,7 +27,7 @@
       "id": "p2-t04",
       "priority": "P1",
       "title": "Improve synchronization failure diagnostics and error logging",
-      "status": "verified",
+      "status": "done",
       "file": "v0.4.12/p2-t04.json"
     },
     {
