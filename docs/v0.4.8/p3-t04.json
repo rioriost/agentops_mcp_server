@@ -2,8 +2,8 @@
   "id": "p3-t04",
   "title": "Add regression tests and verify 90 percent coverage",
   "priority": "P1",
-  "status": "planned",
-  "summary": "Add regression coverage for the reported startup failures and verify that the release satisfies the draft coverage target.",
+  "status": "done",
+  "summary": "Regression coverage for the reported startup failures is in place and repository verification now demonstrates the release target is met: startup/bootstrap, state capture, handoff export, and init-script contract checks are covered by tests, and the measured total coverage is 95 percent.",
   "inputs": [
     "docs/draft.md",
     "docs/v0.4.8/plan.md",
@@ -32,14 +32,14 @@
     "Run the full verification flow and record the result.",
     "Run coverage measurement and confirm the threshold is satisfied."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p2-t02",
-    "p2-t03"
-  ],
+  "dependencies": ["p1-t01", "p2-t02", "p2-t03"],
   "notes": [
     "Prefer targeted regression tests over broad unrelated test changes.",
     "Keep the coverage work aligned to the startup contract defined in the plan.",
-    "Use the draft acceptance criteria as the final verification gate."
+    "Use the draft acceptance criteria as the final verification gate.",
+    "Regression coverage already exercises the startup contract through `tests/test_ops_tools.py`, `tests/test_state_rebuilder.py`, `tests/test_state_store.py`, and `tests/test_init.py`.",
+    "Covered startup behaviors include zero-event baseline handling, first-task `tx.begin` bootstrap, derived `next_action` defaults for state capture and handoff export, and init-script/rules contract expectations.",
+    "Verification command completed successfully with 294 passing tests.",
+    "Coverage measurement reported TOTAL 95% for `agentops_mcp_server`, exceeding the draft requirement of at least 90%."
   ]
 }
