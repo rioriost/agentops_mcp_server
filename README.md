@@ -1,69 +1,72 @@
 # Zed AgentOps
 
-- CI/CD-like loop: edit -> verify -> commit
-- Test generation as part of the loop (agent adds tests, then verify)
+Zed AgentOps helps you run an edit → verify → commit loop inside Zed with an MCP server and a project scaffold designed for resumable agent work.
 
-Note: This project currently supports macOS only.
+> Currently supported on macOS.
 
-## Quick start
+## What it does
 
-```bash
-zed-agentops-init.sh project_name
-zed-agentops-init.sh --update existing_project
-```
+- Scaffolds a project for AgentOps use in Zed
+- Provides a local MCP server for repo, verification, and resume-oriented workflow helpers
+- Adds a default `verify` entry point you can extend for your project
+- Keeps enough local state for the agent to resume work more reliably across interrupted sessions
 
-Use `--update` to migrate an existing AgentOps-managed directory (refreshes `.rules` and ensures `.agent` state files exist; it does not remove legacy artifacts).
+This README is written for users of the tool. Internal implementation details are intentionally kept to a minimum.
 
 ## Installation
 
-```
+Install with Homebrew:
+
+```bash
 brew tap rioriost/agentops_mcp_server
 brew install agentops_mcp_server
 ```
 
-Use `zed-agentops-init.sh` to scaffold a directory (it creates `.rules`, `.zed/`, `.agent`, and `.zed/scripts/verify`, plus canonical `.agent/tx_event_log.jsonl` and `.agent/tx_state.json`, along with legacy derived-only `.agent/journal.jsonl`).
-It also auto-appends common entries to `.gitignore`.
-Open the directory in Zed and use the Agent Panel.
-For release coverage runs, use `.zed/scripts/verify-release` (requires `pytest-cov`).
+This installs the `agentops_mcp_server` binary and `zed-agentops-init.sh`.
 
-## Workflow tips
+## Quick start
 
-- Before ending a session or when context is tight:
-  - Run `ops_compact_context` (prefer `include_diff=false`, `max_chars` optional)
-  - Run `ops_capture_state` (captures transaction state)
-  - Run `ops_handoff_export` (writes `.agent/handoff.json`)
-- To resume quickly: run `ops_resume_brief`
-- Task tracking: `ops_start_task` / `ops_update_task` / `ops_end_task`
-- Token discipline: prefer summaries/diff stats over full diffs and keep outputs short
+Initialize a new project directory:
 
-## Semantic resume (0.4.0)
-- Canonical sources of truth are `.agent/tx_event_log.jsonl` (event log) and `.agent/tx_state.json` (materialized state).
-- `semantic_summary` captures concise progress; `user_intent` records explicit resume intent (e.g., “continue”).
-- `.agent/handoff.json` is derived-only and never a canonical input for resume decisions.
+```bash
+zed-agentops-init.sh my_project
+```
 
-## About .rules (from v0.2.0)
-`zed-agentops-init.sh` generates `.rules`.
+Update an existing AgentOps-managed directory:
 
-## Where things live
+```bash
+zed-agentops-init.sh --update my_project
+```
 
-- `.rules` : project rules auto-injected into Zed Agent context
-- `.zed/tasks.json` : reusable Tasks (verify, git helpers)
-- `.zed/scripts/verify` : the single entry point for build/test/lint (extend as needed)
-- `.zed/scripts/verify-release` : release-only coverage run (pytest-cov)
-- `.agent/tx_event_log.jsonl` : canonical transaction event log
-- `.agent/tx_state.json` : canonical materialized transaction state
-- `.agent/handoff.json` : derived-only human-readable summary
-- `.agent/observability_summary.json` : derived-only observability summary
-- `.agent/journal.jsonl` : legacy derived-only artifacts
-- `/opt/homebrew/bin/agentops_mcp_server` : MCP server binary installed by Homebrew (macOS)
+After initialization:
 
-## MCP Server (Zed)
+1. Open the directory in Zed
+2. Register the MCP server in your Zed settings
+3. Open the Agent Panel
+4. Start working in the repo
 
-The MCP server is provided as a Homebrew-installed binary (e.g. `/opt/homebrew/bin/agentops_mcp_server`) and exposes a minimal JSON-RPC 2.0 stdio protocol compatible with Zed. It reads one JSON object per line from stdin and writes JSON-RPC responses to stdout. Supported methods include `initialize`, `initialized`, `tools/list`, `tools/call`, `shutdown`, and `exit`.
+## What initialization creates
 
+Running `zed-agentops-init.sh` sets up the files you need to start using AgentOps in Zed:
 
+- `.rules`
+- `.zed/tasks.json`
+- `.zed/scripts/verify`
+- `.agent/tx_event_log.jsonl`
+- `.agent/tx_state.json`
 
-Zed (MCP Server):
+It also:
+- creates a Git repository if one does not already exist
+- appends common ignore entries to `.gitignore`
+- preserves existing files when possible
+- supports `--update` to refresh an existing setup
+
+## Recommended Zed configuration
+
+Add the MCP server to your Zed settings.
+
+Example:
+
 ```json
 {
   "agentops-server": {
@@ -76,112 +79,86 @@ Zed (MCP Server):
 }
 ```
 
-Tool Settings (settings.json):
-```json
-"agent": {
-  "tool_permissions": {
-    "tools": {
-      "create_directory": {
-        "default": "allow"
-      },
-      "fetch": {
-        "default": "allow"
-      },
-      "web_search": {
-        "default": "allow"
-      },
-      "terminal": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:session_capture_context": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:repo_verify": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:repo_commit": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:repo_status_summary": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:repo_commit_message_suggest": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:tests_suggest": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:tests_suggest_from_failures": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:commit_if_verified": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_compact_context": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_handoff_export": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_resume_brief": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_start_task": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_update_task": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_end_task": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_capture_state": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_task_summary": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_observability_summary": {
-        "default": "allow"
-      }
-    }
-  },
-  "default_model": {
-    "provider": "copilot_chat",
-    "model": "gpt-5.2-codex"
-  }
-},
+You can then grant tool permissions in Zed according to your preferences.
+
+## Typical usage flow
+
+Once the project is initialized, the normal flow is:
+
+1. Ask the agent to make a change
+2. Let it run project verification
+3. Review the result
+4. Commit the change
+
+The scaffolded verify script is the default entry point for checks:
+
+```bash
+.zed/scripts/verify
 ```
 
-MCP tools (snake_case):
-- `commit_if_verified`
-- `tx_event_append`
-- `tx_state_save`
-- `tx_state_rebuild`
-- `session_capture_context`
-- `repo_verify`
-- `repo_commit`
-- `repo_status_summary`
-- `repo_commit_message_suggest`
-- `tests_suggest`
-- `tests_suggest_from_failures`
-- `ops_compact_context`
-- `ops_handoff_export`
-- `ops_resume_brief`
-- `ops_start_task`
-- `ops_update_task`
-- `ops_end_task`
-- `ops_capture_state`
-- `ops_task_summary`
-- `ops_observability_summary`
-- Aliases: dotted names (e.g. `ops.handoff_export`) map to snake_case for compatibility.
+Extend it to match your repository. By default, it tries common checks for changed files, such as Python, Swift, Rust, shell scripts, and Bicep where the corresponding tools are installed.
 
-Usage notes:
-- Call `tools/list` to enumerate tools. Example request: `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
-- Call `tools/call` to invoke a tool. Example request: `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ops_start_task","arguments":{"title":"Review v0.1.0 docs"}}}`
-- Successful responses include a `result`; failures include an `error` with `code` and `message`.
+## Release verification / coverage
 
-Then register the MCP server in Zed and grant tool permissions as you prefer.
+For release-oriented Python coverage runs, use:
+
+```bash
+.zed/scripts/verify-release
+```
+
+This requires `pytest-cov` to be available.
+
+## Updating from older versions
+
+If you already use Zed AgentOps, run:
+
+```bash
+zed-agentops-init.sh --update <project>
+```
+
+This refreshes the user-facing scaffold, especially:
+
+- `.rules`
+- `.agent` state file presence
+- default verify/task scaffolding where applicable
+
+Recent versions also tightened resumability and state alignment, so updating is recommended before starting new work in an older scaffold.
+
+## What changed in recent versions
+
+### Current behavior summary
+
+- The scaffold now aligns `.rules` with the current workflow expectations
+- Initial transaction state starts from the current baseline
+- Resume behavior is centered on the local AgentOps state files
+- The default setup is aimed at safer interruption/resume cycles
+
+### If you are upgrading from an older scaffold
+
+You may notice:
+
+- refreshed `.rules`
+- refreshed initial state defaults
+- improved consistency between the scaffold and the current runtime behavior
+
+In most cases, `--update` is enough.
+
+## Files you will commonly interact with
+
+- `.rules` — project instructions injected into the agent context
+- `.zed/scripts/verify` — your main verification entry point
+- `.zed/tasks.json` — reusable Zed tasks
+- `.agent/tx_event_log.jsonl` — local AgentOps event log
+- `.agent/tx_state.json` — local AgentOps state used for resuming work
+
+For most users, the important point is simple: keep `.rules` current by using the latest scaffold or running `--update`.
+
+## Notes
+
+- macOS only at the moment
+- The generated scaffold is meant to be customized per repository
+- The default verify script is intentionally conservative and may need project-specific additions
 
 ## License
+
 MIT

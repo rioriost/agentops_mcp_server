@@ -1,70 +1,73 @@
 # Zed AgentOps
 
-- CI/CD 的ループ：編集 -> verify -> commit
-- テスト生成をループに含める（エージェントがテスト追加し、verify）
+Zed AgentOps は、Zed 上で edit → verify → commit の流れを回しやすくするための MCP サーバーと、再開しやすい作業用スキャフォールドを提供します。
 
-※ 現時点では動作環境は macOS のみです。
+> 現在の対応環境は macOS のみです。
 
-## クイックスタート
+## できること
 
-```bash
-zed-agentops-init.sh project_name
-zed-agentops-init.sh --update existing_project
-```
+- Zed で AgentOps を使うためのプロジェクト雛形を作成
+- リポジトリ操作、検証、作業再開を支援するローカル MCP サーバーを提供
+- プロジェクトごとに拡張できる標準 `verify` エントリーポイントを追加
+- セッション中断後でも作業を再開しやすくするためのローカル状態を保持
 
-`--update` を使うと既存の AgentOps 管理ディレクトリを移行できます（`.rules` を更新し、`.agent` の状態ファイルが存在することを保証します。legacy アーティファクトは削除しません）。
+この README は利用者向けです。内部実装の詳細は必要最小限に絞っています。
 
 ## インストール
 
-```
+Homebrew でインストールします。
+
+```bash
 brew tap rioriost/agentops_mcp_server
 brew install agentops_mcp_server
 ```
 
-`zed-agentops-init.sh` を使ってディレクトリをスキャフォールドします（`.rules`、`.zed/`、`.agent`、`.zed/scripts/verify` に加え、canonical な `.agent/tx_event_log.jsonl` と `.agent/tx_state.json`、および legacy の派生専用 `.agent/journal.jsonl` を作成）。
-ディレクトリを Zed で開き、Agent パネルを使ってください。
-リリース向けのカバレッジ計測は `.zed/scripts/verify-release`（`pytest-cov` が必要）を使ってください。
-`.gitignore` にはエントリが自動追記されます。
+これにより、`agentops_mcp_server` と `zed-agentops-init.sh` がインストールされます。
 
-## ワークフローのヒント
+## クイックスタート
 
-- セッション終了前／コンテキストが厳しいとき:
-  - `ops_compact_context` を実行（`include_diff=false` 推奨、`max_chars` は任意）
-  - `ops_capture_state` を実行（トランザクション状態を保存）
-  - `ops_handoff_export` は `.agent/handoff.json` に書き出し
-- すぐ再開する場合は `ops_resume_brief` を実行
-- タスクの進行記録: `ops_start_task` / `ops_update_task` / `ops_end_task`
-- トークン節約: フル diff より要約・diff stats を優先し、出力は短く保つ
+新しいプロジェクトディレクトリを初期化する場合:
 
-## セマンティック再開（0.4.0）
-- canonical なソースは `.agent/tx_event_log.jsonl`（イベントログ）と `.agent/tx_state.json`（マテリアライズド状態）。
-- `semantic_summary` は進捗の要約、`user_intent` は明示的な再開意図（例: “continue”）を記録。
-- `.agent/handoff.json` は派生専用で、再開判断の canonical 入力にはならない。
+```bash
+zed-agentops-init.sh my_project
+```
 
-## .rulesについて（from v0.2.0）
-zed-agentops-init.sh は `.rules` を生成します。
+既存の AgentOps 管理ディレクトリを更新する場合:
 
-## 主要ファイルの配置
+```bash
+zed-agentops-init.sh --update my_project
+```
 
-- `.rules` : Zed Agent のコンテキストに自動注入されるプロジェクトルール
-- `.zed/tasks.json` : 再利用可能なタスク（verify、git ヘルパー）
-- `.zed/scripts/verify` : build/test/lint の単一エントリーポイント（必要に応じて拡張）
-- `.zed/scripts/verify-release` : リリース向けのカバレッジ計測（pytest-cov）
+初期化後の流れ:
 
-- `.agent/tx_event_log.jsonl` : canonical なトランザクションイベントログ
-- `.agent/tx_state.json` : canonical なマテリアライズド状態
-- `.agent/handoff.json` : 派生専用の引き継ぎサマリ
-- `.agent/observability_summary.json` : 派生専用の観測サマリ
-- `.agent/journal.jsonl` : legacy の派生専用アーティファクト
-- `/opt/homebrew/bin/agentops_mcp_server` : Homebrew でインストールされる MCP サーババイナリ（macOS）
+1. ディレクトリを Zed で開く
+2. Zed の設定に MCP サーバーを登録する
+3. Agent Panel を開く
+4. リポジトリ上で作業を開始する
 
-## MCP Server (Zed)
+## 初期化で作成されるもの
 
-MCP サーバは Homebrew でインストールされるバイナリ（例: `/opt/homebrew/bin/agentops_mcp_server`）として提供され、Zed と互換の最小 JSON-RPC 2.0 stdio プロトコルを提供します。stdin から 1 行 1 JSON を読み、stdout に JSON-RPC 応答を返します。対応メソッドは `initialize`、`initialized`、`tools/list`、`tools/call`、`shutdown`、`exit` です。
+`zed-agentops-init.sh` を実行すると、Zed で AgentOps を使い始めるために必要なファイルが作成されます。
 
+- `.rules`
+- `.zed/tasks.json`
+- `.zed/scripts/verify`
+- `.agent/tx_event_log.jsonl`
+- `.agent/tx_state.json`
 
+加えて、次も行います。
 
-Zed (MCP):
+- Git リポジトリが無ければ初期化
+- `.gitignore` に一般的な除外設定を追記
+- 既存ファイルは可能な限り保持
+- `--update` により既存セットアップを更新可能
+
+## 推奨される Zed 設定
+
+Zed の設定に MCP サーバーを追加してください。
+
+例:
+
 ```json
 {
   "agentops-server": {
@@ -77,113 +80,88 @@ Zed (MCP):
 }
 ```
 
-Tool Settings (settings.json):
-```json
-"agent": {
-  "tool_permissions": {
-    "tools": {
-      "create_directory": {
-        "default": "allow"
-      },
-      "fetch": {
-        "default": "allow"
-      },
-      "web_search": {
-        "default": "allow"
-      },
-      "terminal": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:session_capture_context": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:repo_verify": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:repo_commit": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:repo_status_summary": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:repo_commit_message_suggest": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:tests_suggest": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:tests_suggest_from_failures": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:commit_if_verified": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_compact_context": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_handoff_export": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_resume_brief": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_start_task": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_update_task": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_end_task": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_capture_state": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_task_summary": {
-        "default": "allow"
-      },
-      "mcp:agentops-server:ops_observability_summary": {
-        "default": "allow"
-      }
-    }
-  },
-  "default_model": {
-    "provider": "copilot_chat",
-    "model": "gpt-5.2-codex"
-  }
-},
+その後、必要に応じて Zed 側でツール権限を設定してください。
+
+## 基本的な使い方
+
+プロジェクトを初期化したあとの基本的な流れは次のとおりです。
+
+1. エージェントに変更を依頼する
+2. プロジェクトの検証を実行させる
+3. 結果を確認する
+4. 変更をコミットする
+
+標準の検証入口は次です。
+
+```bash
+.zed/scripts/verify
 ```
 
-提供ツール（snake_case）:
-- `commit_if_verified`
-- `tx_event_append`
-- `tx_state_save`
-- `tx_state_rebuild`
+必要に応じて、各リポジトリ向けに内容を拡張してください。  
+デフォルトでは、変更されたファイルに応じて、利用可能なツールが入っていれば Python、Swift、Rust、Shell、Bicep などの代表的なチェックを試みます。
 
-- `session_capture_context`
-- `repo_verify`
-- `repo_commit`
-- `repo_status_summary`
-- `repo_commit_message_suggest`
-- `tests_suggest`
-- `tests_suggest_from_failures`
-- `ops_compact_context`
-- `ops_handoff_export`
-- `ops_resume_brief`
-- `ops_start_task`
-- `ops_update_task`
-- `ops_end_task`
-- `ops_capture_state`
-- `ops_task_summary`
-- `ops_observability_summary`
-- 互換: ドット区切り（例: `ops.handoff_export`）は snake_case にマップされます
+## リリース向け検証 / カバレッジ
 
-使用メモ:
-- `tools/list` でツール一覧を取得。例: `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
-- `tools/call` でツールを呼び出し。例: `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ops_start_task","arguments":{"title":"v0.1.0 ドキュメント確認"}}}`
-- 成功時は `result`、失敗時は `error`（`code` と `message`）が返ります。
+リリース向けの Python カバレッジ計測には、次を使ってください。
 
-あとは Zed に MCP サーバを登録し、必要な権限を付与してください。
+```bash
+.zed/scripts/verify-release
+```
+
+これには `pytest-cov` が必要です。
+
+## 古いバージョンから更新する場合
+
+すでに Zed AgentOps を使っている場合は、次を実行してください。
+
+```bash
+zed-agentops-init.sh --update <project>
+```
+
+これにより、主に次の利用者向けセットアップが更新されます。
+
+- `.rules`
+- `.agent` の状態ファイルの存在
+- 必要に応じた標準の verify / task スキャフォールド
+
+最近のバージョンでは、作業再開まわりと状態整合性も改善されているため、古いスキャフォールドを使っている場合は新しい作業を始める前に更新を推奨します。
+
+## 最近の変更点
+
+### 現在の動作の要点
+
+- スキャフォールド生成時の `.rules` が現在のワークフロー前提に揃うようになりました
+- 初期トランザクション状態が現在の基準値に揃いました
+- 作業再開はローカルの AgentOps 状態ファイルを中心に扱う前提です
+- セッション中断と再開をより安全に扱える初期構成になっています
+
+### 古いスキャフォールドから更新した場合に変わること
+
+次のような更新が入る場合があります。
+
+- `.rules` の更新
+- 初期状態デフォルト値の更新
+- スキャフォールドと現在の実行時挙動の整合性向上
+
+ほとんどのケースでは `--update` で十分です。
+
+## よく触るファイル
+
+- `.rules` — エージェントのコンテキストに注入されるプロジェクト指示
+- `.zed/scripts/verify` — 主な検証エントリーポイント
+- `.zed/tasks.json` — 再利用可能な Zed タスク
+- `.agent/tx_event_log.jsonl` — ローカルの AgentOps イベントログ
+- `.agent/tx_state.json` — 作業再開に使われるローカル状態
+
+利用者の観点では、重要なのはシンプルです。  
+最新のスキャフォールドを使うか `--update` を実行して、`.rules` を最新に保ってください。
+
+## 補足
+
+- 現時点では macOS のみ対応
+- 生成されるスキャフォールドは、各リポジトリに合わせて調整する前提です
+- 標準の verify スクリプトは控えめな初期設定なので、プロジェクトに応じた追加が必要になることがあります
 
 ## ライセンス
+
 MIT
