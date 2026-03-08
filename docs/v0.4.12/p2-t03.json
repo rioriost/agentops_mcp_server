@@ -2,7 +2,7 @@
   "id": "p2-t03",
   "title": "Correct active transaction rebuild and resume selection behavior",
   "priority": "P1",
-  "status": "committed",
+  "status": "done",
   "summary": "Fix the rebuild path so the materialized transaction state consistently selects the correct active transaction from the canonical event log during resume. This ticket focuses on correctly handling later tx.begin events after terminal transactions, preventing misleading last_applied_seq snapshots when active_tx selection is stale, and adding regression coverage for active transaction rebuild behavior.",
   "inputs": [
     "docs/draft_0.4.12.md",
