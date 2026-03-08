@@ -169,6 +169,11 @@ cat <<'RULES' > "$SOURCE_RULES"
   - docs/__version__/tickets_list.json (metadata)
   - docs/__version__/pX-tY.json (full ticket with status/inputs/outputs/deps)
 - Ticket status enum: planned, in-progress, checking, verified, committed, done, blocked.
+- Ticket status persistence is mandatory throughout execution, not optional bookkeeping.
+- Every ticket status change must be persisted to both:
+  - the per-ticket JSON file, and
+  - docs/__version__/tickets_list.json.
+- The per-ticket JSON file and docs/__version__/tickets_list.json must stay synchronized with each other for the same ticket.
 
 ## Work loop (mandatory)
 - Tickets are the only unit of work.
@@ -180,17 +185,23 @@ cat <<'RULES' > "$SOURCE_RULES"
   - commit operations require a valid verify sequence and existing transaction context
 - For any code change:
   1) Set status -> in-progress (emit tx.begin if new)
+     - Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json when work begins.
   2) Register file intents before mutation
   3) Implement smallest safe change
   4) Update semantic_summary (required) and user_intent only on explicit user resume intent; persist tx_state after mutation
   5) Run `repo_verify` (runs `.zed/scripts/verify`)
      - If fails: fix and repeat (update semantic summary)
   6) Set status -> checking
+     - Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json.
      - Compare acceptance_criteria AND plan.md to avoid omissions
   7) Set status -> verified
+     - Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json.
   8) Commit changes (emit tx.commit.start/done|fail)
   9) Set status -> committed
+     - Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json.
   10) Set status -> done (emit tx.end.done|blocked)
+     - Persist the terminal ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json.
+- Runtime transaction status/phase and persisted ticket-document status must stay synchronized at each ticket lifecycle transition and must not be reconciled later as optional follow-up bookkeeping.
 
 ## Persistence & logging (mandatory)
 - Always record events for plan/task/progress/verify/commit.

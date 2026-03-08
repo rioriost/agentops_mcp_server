@@ -2,7 +2,7 @@
   "id": "p3-t04",
   "title": "Add regression checks for ticket status persistence and rules alignment",
   "priority": "P1",
-  "status": "planned",
+  "status": "done",
   "summary": "Add regression coverage for the v0.4.11 contract so ticket status persistence remains explicitly mandatory across runtime guidance, versioned ticket artifacts, and the `.rules` template embedded in `zed-agentops-init.sh`. The checks should prevent future drift between the checked-in rules, generated rules template, and the expected persistence behavior for per-ticket JSON files plus `tickets_list.json`.",
   "inputs": [
     "docs/draft.md",
@@ -44,6 +44,7 @@
     "Keep the checks focused on contract behavior and text alignment rather than incidental wording where possible.",
     "Do not weaken strict workflow or transaction semantics in order to simplify the checks; the checks should reinforce the mandatory persistence contract.",
     "Prefer assertions that lock the required persistence destinations and synchronization expectations directly.",
-    "Use this ticket to ensure future rule changes update both the checked-in `.rules` file and the init-script template together."
+    "Use this ticket to ensure future rule changes update both the checked-in `.rules` file and the init-script template together.",
+    "Added regression assertions in tests/test_init.py that lock the required ticket status persistence language and rules/template alignment for the v0.4.11 contract."
   ]
 }

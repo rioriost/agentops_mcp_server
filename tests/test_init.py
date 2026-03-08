@@ -79,3 +79,26 @@ def test_init_script_contains_canonical_artifacts_and_rules():
     assert "- semantic_summary is required for non-terminal tx" in content
     assert "- Identify active ticket (status != done) and resume it." in content
     assert "active_tx.next_action is required" not in content
+    assert (
+        "- Ticket status persistence is mandatory throughout execution, not optional bookkeeping."
+        in content
+    )
+    assert "- Every ticket status change must be persisted to both:" in content
+    assert "- the per-ticket JSON file, and" in content
+    assert "- docs/__version__/tickets_list.json." in content
+    assert (
+        "- The per-ticket JSON file and docs/__version__/tickets_list.json must stay synchronized with each other for the same ticket."
+        in content
+    )
+    assert (
+        "- Runtime transaction status/phase and persisted ticket-document status must stay synchronized at each ticket lifecycle transition and must not be reconciled later as optional follow-up bookkeeping."
+        in content
+    )
+    assert (
+        "- Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json when work begins."
+        in content
+    )
+    assert (
+        "- Persist the terminal ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json."
+        in content
+    )

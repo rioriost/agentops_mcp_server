@@ -2,7 +2,7 @@
   "id": "p2-t03",
   "title": "Clarify runtime-to-ticket status synchronization expectations",
   "priority": "P1",
-  "status": "planned",
+  "status": "done",
   "summary": "Define and document how runtime transaction status and persisted ticket-document status must stay synchronized during execution. The goal is to remove ambiguity about whether runtime-only status changes are sufficient and to ensure that per-ticket JSON files plus `tickets_list.json` reflect the same lifecycle progression expected by the canonical work loop.",
   "inputs": [
     "docs/draft.md",
@@ -40,6 +40,7 @@
     "This ticket is about synchronization expectations and guidance, not about changing the status enum itself.",
     "Do not define a separate status lifecycle for docs that can drift from runtime transaction state.",
     "Keep the contract strict enough that operators and resume logic can trust versioned planning artifacts as a reflection of execution progress.",
-    "Coordinate closely with the rules/template alignment work so persistence destinations and synchronization timing remain consistent."
+    "Coordinate closely with the rules/template alignment work so persistence destinations and synchronization timing remain consistent.",
+    "Clarified that runtime transaction status and persisted ticket-document status must stay synchronized throughout the work loop, with the per-ticket JSON file and tickets_list.json updated together at each lifecycle transition."
   ]
 }
