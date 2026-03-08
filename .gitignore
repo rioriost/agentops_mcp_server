@@ -1,4 +1,5 @@
 .agent/
+.agent.backup*/
 .venv/
 __pycache__/
 *.py[cod]
