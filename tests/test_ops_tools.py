@@ -239,9 +239,8 @@ def test_ops_update_task_mismatch_error_includes_recovery_guidance(
     with pytest.raises(
         ValueError,
         match=(
-            "tx_id does not match active transaction: active_tx=t-1, requested_tx=t-2, "
-            "active_ticket=t-1, status=in-progress, next_action=tx.verify.start. "
-            "Resume or complete the active transaction before starting a new ticket."
+            "tx_id does not match active transaction: active_tx=t-1, requested_tx=t-2. "
+            "Resume active transaction 't-1' first \\(next_action=tx.verify.start\\)."
         ),
     ):
         ops.ops_update_task(
@@ -327,9 +326,8 @@ def test_ops_end_task_mismatch_error_includes_recovery_guidance(
     with pytest.raises(
         ValueError,
         match=(
-            "tx_id does not match active transaction: active_tx=t-1, requested_tx=t-2, "
-            "active_ticket=t-1, status=in-progress, next_action=tx.verify.start. "
-            "Resume or complete the active transaction before starting a new ticket."
+            "tx_id does not match active transaction: active_tx=t-1, requested_tx=t-2. "
+            "Resume active transaction 't-1' first \\(next_action=tx.verify.start\\)."
         ),
     ):
         ops.ops_end_task(summary="done", task_id="t-2", session_id="s1")

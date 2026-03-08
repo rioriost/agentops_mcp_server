@@ -270,7 +270,25 @@ def test_log_tool_error_writes_errors_jsonl(tmp_path):
     assert len(lines) == 1
     assert lines[0]["tool_name"] == "repo_verify"
     assert lines[0]["tool_input"] == {"timeout_sec": 30}
-    assert lines[0]["tool_output"] == {"error": "verify failed"}
+    assert lines[0]["tool_output"]["error"] == "verify failed"
+    assert lines[0]["tool_output"]["diagnostics"]["validation_point"] == "repo_verify"
+    assert lines[0]["tool_output"]["diagnostics"]["event_sequence"] == {
+        "last_logged_seq": None
+    }
+    assert lines[0]["tool_output"]["diagnostics"]["active_tx_context"] == {
+        "tx_id": "none",
+        "ticket_id": "none",
+        "status": "unknown",
+        "phase": "unknown",
+        "current_step": "none",
+        "next_action": "",
+        "session_id": "",
+    }
+    assert lines[0]["tool_output"]["diagnostics"]["session_context"] == {
+        "requested_session_id": "",
+        "active_session_id": "",
+    }
+    assert lines[0]["diagnostics"] == lines[0]["tool_output"]["diagnostics"]
     assert isinstance(lines[0]["ts"], str)
     assert lines[0]["ts"]
 
