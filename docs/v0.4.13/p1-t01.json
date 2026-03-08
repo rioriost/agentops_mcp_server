@@ -1,0 +1,47 @@
+{
+  "id": "p1-t01",
+  "title": "Define the explicit transaction state machine contract",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Define the Phase 1 contract for v0.4.13 that makes transaction-aware task management explicit as a state machine. The contract must define valid and forbidden transaction transitions, separate new-start from resume behavior, and clarify the synchronization guarantees required between canonical transaction events and materialized transaction state so that a single ticket is managed as one coherent transaction from start to terminal completion.",
+  "inputs": [
+    "docs/draft_0.4.13.md",
+    "docs/v0.4.13/plan.md",
+    ".agent/errors.jsonl",
+    ".agent/tx_event_log.jsonl",
+    ".agent/tx_state.json",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py"
+  ],
+  "outputs": [
+    "Documented explicit transaction state machine for ticket execution from begin through terminal completion",
+    "Defined valid transitions, forbidden transitions, and integrity-failure boundaries for transaction-aware task management",
+    "Defined canonical start, resume, verify, commit, end, and synchronization semantics to guide implementation and regression protection"
+  ],
+  "acceptance_criteria": [
+    "The Phase 1 contract explicitly defines the transaction lifecycle states and sub-states used for transaction-aware task management.",
+    "The contract explicitly distinguishes new transaction start from resume and states that resume must not emit a second tx.begin for a non-terminal transaction.",
+    "The contract defines the valid happy-path, blocked-path, verify-retry, and resume flows for a single ticket transaction.",
+    "The contract defines forbidden flows including lifecycle before tx.begin, duplicate non-terminal tx.begin, verify result without verify start, commit start without verify pass, event/state synchronization drift, active transaction loss, and post-terminal follow-up events.",
+    "The contract states that canonical event progression and materialized transaction state must remain synchronized and that divergence is an integrity failure rather than a recoverable success path.",
+    "The contract defines the required behavior for begin semantics, resume semantics, verify semantics, commit semantics, and terminal end semantics clearly enough to guide implementation tickets."
+  ],
+  "tasks": [
+    "Review the v0.4.13 draft and the observed workflow failures to identify the missing state-machine contract details.",
+    "Define the top-level transaction lifecycle states, verify and commit sub-states, and the canonical meaning of each state.",
+    "Define valid transition sequences for happy path, blocked path, verification retry, and resume behavior.",
+    "Define forbidden transitions and explicit integrity-failure conditions for transaction-invalid flows.",
+    "Define the synchronization contract between canonical transaction events, active transaction materialization, last_applied_seq, verify state, commit state, and guarded workflow operations.",
+    "Document the Phase 1 contract so that later implementation tickets can use one consistent model for runtime enforcement and regression testing."
+  ],
+  "dependencies": [],
+  "notes": [
+    "This is a contract-definition ticket for Phase 1, not the implementation ticket.",
+    "Do not weaken strict workflow guards or transaction validation rules as part of this ticket.",
+    "Keep the contract explicit enough that all runtime helpers can share one transaction model instead of reconstructing behavior from distributed assumptions.",
+    "Use the observed failures as concrete examples of specification-violating flows that the contract must classify and forbid.",
+    "The contract should support deterministic resumability by requiring that one ticket remains one coherent transaction lineage until it reaches a terminal outcome."
+  ]
+}

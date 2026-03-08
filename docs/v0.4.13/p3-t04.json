@@ -1,0 +1,50 @@
+{
+  "id": "p3-t04",
+  "title": "Repair rebuild integrity handling and transaction violation diagnostics",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Implement the Phase 3 changes for v0.4.13 so rebuild, capture, and recovery behavior enforce the explicit transaction state machine and surface specification violations directly. The work should ensure rebuild deterministically materializes the correct active transaction, rejects invalid sequences such as duplicate non-terminal begin without collapsing into misleading default state, and records diagnostics rich enough to explain why transaction-aware task execution became invalid.",
+  "inputs": [
+    "docs/draft_0.4.13.md",
+    "docs/v0.4.13/plan.md",
+    "docs/v0.4.13/p1-t01.json",
+    "docs/v0.4.13/p2-t02.json",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/repo_context.py",
+    ".agent/errors.jsonl",
+    ".agent/tx_event_log.jsonl",
+    ".agent/tx_state.json",
+    ".agent/handoff.json"
+  ],
+  "outputs": [
+    "Rebuild logic that deterministically materializes the correct active non-terminal transaction or fails with a specific integrity error",
+    "Recovery and capture behavior that does not silently replace canonical transaction context with misleading default state",
+    "Improved structured diagnostics for duplicate begin, stale state, active transaction loss, and related transaction state-machine violations"
+  ],
+  "acceptance_criteria": [
+    "Rebuild rejects duplicate non-terminal `tx.begin` as an explicit integrity violation and preserves the invalid event context needed for diagnosis.",
+    "When canonical history contains a non-terminal transaction, rebuild does not collapse the materialized result into an unqualified default `none` active transaction unless that is the actual canonical outcome.",
+    "Rebuild deterministically selects the latest valid active transaction after replay, including cases involving terminal handoff to a later transaction.",
+    "Capture and handoff-related flows do not overwrite valid transaction context with stale or guessed defaults when rebuild detects integrity problems.",
+    "Structured diagnostics for rebuild and recovery failures include enough context to identify tx_id, ticket_id, expected next action, invalid event sequence, session context, and whether the failure was caused by ordering violation or state drift."
+  ],
+  "tasks": [
+    "Review rebuild, capture, and recovery paths to identify where invalid replay results currently degrade into ambiguous default state instead of explicit integrity failure.",
+    "Implement stricter active-transaction reconstruction so replay selects the correct latest valid non-terminal transaction and preserves terminal handoff semantics.",
+    "Ensure invalid sequences such as duplicate non-terminal begin, event-after-terminal, and active transaction loss are surfaced as direct rebuild integrity failures with actionable context.",
+    "Update capture and handoff-facing behavior so integrity failures are preserved diagnostically rather than masked by default empty transaction state.",
+    "Document any helper boundaries or invariants needed to keep rebuild authoritative for transaction correctness and diagnostics."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p2-t02"
+  ],
+  "notes": [
+    "This ticket focuses on rebuild integrity, recovery safety, and observability rather than runtime transition emission itself.",
+    "Do not weaken transaction validation in order to make rebuild succeed on invalid history; preserve strict correctness and improve diagnostics instead.",
+    "Prefer explicit integrity failure with canonical context over permissive fallback to empty or guessed active transaction state.",
+    "Use the observed violation patterns from 0.4.12 analysis, including duplicate begin and state drift, as concrete regression targets for rebuild diagnostics."
+  ]
+}

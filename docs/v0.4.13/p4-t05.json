@@ -1,0 +1,62 @@
+{
+  "id": "p4-t05",
+  "title": "Add regression coverage for invalid transaction flows and integrity enforcement",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Add regression coverage for the v0.4.13 transaction state machine hardening work so specification-violating transaction flows are detected early, rejected deterministically, and logged with actionable integrity diagnostics. The checks should lock the intended behavior for lifecycle ordering, resume semantics, verify/commit sequencing, rebuild integrity, and event/state synchronization across the canonical transaction workflow.",
+  "inputs": [
+    "docs/draft_0.4.13.md",
+    "docs/v0.4.13/plan.md",
+    "docs/v0.4.13/p1-t01.json",
+    "docs/v0.4.13/p2-t02.json",
+    "docs/v0.4.13/p2-t03.json",
+    "docs/v0.4.13/p3-t04.json",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/state_store.py",
+    "tests/test_commit_manager.py",
+    "tests/test_ops_tools.py",
+    "tests/test_state_rebuilder.py",
+    "tests/test_state_store.py"
+  ],
+  "outputs": [
+    "Regression checks for invalid transaction flow detection and rejection",
+    "Regression checks for synchronized event-log and tx-state behavior across failure paths",
+    "Regression checks for deterministic resume, rebuild, and terminal-state handling",
+    "Verification evidence that v0.4.13 integrity rules remain enforced"
+  ],
+  "acceptance_criteria": [
+    "Tests cover rejection of lifecycle operations that occur before a canonical tx.begin.",
+    "Tests cover rejection of duplicate tx.begin for a non-terminal transaction and confirm resume does not emit a second begin.",
+    "Tests cover rejection of tx.verify.pass or tx.verify.fail when no matching tx.verify.start exists for the step.",
+    "Tests cover rejection of tx.commit.start when canonical tx.verify.pass has not been established.",
+    "Tests cover detection of event/state divergence after tx.begin, tx.verify.start, and tx.verify.pass.",
+    "Tests cover active transaction reconstruction failure or explicit integrity signaling when rebuild encounters invalid ordering such as duplicate non-terminal begin.",
+    "Tests cover rejection of non-terminal follow-up events after tx.end.done or tx.end.blocked.",
+    "Tests cover integrity diagnostics and structured error logging strongly enough to identify ticket id, transaction id, sequence context, and validation point from .agent artifacts.",
+    "Repository verification passes with the new regression coverage in place."
+  ],
+  "tasks": [
+    "Identify the existing test modules that should own invalid-flow, synchronization-drift, rebuild-integrity, and diagnostics coverage.",
+    "Add or extend tests for lifecycle-before-begin and duplicate-begin violations using canonical event ordering assertions.",
+    "Add or extend tests for verify-result-without-start and commit-without-verify-pass violations.",
+    "Add or extend tests for resume behavior so existing non-terminal transactions are reused rather than re-begun.",
+    "Add or extend tests for rebuild behavior so invalid event sequences fail explicitly and do not silently collapse into a default empty active transaction.",
+    "Add or extend tests for post-terminal event rejection and repeated recovery attempts that must not multiply invalid transaction sequences.",
+    "Add or extend tests for structured integrity failure logging in .agent/errors.jsonl and related transaction-state artifacts.",
+    "Run verification and confirm the v0.4.13 transaction state machine contract is protected by automated checks."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p2-t02",
+    "p2-t03",
+    "p3-t04"
+  ],
+  "notes": [
+    "Keep the checks focused on enforcing the explicit v0.4.13 transaction state machine, not on weakening guards to accommodate invalid flows.",
+    "Prefer tests that assert canonical transaction behavior directly through tx_event_log, tx_state, rebuild, and guarded-operation outcomes.",
+    "Use the observed workflow violations as concrete regression targets: lifecycle before begin, stale verify state, commit without canonical verify pass, duplicate non-terminal begin, and active transaction loss during rebuild.",
+    "This ticket should confirm that invalid transaction flows fail early, fail specifically, and do not cascade into misleading downstream guard errors."
+  ]
+}

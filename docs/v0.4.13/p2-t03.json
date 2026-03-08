@@ -1,0 +1,52 @@
+{
+  "id": "p2-t03",
+  "title": "Implement synchronized canonical event-state progression across transaction helpers",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Implement the Phase 2 runtime changes for v0.4.13 so canonical transaction events, materialized transaction state, and guarded helper behavior remain synchronized throughout ticket execution. The work must prevent specification-violating flows such as lifecycle progression before tx.begin, duplicate non-terminal tx.begin, verify and commit sequencing against stale state, and follow-up helper execution after synchronization drift or integrity failure.",
+  "inputs": [
+    "docs/draft_0.4.13.md",
+    "docs/v0.4.13/plan.md",
+    "docs/v0.4.13/p1-t01.json",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/repo_context.py",
+    ".agent/errors.jsonl",
+    ".agent/tx_event_log.jsonl",
+    ".agent/tx_state.json"
+  ],
+  "outputs": [
+    "Runtime implementation that keeps canonical event append, tx_state materialization, and guarded helper reads synchronized",
+    "Precondition enforcement that rejects invalid transaction transitions before further canonical mutation",
+    "Safer start/resume behavior that prevents duplicate non-terminal tx.begin and stale-state follow-up actions"
+  ],
+  "acceptance_criteria": [
+    "After tx.begin is emitted successfully, subsequent task lifecycle helpers observe the same transaction as active without requiring manual recovery or rebuild-driven guessing.",
+    "Resume paths bind to the existing non-terminal transaction and do not emit a second tx.begin for the same open ticket.",
+    "tx.verify.start, tx.verify.pass, tx.verify.fail, tx.commit.start, tx.commit.done, tx.commit.fail, and tx.end.* transitions materialize the corresponding tx_state before downstream guarded logic runs.",
+    "Guarded helper behavior does not disagree about whether a transaction exists, is in progress, is verified, or is terminal.",
+    "The implementation rejects specification-violating flows such as lifecycle before tx.begin, duplicate non-terminal tx.begin, commit start before canonical verify pass, and post-terminal non-terminal follow-up events.",
+    "If canonical event append succeeds but materialized state cannot be synchronized, the runtime surfaces an integrity failure and stops invalid follow-up progression.",
+    "The implementation does not silently replace an ambiguous or inconsistent active transaction with a default none state during normal runtime progression."
+  ],
+  "tasks": [
+    "Review current runtime helper entry points and canonical event mutation paths to identify where event append, tx_state persistence, and guard reads can diverge.",
+    "Implement explicit runtime enforcement for valid transaction progression so helper behavior follows the v0.4.13 state-machine contract rather than distributed assumptions.",
+    "Repair start versus resume flow selection so existing non-terminal work is resumed canonically instead of re-begun.",
+    "Ensure event append and tx_state materialization remain coupled strongly enough that downstream verify, commit, and lifecycle helpers cannot observe stale state after successful canonical transitions.",
+    "Add integrity handling that stops follow-up helper execution when synchronized canonical state cannot be established after an attempted transition.",
+    "Document any helper-boundary constraints or invariants in code comments where ordering and synchronization are critical to transaction correctness."
+  ],
+  "dependencies": [
+    "p1-t01"
+  ],
+  "notes": [
+    "This ticket is the main Phase 2 runtime implementation ticket for 0.4.13.",
+    "Do not weaken workflow guards to mask invalid transaction flows; fix the underlying canonical progression and synchronization behavior.",
+    "Treat resume misclassification, duplicate begin, and stale-state verify or commit decisions as one class of transaction-correctness failure.",
+    "Prefer failing early with explicit integrity context over allowing later helper calls to cascade into secondary guard errors.",
+    "Keep runtime behavior aligned with the explicit state-machine and forbidden-transition rules defined in docs/draft_0.4.13.md."
+  ]
+}

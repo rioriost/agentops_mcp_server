@@ -1,0 +1,53 @@
+{
+  "id": "p2-t02",
+  "title": "Implement start/resume separation and transaction transition enforcement",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Implement the Phase 2 runtime changes for v0.4.13 so transaction start, resume, and lifecycle progression obey one explicit transaction state machine. The work must prevent duplicate non-terminal begin, ensure resume binds to the existing active transaction instead of creating a new one, and enforce canonical transition preconditions before lifecycle, verify, commit, and terminal events are emitted.",
+  "inputs": [
+    "docs/draft_0.4.13.md",
+    "docs/v0.4.13/plan.md",
+    "docs/v0.4.13/p1-t01.json",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    ".agent/errors.jsonl",
+    ".agent/tx_event_log.jsonl",
+    ".agent/tx_state.json"
+  ],
+  "outputs": [
+    "Runtime implementation that separates new transaction start from resume behavior",
+    "Explicit enforcement of valid transaction transitions across lifecycle, verify, commit, and terminal operations",
+    "Prevention of duplicate non-terminal tx.begin and other specification-violating follow-up flows",
+    "Clear integrity failures when a requested action does not match the canonical transaction state machine"
+  ],
+  "acceptance_criteria": [
+    "A non-terminal transaction cannot receive a second `tx.begin` for the same ticket lineage.",
+    "Resume logic binds to the existing active non-terminal transaction and does not emit another `tx.begin`.",
+    "Lifecycle progression cannot occur before canonical `tx.begin` has been recorded.",
+    "Verify result events cannot be recorded without a canonical prior `tx.verify.start` for the relevant step.",
+    "Commit cannot start unless canonical synchronized state confirms a prior successful verify pass.",
+    "Terminal transactions reject additional non-terminal follow-up events.",
+    "When canonical state is ambiguous or invalid, the implementation fails with an integrity error instead of guessing or self-healing by issuing a new begin."
+  ],
+  "tasks": [
+    "Review the current start, resume, lifecycle, verify, commit, and terminal event paths to identify where implicit assumptions bypass the intended state machine.",
+    "Implement an explicit distinction between new-start and resume flows so that only true new work emits `tx.begin`.",
+    "Add enforcement that prevents duplicate non-terminal `tx.begin` and rejects lifecycle progression before begin.",
+    "Ensure verify and commit helpers validate required prior canonical transitions before emitting follow-up events.",
+    "Ensure post-terminal follow-up events are rejected consistently across all helpers.",
+    "Return direct integrity failures when transition preconditions are not met rather than continuing into secondary downstream errors.",
+    "Document any helper-level transition constraints needed to keep start/resume and event progression behavior consistent."
+  ],
+  "dependencies": [
+    "p1-t01"
+  ],
+  "notes": [
+    "This ticket focuses on Phase 2 transition enforcement, not on weakening validator behavior.",
+    "Treat duplicate non-terminal begin as a specification violation, not as a recoverable convenience path.",
+    "Resume must reuse canonical active transaction context; it must not synthesize a replacement transaction start because materialized state looks incomplete.",
+    "Use the observed failure patterns `tx.begin required before other events`, `commit.start requires verify.pass`, and `duplicate tx.begin` as concrete regression targets for the implementation."
+  ]
+}

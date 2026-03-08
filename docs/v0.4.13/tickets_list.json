@@ -1,0 +1,41 @@
+{
+  "version": "0.4.13",
+  "source": "draft_0.4.13.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P1",
+      "title": "Define the explicit transaction state machine contract",
+      "status": "planned",
+      "file": "v0.4.13/p1-t01.json"
+    },
+    {
+      "id": "p2-t02",
+      "priority": "P1",
+      "title": "Implement start/resume separation and transaction transition enforcement",
+      "status": "planned",
+      "file": "v0.4.13/p2-t02.json"
+    },
+    {
+      "id": "p2-t03",
+      "priority": "P1",
+      "title": "Implement synchronized canonical event-state progression across transaction helpers",
+      "status": "planned",
+      "file": "v0.4.13/p2-t03.json"
+    },
+    {
+      "id": "p3-t04",
+      "priority": "P1",
+      "title": "Repair rebuild integrity handling and transaction violation diagnostics",
+      "status": "planned",
+      "file": "v0.4.13/p3-t04.json"
+    },
+    {
+      "id": "p4-t05",
+      "priority": "P1",
+      "title": "Add regression coverage for invalid transaction flows and integrity enforcement",
+      "status": "planned",
+      "file": "v0.4.13/p4-t05.json"
+    }
+  ]
+}
