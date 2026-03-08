@@ -2,7 +2,7 @@
   "id": "p3-t04",
   "title": "Repair rebuild integrity handling and transaction violation diagnostics",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Implement the Phase 3 changes for v0.4.13 so rebuild, capture, and recovery behavior enforce the explicit transaction state machine and surface specification violations directly. Integrated diagnostics coverage now confirms that rebuild surfaces duplicate tx.begin and invalid ordering drift through rebuild_warning, rebuild_invalid_seq, rebuild_observed_mismatch, and .agent/errors.jsonl, while capture and handoff flows preserve safe none-state behavior and expose drift context instead of continuing from ambiguous rebuilt state.",
   "inputs": [
     "docs/draft_0.4.13.md",
