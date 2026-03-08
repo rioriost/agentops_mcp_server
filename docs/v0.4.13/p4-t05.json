@@ -2,7 +2,7 @@
   "id": "p4-t05",
   "title": "Add regression coverage for invalid transaction flows and integrity enforcement",
   "priority": "P1",
-  "status": "planned",
+  "status": "verified",
   "summary": "Add regression coverage for the v0.4.13 transaction state machine hardening work so specification-violating transaction flows are detected early, rejected deterministically, and logged with actionable integrity diagnostics. The checks should lock the intended behavior for lifecycle ordering, resume semantics, verify/commit sequencing, rebuild integrity, and event/state synchronization across the canonical transaction workflow.",
   "inputs": [
     "docs/draft_0.4.13.md",
@@ -47,16 +47,12 @@
     "Add or extend tests for structured integrity failure logging in .agent/errors.jsonl and related transaction-state artifacts.",
     "Run verification and confirm the v0.4.13 transaction state machine contract is protected by automated checks."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p2-t02",
-    "p2-t03",
-    "p3-t04"
-  ],
+  "dependencies": ["p1-t01", "p2-t02", "p2-t03", "p3-t04"],
   "notes": [
     "Keep the checks focused on enforcing the explicit v0.4.13 transaction state machine, not on weakening guards to accommodate invalid flows.",
     "Prefer tests that assert canonical transaction behavior directly through tx_event_log, tx_state, rebuild, and guarded-operation outcomes.",
     "Use the observed workflow violations as concrete regression targets: lifecycle before begin, stale verify state, commit without canonical verify pass, duplicate non-terminal begin, and active transaction loss during rebuild.",
-    "This ticket should confirm that invalid transaction flows fail early, fail specifically, and do not cascade into misleading downstream guard errors."
+    "This ticket should confirm that invalid transaction flows fail early, fail specifically, and do not cascade into misleading downstream guard errors.",
+    "Verification note: pytest tests/test_commit_manager.py tests/test_ops_tools.py tests/test_state_store.py tests/test_state_rebuilder.py -q -> 258 passed in 0.93s."
   ]
 }

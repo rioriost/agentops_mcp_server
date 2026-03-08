@@ -47,6 +47,7 @@ class DummyStateStore:
     def __init__(self):
         self.repo_context = SimpleNamespace(
             tx_state="tx_state.json",
+            tx_event_log="tx_event_log.jsonl",
             verify="verify",
             get_repo_root=lambda: "/tmp",
         )
@@ -728,6 +729,59 @@ def test_commit_if_verified_verify_failure_emits_event(tmp_path):
     event_types = [event["event_type"] for event in events]
 
     assert event_types == ["tx.begin", "tx.verify.start", "tx.verify.fail"]
+
+
+def test_commit_if_verified_rejects_verify_result_without_verify_start():
+    class RebuildAwareStateStore(DummyStateStore):
+        def __init__(self):
+            super().__init__()
+            self.read_count = 0
+            self.events = []
+
+        def read_json_file(self, _path):
+            self.read_count += 1
+            if self.read_count == 1:
+                return {
+                    "active_tx": {
+                        "verify_state": {"status": "not_started"},
+                    }
+                }
+            return None
+
+        def read_last_json_line(self, _path):
+            return None
+
+        def tx_event_append(self, **kwargs):
+            self.events.append(kwargs)
+            return {"ok": True, "event_type": kwargs["event_type"]}
+
+        def tx_event_append_and_state_save(self, **kwargs):
+            self.events.append(kwargs)
+            return {"ok": True, "event_type": kwargs["event_type"]}
+
+    state_store = RebuildAwareStateStore()
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"}),
+        state_store,
+        DummyStateRebuilder({"ok": False}),
+    )
+    manager._load_tx_context = lambda: {
+        "tx_id": "tx-1",
+        "ticket_id": "p4-t3",
+        "phase": "checking",
+        "step_id": "commit",
+        "session_id": "s1",
+    }
+
+    with pytest.raises(
+        RuntimeError,
+        match="verify.start not recorded; tx_state missing",
+    ):
+        manager.commit_if_verified("message", timeout_sec=1)
+
+    event_types = [event["event_type"] for event in state_store.events]
+    assert event_types == ["tx.begin", "tx.verify.start"]
 
 
 def test_repo_commit_with_verify_updates_verify_state(tmp_path, monkeypatch):
