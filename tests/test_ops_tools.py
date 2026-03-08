@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from typing import Any, Dict
 
 import pytest
@@ -12,12 +13,22 @@ from agentops_mcp_server.ops_tools import (
 
 
 class DummyGitRepo:
+    def __init__(self, diff_value: str = "diff", diff_error: Exception | None = None):
+        self.diff_value = diff_value
+        self.diff_error = diff_error
+
     def diff_stat(self) -> str:
-        return "diff"
+        if self.diff_error is not None:
+            raise self.diff_error
+        return self.diff_value
 
 
-def _build_ops_tools(repo_context, state_store, state_rebuilder):
-    return OpsTools(repo_context, state_store, state_rebuilder, DummyGitRepo())
+def _build_ops_tools(
+    repo_context, state_store, state_rebuilder, git_repo: DummyGitRepo | None = None
+):
+    return OpsTools(
+        repo_context, state_store, state_rebuilder, git_repo or DummyGitRepo()
+    )
 
 
 def _read_tx_events(repo_context):
@@ -114,6 +125,135 @@ def test_ops_compact_context_updates_journal(
 
     assert result["ok"] is True
     assert isinstance(result["compact_context"], str)
+
+
+def test_ops_compact_context_defaults_and_includes_diff(
+    repo_context, state_store, state_rebuilder
+):
+    _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="checking",
+        phase="checking",
+        current_step="resume-step",
+        session_id="s1",
+    )
+    git_repo = DummyGitRepo(
+        diff_value=" file.py | 1 +\n 1 file changed, 1 insertion(+)"
+    )
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder, git_repo)
+
+    result = ops.ops_compact_context(max_chars=None, include_diff=True)
+
+    assert result["ok"] is True
+    assert result["max_chars"] == 800
+    assert result["include_diff"] is True
+    assert "current_phase: checking" in result["compact_context"]
+    assert "current_task: t-1" in result["compact_context"]
+    assert "diff_stat:" in result["compact_context"]
+    assert "1 file changed" in result["compact_context"]
+
+
+def test_ops_compact_context_uses_empty_values_when_states_missing(
+    repo_context, state_store, state_rebuilder
+):
+    tx_state = _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="in-progress",
+        phase="in-progress",
+        current_step="resume-step",
+        session_id="s1",
+    )
+    tx_state["active_tx"]["verify_state"] = "bad"
+    tx_state["active_tx"]["commit_state"] = None
+    tx_state["active_tx"]["next_action"] = ""
+    tx_state["active_tx"]["semantic_summary"] = ""
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_compact_context(max_chars=120, include_diff=False)
+
+    assert result["ok"] is True
+    assert "current_phase: in-progress" in result["compact_context"]
+    assert "current_task: t-1" in result["compact_context"]
+
+
+def test_ops_compact_context_truncates_without_diff(
+    repo_context, state_store, state_rebuilder
+):
+    _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="checking",
+        phase="checking",
+        current_step="resume-step",
+        session_id="s1",
+    )
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_compact_context(max_chars=20, include_diff=False)
+
+    assert result["ok"] is True
+    assert result["max_chars"] == 20
+    assert result["compact_context"].endswith("...(truncated)")
+
+
+def test_ops_handoff_export_materializes_rebuilt_next_action_when_missing(
+    repo_context, state_store, state_rebuilder
+):
+    class RebuilderWithMissingNextAction:
+        def rebuild_tx_state(self):
+            return {
+                "ok": True,
+                "state": {
+                    "schema_version": "0.4.0",
+                    "active_tx": {
+                        "tx_id": "t-1",
+                        "ticket_id": "t-1",
+                        "status": "checking",
+                        "phase": "checking",
+                        "current_step": "resume-step",
+                        "last_completed_step": "",
+                        "next_action": "",
+                        "semantic_summary": "Resume work.",
+                        "user_intent": None,
+                        "session_id": "s1",
+                        "verify_state": {
+                            "status": "running",
+                            "last_result": None,
+                        },
+                        "commit_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "file_intents": [],
+                    },
+                    "last_applied_seq": 3,
+                    "integrity": {
+                        "state_hash": "test-hash",
+                        "rebuilt_from_seq": 3,
+                        "drift_detected": False,
+                        "active_tx_source": "active_candidate",
+                    },
+                    "updated_at": "2026-03-08T00:00:00+00:00",
+                },
+            }
+
+    ops = _build_ops_tools(repo_context, state_store, RebuilderWithMissingNextAction())
+
+    result = ops.ops_handoff_export()
+
+    assert result["ok"] is True
+    assert result["handoff"]["next_step"] == "resume-step"
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    assert tx_state["active_tx"]["next_action"] == "resume-step"
 
 
 def test_ops_handoff_export_writes_json(repo_context, state_store, state_rebuilder):
@@ -280,6 +420,22 @@ def test_ops_start_task_requires_session_id(repo_context, state_store, state_reb
 
     with pytest.raises(ValueError, match="session_id is required"):
         ops.ops_start_task(title="Build", task_id="t-1", session_id="")
+
+
+def test_ops_start_task_uses_explicit_status_for_phase(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_start_task(
+        title="Build", task_id="t-1", session_id="s1", status="checking"
+    )
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert [event["event_type"] for event in events] == ["tx.begin", "tx.step.enter"]
+    assert events[0]["phase"] == "checking"
+    assert events[1]["phase"] == "checking"
 
 
 def test_ops_start_task_rejects_mismatched_task_id(
@@ -885,6 +1041,106 @@ def test_ops_capture_state_updates_tx_state(repo_context, state_store, state_reb
     assert tx_state["last_applied_seq"] == last_seq
 
 
+def test_ops_capture_state_fills_next_action_from_current_step(
+    repo_context, state_store, state_rebuilder
+):
+    class CaptureRebuilder:
+        def rebuild_tx_state(self):
+            return {
+                "ok": True,
+                "state": {
+                    "schema_version": "0.4.0",
+                    "active_tx": {
+                        "tx_id": "t-1",
+                        "ticket_id": "t-1",
+                        "status": "checking",
+                        "phase": "checking",
+                        "current_step": "resume-step",
+                        "last_completed_step": "",
+                        "next_action": "",
+                        "semantic_summary": "Resume work.",
+                        "user_intent": None,
+                        "session_id": "s1",
+                        "verify_state": {
+                            "status": "running",
+                            "last_result": None,
+                        },
+                        "commit_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "file_intents": [],
+                    },
+                    "last_applied_seq": 4,
+                    "integrity": {
+                        "state_hash": "test-hash",
+                        "rebuilt_from_seq": 4,
+                        "drift_detected": False,
+                        "active_tx_source": "active_candidate",
+                    },
+                    "updated_at": "2026-03-08T00:00:00+00:00",
+                },
+            }
+
+    ops = _build_ops_tools(repo_context, state_store, CaptureRebuilder())
+
+    result = ops.ops_capture_state(session_id="s1")
+
+    assert result["ok"] is True
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    assert tx_state["active_tx"]["next_action"] == "resume-step"
+
+
+def test_ops_capture_state_preserves_literal_none_current_step(
+    repo_context, state_store, state_rebuilder
+):
+    class CaptureRebuilder:
+        def rebuild_tx_state(self):
+            return {
+                "ok": True,
+                "state": {
+                    "schema_version": "0.4.0",
+                    "active_tx": {
+                        "tx_id": "none",
+                        "ticket_id": "none",
+                        "status": "planned",
+                        "phase": "planned",
+                        "current_step": "none",
+                        "last_completed_step": "",
+                        "next_action": "",
+                        "semantic_summary": "No active transaction.",
+                        "user_intent": None,
+                        "session_id": "",
+                        "verify_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "commit_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "file_intents": [],
+                    },
+                    "last_applied_seq": 0,
+                    "integrity": {
+                        "state_hash": "test-hash",
+                        "rebuilt_from_seq": 0,
+                        "drift_detected": False,
+                        "active_tx_source": "none",
+                    },
+                    "updated_at": "2026-03-08T00:00:00+00:00",
+                },
+            }
+
+    ops = _build_ops_tools(repo_context, state_store, CaptureRebuilder())
+
+    result = ops.ops_capture_state(session_id="s1")
+
+    assert result["ok"] is True
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    assert tx_state["active_tx"]["next_action"] == "none"
+
+
 def test_ops_capture_state_returns_error_without_canonical_event_log(
     repo_context, state_store, state_rebuilder
 ):
@@ -1029,6 +1285,373 @@ def test_ops_handoff_export_defaults_to_tx_begin_without_canonical_event_log(
     assert result["handoff"]["next_step"] == "tx.begin"
 
 
+def test_ops_task_summary_uses_failure_reason_and_truncates(
+    repo_context, state_store, state_rebuilder
+):
+    tx_state = _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="checking",
+        phase="checking",
+        current_step="resume-step",
+        session_id="s1",
+    )
+    tx_state["active_tx"]["verify_state"] = {
+        "status": "failed",
+        "last_result": {"error": "verification failed in detail"},
+    }
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_task_summary(session_id="s1", max_chars=60)
+
+    assert result["ok"] is True
+    assert result["summary"]["failure_reason"] == "verification failed in detail"
+    assert len(result["text"]) <= 60
+
+
+def test_ops_observability_summary_without_events_or_errors(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_observability_summary(session_id="s1", max_events=0, max_chars=80)
+
+    assert result["ok"] is True
+    assert result["max_events"] == 20
+    assert result["max_chars"] == 80
+    assert result["summary"]["recent_events"] == []
+    assert repo_context.observability.exists()
+    assert Path(result["text_path"]).exists()
+
+
+def test_ops_observability_summary_includes_failure_reason_from_commit_state(
+    repo_context, state_store, state_rebuilder
+):
+    tx_state = _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="verified",
+        phase="verified",
+        current_step="commit",
+        session_id="s1",
+    )
+    tx_state["active_tx"]["verify_state"] = {
+        "status": "passed",
+        "last_result": {"ok": True},
+    }
+    tx_state["active_tx"]["commit_state"] = {
+        "status": "failed",
+        "last_result": {"error": "commit failed badly"},
+    }
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_observability_summary(session_id="s1", max_events=5, max_chars=200)
+
+    assert result["ok"] is True
+    assert result["summary"]["failure_reason"] == "commit failed badly"
+    assert "failure_reason: commit failed badly" in result["text"]
+
+
+def test_ops_resume_brief_uses_defaults_when_no_active_transaction(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_resume_brief(max_chars=None)
+
+    assert result["ok"] is True
+    assert result["max_chars"] == 400
+    assert "- can_start_new_ticket: yes" in result["brief"]
+
+
+def test_ops_resume_brief_ignores_ticket_only_active_transaction(
+    repo_context, state_store, state_rebuilder
+):
+    _set_active_tx(
+        repo_context,
+        tx_id="none",
+        ticket_id="t-1",
+        status="checking",
+        phase="checking",
+        current_step="resume-step",
+        session_id="s1",
+    )
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_resume_brief(max_chars=400)
+
+    assert result["ok"] is True
+    assert "- ticket_id: t-1" in result["brief"]
+    assert "- can_start_new_ticket: yes" in result["brief"]
+    assert "- active_ticket:" not in result["brief"]
+
+
+def test_ops_task_summary_defaults_when_state_values_are_missing(
+    repo_context, state_store, state_rebuilder
+):
+    tx_state = _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="",
+        phase="in-progress",
+        current_step="resume-step",
+        session_id="s1",
+    )
+    tx_state["active_tx"]["semantic_summary"] = ""
+    tx_state["active_tx"]["next_action"] = ""
+    tx_state["active_tx"]["verify_state"] = "bad"
+    tx_state["active_tx"]["commit_state"] = None
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_task_summary(session_id="s1", max_chars=200)
+
+    assert result["ok"] is True
+    assert result["summary"]["task_status"] == ""
+    assert result["summary"]["next_step"] == "resume-step"
+    assert result["summary"]["verification_status"] == ""
+    assert result["summary"]["failure_reason"] == ""
+
+
+def test_ops_observability_summary_uses_txt_suffix_when_path_has_no_suffix(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    repo_context.observability.unlink(missing_ok=True)
+    text_path = repo_context.observability.parent / (
+        repo_context.observability.name + ".txt"
+    )
+    text_path.unlink(missing_ok=True)
+    repo_context.observability = repo_context.observability.parent / "observability"
+
+    result = ops.ops_observability_summary(session_id="s1", max_events=1, max_chars=80)
+
+    assert result["ok"] is True
+    assert result["text_path"].endswith("observability.txt")
+    assert Path(result["text_path"]).exists()
+
+
+def test_ops_compact_context_uses_commit_summary_and_error_fields(
+    repo_context, state_store, state_rebuilder
+):
+    tx_state = _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="verified",
+        phase="verified",
+        current_step="commit",
+        session_id="s1",
+    )
+    tx_state["active_tx"]["verify_state"] = {
+        "status": "passed",
+        "last_result": {"ok": True},
+    }
+    tx_state["active_tx"]["commit_state"] = {
+        "status": "failed",
+        "last_result": {
+            "error": "commit failed badly",
+            "sha": "abc123",
+        },
+    }
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_compact_context(max_chars=200, include_diff=False)
+
+    assert result["ok"] is True
+    assert "verification_status: passed" in result["compact_context"]
+    assert "last_commit: abc123" in result["compact_context"]
+    assert "last_error: commit failed badly" in result["compact_context"]
+
+
+def test_ops_helpers_cover_identifier_and_terminal_branches(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    assert ops._normalize_tx_identifier(None) == ""
+    assert ops._normalize_tx_identifier(" none ") == ""
+    assert ops._normalize_tx_identifier(" t-1 ") == "t-1"
+
+    assert ops._is_terminal_active_tx({"status": "done"}) is True
+    assert ops._is_terminal_active_tx({"phase": "blocked"}) is True
+    assert ops._is_terminal_active_tx({"_terminal": True}) is True
+    assert (
+        ops._is_terminal_active_tx({"status": "checking", "phase": "checking"}) is False
+    )
+
+    identity = ops._active_tx_identity({"tx_id": "none", "ticket_id": " t-2 "})
+    assert identity == {
+        "tx_id": "",
+        "ticket_id": "t-2",
+        "canonical_id": "t-2",
+    }
+
+
+def test_require_active_tx_allow_resume_returns_requested_id(
+    repo_context, state_store, state_rebuilder
+):
+    _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="checking",
+        phase="checking",
+        current_step="resume-step",
+        session_id="s1",
+    )
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    active_tx, resolved_id = ops._require_active_tx("t-1", allow_resume=True)
+
+    assert active_tx["tx_id"] == "t-1"
+    assert resolved_id == "t-1"
+
+
+def test_emit_tx_event_returns_none_when_no_identifier(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops._emit_tx_event(
+        event_type="tx.step.enter",
+        payload={"step_id": "task", "description": "noop"},
+        title="   ",
+        task_id="   ",
+        phase="in-progress",
+        step_id="task",
+        session_id="s1",
+        agent_id=None,
+    )
+
+    assert result is None
+
+
+def test_emit_tx_event_uses_rebuild_state_when_materialized_state_lacks_identity(
+    repo_context, state_store, state_rebuilder
+):
+    tx_state = _set_active_tx(
+        repo_context,
+        tx_id="none",
+        ticket_id="none",
+        status="planned",
+        phase="planned",
+        current_step="none",
+        session_id="",
+    )
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_event_log.write_text("", encoding="utf-8")
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops._emit_tx_event(
+        event_type="tx.step.enter",
+        payload={"step_id": "resume-step", "description": "from rebuild"},
+        title="t-1",
+        task_id="t-1",
+        phase="checking",
+        step_id="resume-step",
+        session_id="s1",
+        agent_id="agent-1",
+    )
+
+    assert result is not None
+    events = _read_tx_events(repo_context)
+    assert events[-1]["event_type"] == "tx.step.enter"
+    assert events[-1]["actor"]["agent_id"] == "agent-1"
+
+    saved_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    assert saved_state["active_tx"]["tx_id"] == "t-1"
+    assert saved_state["active_tx"]["status"] == "checking"
+    assert saved_state["active_tx"]["current_step"] == "resume-step"
+
+
+def test_emit_tx_event_appends_without_state_save_when_rebuild_drifts(
+    repo_context, state_store, state_rebuilder
+):
+    class DriftRebuilder:
+        def rebuild_tx_state(self):
+            return {
+                "ok": True,
+                "state": {
+                    "schema_version": "0.4.0",
+                    "active_tx": {
+                        "tx_id": "t-1",
+                        "ticket_id": "t-1",
+                        "status": "checking",
+                        "phase": "checking",
+                        "current_step": "resume-step",
+                        "last_completed_step": "",
+                        "next_action": "tx.verify.start",
+                        "semantic_summary": "Resume work.",
+                        "user_intent": None,
+                        "session_id": "s1",
+                        "verify_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "commit_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "file_intents": [],
+                    },
+                    "last_applied_seq": 1,
+                    "integrity": {
+                        "state_hash": "test-hash",
+                        "rebuilt_from_seq": 1,
+                        "drift_detected": True,
+                        "active_tx_source": "active_candidate",
+                    },
+                    "updated_at": "2026-03-08T00:00:00+00:00",
+                },
+            }
+
+    repo_context.tx_state.unlink(missing_ok=True)
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_event_log.write_text("", encoding="utf-8")
+    ops = _build_ops_tools(repo_context, state_store, DriftRebuilder())
+
+    with pytest.raises(ValueError, match="tx.begin required before other events"):
+        ops._emit_tx_event(
+            event_type="tx.step.enter",
+            payload={"step_id": "resume-step", "description": "drift append"},
+            title="t-1",
+            task_id="t-1",
+            phase="checking",
+            step_id="resume-step",
+            session_id="s1",
+            agent_id=None,
+        )
+
+    events = _read_tx_events(repo_context)
+    assert events == []
+    assert repo_context.tx_state.exists() is False
+
+
 def test_truncate_text_variants():
     assert truncate_text(None) is None
     assert truncate_text("x", limit=0) == ""
@@ -1043,9 +1666,25 @@ def test_build_compact_context_includes_diff():
     assert "done" in summary
 
 
+def test_build_compact_context_defaults_when_empty():
+    assert build_compact_context({}, None, 50) == "no recent state available"
+
+
 def test_summarize_result_truncates():
     result = summarize_result({"text": "x" * 3000}, limit=10)
     assert result["truncated"] is True
+
+
+def test_summarize_result_preserves_small_serializable_value():
+    result = summarize_result({"ok": True}, limit=100)
+    assert result == {"ok": True}
+
+
+def test_summarize_result_falls_back_to_string_for_non_serializable_value():
+    result = summarize_result({"bad": {1, 2, 3}}, limit=20)
+    assert isinstance(result, dict)
+    assert "bad" in result
+    assert isinstance(result["bad"], set)
 
 
 def test_ops_start_task_requires_title(repo_context, state_store, state_rebuilder):
@@ -1071,7 +1710,74 @@ def test_ops_update_task_requires_status_or_note(
         ops.ops_update_task()
 
 
+def test_ops_update_task_with_note_only_uses_active_task_and_default_phase(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    result = ops.ops_update_task(note="note only", session_id="s1")
+
+    assert result["ok"] is True
+    assert result["payload"]["task_id"] == "t-1"
+    events = _read_tx_events(repo_context)
+    assert events[-1]["event_type"] == "tx.step.enter"
+    assert events[-1]["phase"] == "in-progress"
+    assert events[-1]["payload"]["description"] == "note only"
+    assert events[-1]["payload"]["step_id"] == "task"
+
+
+def test_ops_update_task_with_done_status_keeps_non_terminal_phase_until_end(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    result = ops.ops_update_task(status="done", note="wrap up", session_id="s1")
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert events[-1]["event_type"] == "tx.step.enter"
+    assert events[-1]["phase"] == "in-progress"
+    assert events[-1]["payload"]["step_id"] == "done"
+
+
 def test_ops_end_task_requires_summary(repo_context, state_store, state_rebuilder):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
     with pytest.raises(ValueError, match="summary is required"):
         ops.ops_end_task(summary=" ")
+
+
+def test_ops_end_task_defaults_to_done_phase_and_omits_blank_next_action(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    result = ops.ops_end_task(summary="done", next_action="   ", session_id="s1")
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert events[-1]["event_type"] == "tx.end.done"
+    assert events[-1]["phase"] == "done"
+    assert "next_action" not in events[-1]["payload"]
+
+
+def test_ops_end_task_emits_blocked_reason_payload(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    result = ops.ops_end_task(
+        summary="waiting on review",
+        status="blocked",
+        task_id="t-1",
+        session_id="s1",
+    )
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert events[-1]["event_type"] == "tx.end.blocked"
+    assert events[-1]["payload"]["summary"] == "waiting on review"
+    assert events[-1]["payload"]["reason"] == "waiting on review"
