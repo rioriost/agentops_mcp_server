@@ -334,6 +334,63 @@ def test_log_tool_error_writes_rebuild_drift_context(tmp_path):
     }
 
 
+def test_log_tool_error_writes_structured_sync_diagnostics(tmp_path):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+
+    tool_input = {
+        "tx_id": "tx-7",
+        "ticket_id": "p2-t04",
+        "validation_point": "commit_gating",
+        "event_seq": 11,
+    }
+    tool_output = {
+        "error": "commit.start requires verify.pass",
+        "diagnostic_type": "synchronization_guard_failure",
+        "expected_state": {
+            "verify_state": "passed",
+            "commit_state": "not_started",
+        },
+        "observed_state": {
+            "verify_state": "running",
+            "commit_state": "not_started",
+        },
+        "active_tx": {
+            "tx_id": "tx-7",
+            "ticket_id": "p2-t04",
+            "session_id": "s1",
+        },
+        "event_context": {
+            "event_seq": 11,
+            "event_type": "tx.commit.start",
+        },
+    }
+
+    result = state_store.log_tool_error(
+        tool_name="repo_commit",
+        tool_input=tool_input,
+        tool_output=tool_output,
+    )
+
+    assert result["ok"] is True
+
+    lines = [
+        json.loads(line)
+        for line in repo_context.errors.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(lines) == 1
+    assert lines[0]["tool_name"] == "repo_commit"
+    assert lines[0]["tool_input"] == tool_input
+    assert lines[0]["tool_output"]["diagnostic_type"] == "synchronization_guard_failure"
+    assert lines[0]["tool_output"]["expected_state"]["verify_state"] == "passed"
+    assert lines[0]["tool_output"]["observed_state"]["verify_state"] == "running"
+    assert lines[0]["tool_output"]["active_tx"]["ticket_id"] == "p2-t04"
+    assert lines[0]["tool_output"]["active_tx"]["session_id"] == "s1"
+    assert lines[0]["tool_output"]["event_context"]["event_seq"] == 11
+    assert lines[0]["tool_output"]["event_context"]["event_type"] == "tx.commit.start"
+
+
 def test_log_tool_error_requires_initialized_root(tmp_path):
     repo_context = RepoContext(Path("/"))
     state_store = StateStore(repo_context)

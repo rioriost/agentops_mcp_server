@@ -2,7 +2,7 @@
   "id": "p2-t04",
   "title": "Improve synchronization failure diagnostics and structured error logging",
   "priority": "P1",
-  "status": "planned",
+  "status": "verified",
   "summary": "Improve the 0.4.12 observability path so synchronization failures between `.agent/tx_event_log.jsonl` and `.agent/tx_state.json` become directly diagnosable. This ticket focuses on making guard-triggered failures, integrity mismatches, and state-materialization problems produce structured diagnostics that clearly describe the expected transaction state, the observed transaction state, the relevant event sequence, and the active transaction context.",
   "inputs": [
     "docs/draft_0.4.12.md",
@@ -42,11 +42,7 @@
     "Ensure downstream guard errors preserve enough context to distinguish stale-state mismatches from real workflow-order violations.",
     "Add or extend regression tests that lock the required `.agent/errors.jsonl` structure and synchronization failure observability."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p2-t02",
-    "p2-t03"
-  ],
+  "dependencies": ["p1-t01", "p2-t02", "p2-t03"],
   "notes": [
     "This ticket is focused on observability and diagnostics, not on weakening strict workflow guard behavior.",
     "Prefer explicit structured mismatch reporting over ambiguous downstream error strings with missing transaction context.",

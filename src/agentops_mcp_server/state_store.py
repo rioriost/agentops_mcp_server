@@ -4,7 +4,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from .repo_context import RepoContext
 
@@ -45,6 +45,18 @@ def now_iso() -> str:
 
 
 class StateStore:
+    DIAGNOSTIC_KEYS = {
+        "error",
+        "reason",
+        "validation_point",
+        "event_sequence",
+        "active_tx_context",
+        "expected_state",
+        "observed_state",
+        "observed_mismatch",
+        "session_context",
+    }
+
     def __init__(self, repo_context: RepoContext) -> None:
         self.repo_context = repo_context
 
@@ -60,6 +72,110 @@ class StateStore:
         with path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
+    def _current_active_tx_context(self) -> Dict[str, Any]:
+        active_tx = self._load_active_tx()
+        if not isinstance(active_tx, dict):
+            return {
+                "tx_id": "none",
+                "ticket_id": "none",
+                "status": "unknown",
+                "phase": "unknown",
+                "current_step": "none",
+                "next_action": "",
+                "session_id": "",
+            }
+        return {
+            "tx_id": active_tx.get("tx_id")
+            if isinstance(active_tx.get("tx_id"), str)
+            else "none",
+            "ticket_id": active_tx.get("ticket_id")
+            if isinstance(active_tx.get("ticket_id"), str)
+            else "none",
+            "status": active_tx.get("status")
+            if isinstance(active_tx.get("status"), str)
+            else "unknown",
+            "phase": active_tx.get("phase")
+            if isinstance(active_tx.get("phase"), str)
+            else "unknown",
+            "current_step": active_tx.get("current_step")
+            if isinstance(active_tx.get("current_step"), str)
+            else "none",
+            "next_action": active_tx.get("next_action")
+            if isinstance(active_tx.get("next_action"), str)
+            else "",
+            "session_id": active_tx.get("session_id")
+            if isinstance(active_tx.get("session_id"), str)
+            else "",
+        }
+
+    def _extract_event_sequence(
+        self, tool_input: Dict[str, Any], tool_output: Any
+    ) -> Dict[str, Any]:
+        last_record = self.read_last_json_line(self.repo_context.tx_event_log)
+        last_seq = last_record.get("seq") if isinstance(last_record, dict) else None
+
+        sequence: Dict[str, Any] = {
+            "last_logged_seq": last_seq if isinstance(last_seq, int) else None,
+        }
+
+        start_seq = tool_input.get("start_seq")
+        if isinstance(start_seq, int):
+            sequence["start_seq"] = start_seq
+
+        end_seq = tool_input.get("end_seq")
+        if isinstance(end_seq, int):
+            sequence["end_seq"] = end_seq
+        elif end_seq is None and "end_seq" in tool_input:
+            sequence["end_seq"] = None
+
+        if isinstance(tool_output, dict):
+            for key in ("last_applied_seq", "rebuild_invalid_seq", "seq"):
+                value = tool_output.get(key)
+                if isinstance(value, int):
+                    sequence[key] = value
+            observed_mismatch = tool_output.get("observed_mismatch")
+            if isinstance(observed_mismatch, dict):
+                mismatch_seq = observed_mismatch.get("last_applied_seq")
+                if isinstance(mismatch_seq, int):
+                    sequence["observed_last_applied_seq"] = mismatch_seq
+
+        return sequence
+
+    def _normalize_tool_diagnostics(
+        self, tool_name: str, tool_input: Dict[str, Any], tool_output: Any
+    ) -> Tuple[Any, Optional[Dict[str, Any]]]:
+        if not isinstance(tool_output, dict):
+            return tool_output, None
+
+        diagnostics = {
+            key: tool_output[key] for key in self.DIAGNOSTIC_KEYS if key in tool_output
+        }
+
+        if "validation_point" not in diagnostics:
+            diagnostics["validation_point"] = tool_name
+
+        if "event_sequence" not in diagnostics:
+            diagnostics["event_sequence"] = self._extract_event_sequence(
+                tool_input, tool_output
+            )
+
+        if "active_tx_context" not in diagnostics:
+            diagnostics["active_tx_context"] = self._current_active_tx_context()
+
+        if "session_context" not in diagnostics:
+            diagnostics["session_context"] = {
+                "requested_session_id": tool_input.get("session_id")
+                if isinstance(tool_input.get("session_id"), str)
+                else "",
+                "active_session_id": diagnostics["active_tx_context"].get(
+                    "session_id", ""
+                ),
+            }
+
+        normalized_output = dict(tool_output)
+        normalized_output["diagnostics"] = diagnostics
+        return normalized_output, diagnostics
+
     def log_tool_error(
         self,
         tool_name: str,
@@ -67,12 +183,17 @@ class StateStore:
         tool_output: Any,
     ) -> Dict[str, Any]:
         path = self.repo_context.state_artifact_path("errors")
+        normalized_output, diagnostics = self._normalize_tool_diagnostics(
+            tool_name, tool_input, tool_output
+        )
         record = {
             "ts": now_iso(),
             "tool_name": tool_name,
             "tool_input": tool_input,
-            "tool_output": tool_output,
+            "tool_output": normalized_output,
         }
+        if isinstance(diagnostics, dict):
+            record["diagnostics"] = diagnostics
         self.append_json_line(path, record)
         return {"ok": True, "path": str(path)}
 
