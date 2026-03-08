@@ -56,14 +56,20 @@ class DummyStateStore:
 
 
 class DummyStateRebuilder:
-    pass
+    def __init__(self, result=None):
+        self.result = result
+
+    def rebuild_tx_state(self):
+        if self.result is None:
+            return {"ok": False}
+        return self.result
 
 
-def _build_manager(status_lines=None, verify_result=None):
+def _build_manager(status_lines=None, verify_result=None, rebuild_result=None):
     git_repo = DummyGitRepo(status_lines=status_lines)
     verify_runner = DummyVerifyRunner(verify_result or {"ok": True})
     state_store = DummyStateStore()
-    state_rebuilder = DummyStateRebuilder()
+    state_rebuilder = DummyStateRebuilder(rebuild_result)
     manager = CommitManager(git_repo, verify_runner, state_store, state_rebuilder)
     return manager, git_repo, verify_runner, state_store
 
@@ -123,6 +129,60 @@ def test_repo_commit_no_changes():
     result = manager.repo_commit(message="msg", files="auto", run_verify=False)
     assert result["ok"] is False
     assert result["reason"] == "no changes to commit"
+
+
+def test_repo_commit_no_changes_emits_commit_fail_event(tmp_path):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    state_store.tx_event_append(
+        tx_id="tx-1",
+        ticket_id="p4-t3",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="commit",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "p4-t3", "ticket_title": "p4-t3"},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+    _write_tx_state(
+        state_store,
+        status="verified",
+        phase="verified",
+        verify_state_status="passed",
+    )
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[]),
+        DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"}),
+        state_store,
+        state_rebuilder,
+    )
+
+    result = manager.repo_commit(message="msg", files="auto", run_verify=False)
+
+    assert result["ok"] is False
+    assert result["reason"] == "no changes to commit"
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert [event["event_type"] for event in events] == [
+        "tx.begin",
+        "tx.commit.start",
+        "tx.commit.fail",
+    ]
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    active_tx = tx_state["active_tx"]
+    assert active_tx["commit_state"]["status"] == "failed"
+    assert active_tx["commit_state"]["last_result"]["error"] == "no changes to commit"
+    assert active_tx["status"] == "verified"
+    assert active_tx["phase"] == "verified"
 
 
 def test_repo_commit_auto_message(monkeypatch):
@@ -398,9 +458,15 @@ def test_commit_if_verified_synchronizes_verify_start_state(tmp_path, monkeypatc
     tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
     active_tx = tx_state["active_tx"]
     assert active_tx["verify_state"]["status"] == "passed"
+    assert active_tx["verify_state"]["last_result"]["ok"] is True
     assert active_tx["commit_state"]["status"] == "passed"
+    assert active_tx["commit_state"]["last_result"]["sha"] == "abc123"
     assert active_tx["status"] == "committed"
     assert active_tx["phase"] == "committed"
+    assert active_tx["semantic_summary"] == "Commit completed"
+    assert active_tx["next_action"] == "tx.end.done"
+    assert active_tx["semantic_summary"] == "Commit completed"
+    assert active_tx["next_action"] == "tx.end.done"
     assert tx_state["last_applied_seq"] == 5
 
 
@@ -465,6 +531,109 @@ def test_repo_commit_run_verify_synchronizes_verify_state_before_commit(
     assert active_tx["commit_state"]["status"] == "passed"
     assert active_tx["status"] == "committed"
     assert active_tx["phase"] == "committed"
+
+
+def test_ensure_verify_started_does_not_accept_drifted_rebuild_as_running():
+    class RebuildAwareStateStore(DummyStateStore):
+        def __init__(self):
+            super().__init__()
+            self.read_count = 0
+
+        def read_json_file(self, _path):
+            self.read_count += 1
+            if self.read_count == 1:
+                return {
+                    "active_tx": {
+                        "verify_state": {"status": "not_started"},
+                    }
+                }
+            return None
+
+    drifted_state = {
+        "active_tx": {
+            "verify_state": {"status": "running"},
+        },
+        "integrity": {
+            "drift_detected": True,
+        },
+    }
+    state_store = RebuildAwareStateStore()
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        state_store,
+        DummyStateRebuilder({"ok": True, "state": drifted_state}),
+    )
+    manager._verify_started_in_call = True
+
+    with pytest.raises(
+        RuntimeError,
+        match="verify.start emitted but tx_state was not updated to running",
+    ):
+        manager._ensure_verify_started()
+
+
+def test_emit_tx_event_does_not_use_drifted_rebuild_for_append_and_save():
+    class AppendOnlyStateStore(DummyStateStore):
+        def __init__(self):
+            super().__init__()
+            self.append_calls = []
+            self.append_and_save_calls = []
+            self.saved_states = []
+
+        def read_json_file(self, _path):
+            return None
+
+        def tx_event_append(self, **kwargs):
+            self.append_calls.append(kwargs)
+            return {"ok": True, "event_type": kwargs["event_type"]}
+
+        def tx_event_append_and_state_save(self, **kwargs):
+            self.append_and_save_calls.append(kwargs)
+            return {"ok": True}
+
+        def tx_state_save(self, state):
+            self.saved_states.append(state)
+            return {"ok": True}
+
+    drifted_state = {
+        "active_tx": {
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t3",
+            "status": "checking",
+            "phase": "checking",
+            "current_step": "commit",
+            "session_id": "s1",
+        },
+        "integrity": {
+            "drift_detected": True,
+        },
+    }
+    state_store = AppendOnlyStateStore()
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        state_store,
+        DummyStateRebuilder({"ok": True, "state": drifted_state}),
+    )
+    manager._load_tx_context = lambda: {
+        "tx_id": "tx-1",
+        "ticket_id": "p4-t3",
+        "phase": "checking",
+        "step_id": "commit",
+        "session_id": "s1",
+    }
+
+    result = manager._emit_tx_event(
+        event_type="tx.verify.start",
+        payload={"command": "verify"},
+    )
+
+    assert result["ok"] is True
+    assert len(state_store.append_calls) == 1
+    assert state_store.append_calls[0]["event_type"] == "tx.verify.start"
+    assert state_store.append_and_save_calls == []
+    assert state_store.saved_states == []
 
 
 def test_repo_commit_with_files_list_adds_specific_paths(monkeypatch):

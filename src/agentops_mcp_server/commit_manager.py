@@ -93,16 +93,23 @@ class CommitManager:
         if self._verify_started_in_call:
             rebuild = self.state_rebuilder.rebuild_tx_state()
             if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
-                self.state_store.tx_state_save(rebuild["state"])
-                refreshed_active_tx = rebuild["state"].get("active_tx")
-                if isinstance(refreshed_active_tx, dict):
-                    refreshed_verify_state = (
-                        refreshed_active_tx.get("verify_state")
-                        if isinstance(refreshed_active_tx.get("verify_state"), dict)
-                        else {}
-                    )
-                    if refreshed_verify_state.get("status") == "running":
-                        return
+                rebuilt_state = rebuild["state"]
+                integrity = (
+                    rebuilt_state.get("integrity")
+                    if isinstance(rebuilt_state.get("integrity"), dict)
+                    else {}
+                )
+                if integrity.get("drift_detected") is not True:
+                    refreshed_active_tx = rebuilt_state.get("active_tx")
+                    if isinstance(refreshed_active_tx, dict):
+                        refreshed_verify_state = (
+                            refreshed_active_tx.get("verify_state")
+                            if isinstance(refreshed_active_tx.get("verify_state"), dict)
+                            else {}
+                        )
+                        if refreshed_verify_state.get("status") == "running":
+                            self.state_store.tx_state_save(rebuilt_state)
+                            return
             raise RuntimeError(
                 "verify.start emitted but tx_state was not updated to running"
             )
@@ -124,31 +131,61 @@ class CommitManager:
         phase = phase_override or context["phase"]
         step_id = step_id_override or context["step_id"]
         actor = {"tool": "commit_manager"}
+        tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
+        if isinstance(tx_state, dict):
+            active_tx = tx_state.get("active_tx")
+            if isinstance(active_tx, dict):
+                active_tx["tx_id"] = context["tx_id"]
+                active_tx["ticket_id"] = context["ticket_id"]
+                active_tx["status"] = phase
+                active_tx["phase"] = phase
+                active_tx["current_step"] = step_id
+                if isinstance(context.get("session_id"), str):
+                    active_tx["session_id"] = context["session_id"]
+            return self.state_store.tx_event_append_and_state_save(
+                tx_id=context["tx_id"],
+                ticket_id=context["ticket_id"],
+                event_type=event_type,
+                phase=phase,
+                step_id=step_id,
+                actor=actor,
+                session_id=context["session_id"],
+                payload=payload,
+                state=tx_state,
+            )
+
         rebuild_fn = getattr(self.state_rebuilder, "rebuild_tx_state", None)
         if callable(rebuild_fn):
             rebuild = rebuild_fn()
             if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
                 state = rebuild["state"]
-                active_tx = state.get("active_tx")
-                if isinstance(active_tx, dict):
-                    active_tx["tx_id"] = context["tx_id"]
-                    active_tx["ticket_id"] = context["ticket_id"]
-                    active_tx["status"] = phase
-                    active_tx["phase"] = phase
-                    active_tx["current_step"] = step_id
-                    if isinstance(context.get("session_id"), str):
-                        active_tx["session_id"] = context["session_id"]
-                return self.state_store.tx_event_append_and_state_save(
-                    tx_id=context["tx_id"],
-                    ticket_id=context["ticket_id"],
-                    event_type=event_type,
-                    phase=phase,
-                    step_id=step_id,
-                    actor=actor,
-                    session_id=context["session_id"],
-                    payload=payload,
-                    state=state,
+                integrity = (
+                    state.get("integrity")
+                    if isinstance(state.get("integrity"), dict)
+                    else {}
                 )
+                if integrity.get("drift_detected") is not True:
+                    active_tx = state.get("active_tx")
+                    if isinstance(active_tx, dict):
+                        active_tx["tx_id"] = context["tx_id"]
+                        active_tx["ticket_id"] = context["ticket_id"]
+                        active_tx["status"] = phase
+                        active_tx["phase"] = phase
+                        active_tx["current_step"] = step_id
+                        if isinstance(context.get("session_id"), str):
+                            active_tx["session_id"] = context["session_id"]
+                    return self.state_store.tx_event_append_and_state_save(
+                        tx_id=context["tx_id"],
+                        ticket_id=context["ticket_id"],
+                        event_type=event_type,
+                        phase=phase,
+                        step_id=step_id,
+                        actor=actor,
+                        session_id=context["session_id"],
+                        payload=payload,
+                        state=state,
+                    )
+
         event = self.state_store.tx_event_append(
             tx_id=context["tx_id"],
             ticket_id=context["ticket_id"],
@@ -163,7 +200,14 @@ class CommitManager:
         if callable(rebuild_fn):
             rebuild = rebuild_fn()
             if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
-                self.state_store.tx_state_save(rebuild["state"])
+                rebuilt_state = rebuild["state"]
+                integrity = (
+                    rebuilt_state.get("integrity")
+                    if isinstance(rebuilt_state.get("integrity"), dict)
+                    else {}
+                )
+                if integrity.get("drift_detected") is not True:
+                    self.state_store.tx_state_save(rebuilt_state)
         return event
 
     def _commit_message_from_status(self, status_lines: List[str]) -> str:

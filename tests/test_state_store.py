@@ -877,6 +877,170 @@ def test_tx_event_append_and_state_save_updates_last_applied_seq(
 
     saved = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
     assert saved["last_applied_seq"] == result["seq"]
+    assert saved["integrity"]["rebuilt_from_seq"] == result["seq"]
+    assert saved["integrity"]["drift_detected"] is False
+    assert saved["integrity"]["active_tx_source"] == "materialized"
+    assert saved["active_tx"]["tx_id"] == "tx-1"
+    assert saved["active_tx"]["ticket_id"] == "p4-t1"
+
+
+def test_tx_event_append_and_state_save_raises_when_state_save_validation_fails(
+    state_store, repo_context, monkeypatch
+):
+    state = _valid_tx_state()
+    original_tx_state_save = state_store.tx_state_save
+
+    def failing_tx_state_save(_state):
+        raise ValueError("forced tx_state save failure")
+
+    monkeypatch.setattr(state_store, "tx_state_save", failing_tx_state_save)
+
+    with pytest.raises(
+        RuntimeError,
+        match="canonical event appended but tx_state synchronization failed",
+    ):
+        state_store.tx_event_append_and_state_save(
+            **_base_tx_event_args(),
+            state=state,
+        )
+
+    monkeypatch.setattr(state_store, "tx_state_save", original_tx_state_save)
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert [event["event_type"] for event in events] == ["tx.begin"]
+
+    error_lines = [
+        json.loads(line)
+        for line in repo_context.errors.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(error_lines) == 1
+    assert error_lines[0]["tool_name"] == "tx_event_append_and_state_save"
+    assert (
+        error_lines[0]["tool_output"]["error"]
+        == "event append succeeded but tx_state synchronization failed"
+    )
+    assert error_lines[0]["tool_output"]["reason"] == ("forced tx_state save failure")
+    assert error_lines[0]["tool_output"]["diagnostics"]["event_sequence"] == {
+        "last_logged_seq": 1,
+        "seq": 1,
+    }
+    assert error_lines[0]["tool_output"]["expected_state"]["last_applied_seq"] == 1
+    assert error_lines[0]["tool_output"]["expected_state"]["rebuilt_from_seq"] == 1
+    assert error_lines[0]["tool_output"]["expected_state"]["tx_id"] == "tx-1"
+    assert error_lines[0]["tool_output"]["expected_state"]["ticket_id"] == "p4-t1"
+    assert error_lines[0]["tool_output"]["expected_state"]["status"] == "in-progress"
+    assert error_lines[0]["tool_output"]["expected_state"]["phase"] == "in-progress"
+    assert error_lines[0]["tool_output"]["expected_state"]["current_step"] == "p4-t1-s1"
+    assert error_lines[0]["tool_output"]["observed_state"]["tx_state_path"] == str(
+        repo_context.tx_state
+    )
+
+
+def test_tx_event_append_and_state_save_raises_when_saved_state_drift_is_detected(
+    state_store, repo_context, monkeypatch
+):
+    state = _valid_tx_state()
+    original_tx_state_save = state_store.tx_state_save
+
+    def drifted_tx_state_save(next_state):
+        result = original_tx_state_save(next_state)
+        saved = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+        saved["last_applied_seq"] = 999
+        saved["integrity"]["rebuilt_from_seq"] = 999
+        saved["active_tx"]["current_step"] = "drifted-step"
+        repo_context.tx_state.write_text(
+            json.dumps(saved, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return result
+
+    monkeypatch.setattr(state_store, "tx_state_save", drifted_tx_state_save)
+
+    with pytest.raises(
+        RuntimeError,
+        match="canonical event appended but tx_state synchronization drifted",
+    ):
+        state_store.tx_event_append_and_state_save(
+            **_base_tx_event_args(),
+            state=state,
+        )
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert [event["event_type"] for event in events] == ["tx.begin"]
+
+    error_lines = [
+        json.loads(line)
+        for line in repo_context.errors.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(error_lines) == 1
+    assert error_lines[0]["tool_name"] == "tx_event_append_and_state_save"
+    assert (
+        error_lines[0]["tool_output"]["error"]
+        == "event append succeeded but materialized tx_state drifted"
+    )
+    assert error_lines[0]["tool_output"]["diagnostics"]["event_sequence"] == {
+        "last_logged_seq": 1,
+        "seq": 1,
+    }
+    assert error_lines[0]["tool_output"]["expected_state"]["last_applied_seq"] == 1
+    assert error_lines[0]["tool_output"]["expected_state"]["rebuilt_from_seq"] == 1
+    assert error_lines[0]["tool_output"]["observed_state"]["last_applied_seq"] == 999
+    assert error_lines[0]["tool_output"]["observed_state"]["rebuilt_from_seq"] == 999
+    assert error_lines[0]["tool_output"]["observed_state"]["tx_id"] == "tx-1"
+    assert error_lines[0]["tool_output"]["observed_state"]["ticket_id"] == "p4-t1"
+    assert error_lines[0]["tool_output"]["observed_state"]["status"] == "in-progress"
+    assert error_lines[0]["tool_output"]["observed_state"]["phase"] == "in-progress"
+    assert error_lines[0]["tool_output"]["observed_state"]["current_step"] == (
+        "drifted-step"
+    )
+
+
+def test_tx_event_append_and_state_save_persists_sync_failure_diagnostics_without_tx_state_file(
+    state_store, repo_context, monkeypatch
+):
+    state = _valid_tx_state()
+
+    def failing_tx_state_save(_state):
+        raise ValueError("forced tx_state save failure")
+
+    monkeypatch.setattr(state_store, "tx_state_save", failing_tx_state_save)
+
+    with pytest.raises(
+        RuntimeError,
+        match="canonical event appended but tx_state synchronization failed",
+    ):
+        state_store.tx_event_append_and_state_save(
+            **_base_tx_event_args(),
+            state=state,
+        )
+
+    assert repo_context.tx_state.exists() is False
+
+    error_lines = [
+        json.loads(line)
+        for line in repo_context.errors.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(error_lines) == 1
+    assert error_lines[0]["tool_name"] == "tx_event_append_and_state_save"
+    assert (
+        error_lines[0]["tool_output"]["error"]
+        == "event append succeeded but tx_state synchronization failed"
+    )
+    assert error_lines[0]["tool_output"]["reason"] == "forced tx_state save failure"
+    assert error_lines[0]["tool_output"]["observed_state"] == {
+        "tx_state_path": str(repo_context.tx_state)
+    }
 
 
 def test_tx_state_save_sets_updated_at_when_missing(state_store, repo_context):

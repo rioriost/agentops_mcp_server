@@ -20,7 +20,7 @@
       "id": "p2-t03",
       "priority": "P1",
       "title": "Implement synchronized canonical event-state progression across transaction helpers",
-      "status": "planned",
+      "status": "verified",
       "file": "v0.4.13/p2-t03.json"
     },
     {

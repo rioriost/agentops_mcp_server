@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from .git_repo import GitRepo
 from .repo_context import RepoContext
@@ -76,9 +76,20 @@ class OpsTools:
         self.git_repo = git_repo
 
     def _load_tx_state(self) -> Dict[str, Any]:
+        tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
+        if isinstance(tx_state, dict):
+            return tx_state
         rebuild = self.state_rebuilder.rebuild_tx_state()
         if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
-            return rebuild["state"]
+            state = rebuild["state"]
+            integrity = (
+                state.get("integrity")
+                if isinstance(state.get("integrity"), dict)
+                else {}
+            )
+            if integrity.get("drift_detected") is True:
+                return {}
+            return state
         return {}
 
     def _active_tx(self) -> Dict[str, Any]:
@@ -204,21 +215,29 @@ class OpsTools:
         rebuild = self.state_rebuilder.rebuild_tx_state()
         if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
             rebuilt_state = rebuild["state"]
-            rebuilt_active = (
-                rebuilt_state.get("active_tx")
-                if isinstance(rebuilt_state.get("active_tx"), dict)
+            integrity = (
+                rebuilt_state.get("integrity")
+                if isinstance(rebuilt_state.get("integrity"), dict)
                 else {}
             )
-            next_action = rebuilt_active.get("next_action")
-            current_step = rebuilt_active.get("current_step")
-            if not isinstance(next_action, str) or not next_action.strip():
-                rebuilt_active["next_action"] = (
-                    current_step.strip()
-                    if isinstance(current_step, str) and current_step.strip()
-                    else "tx.begin"
+            if integrity.get("drift_detected") is not True:
+                rebuilt_active = (
+                    rebuilt_state.get("active_tx")
+                    if isinstance(rebuilt_state.get("active_tx"), dict)
+                    else {}
                 )
-            self.state_store.tx_state_save(rebuilt_state)
-            active_tx = rebuilt_active
+                next_action = rebuilt_active.get("next_action")
+                current_step = rebuilt_active.get("current_step")
+                if not isinstance(next_action, str) or not next_action.strip():
+                    rebuilt_active["next_action"] = (
+                        current_step.strip()
+                        if isinstance(current_step, str) and current_step.strip()
+                        else "tx.begin"
+                    )
+                self.state_store.tx_state_save(rebuilt_state)
+                active_tx = rebuilt_active
+            else:
+                active_tx = self._active_tx()
         else:
             active_tx = self._active_tx()
         verify_state = (
@@ -324,7 +343,9 @@ class OpsTools:
 
         active_value = (
             active_tx_id.strip()
-            if isinstance(active_tx_id, str) and active_tx_id.strip()
+            if isinstance(active_tx_id, str)
+            and active_tx_id.strip()
+            and active_tx_id.strip() != "none"
             else "unknown"
         )
         requested_value = (
@@ -381,28 +402,62 @@ class OpsTools:
         if isinstance(agent_id, str) and agent_id.strip():
             actor["agent_id"] = agent_id.strip()
 
+        tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
+        if isinstance(tx_state, dict):
+            active_tx = tx_state.get("active_tx")
+            if isinstance(active_tx, dict):
+                existing_tx_id = self._normalize_tx_identifier(active_tx.get("tx_id"))
+                existing_ticket_id = self._normalize_tx_identifier(
+                    active_tx.get("ticket_id")
+                )
+                has_materialized_identity = bool(existing_tx_id or existing_ticket_id)
+                if event_type == "tx.begin" or has_materialized_identity:
+                    active_tx["tx_id"] = tx_id
+                    active_tx["ticket_id"] = ticket_id
+                    active_tx["status"] = phase
+                    active_tx["phase"] = phase
+                    active_tx["current_step"] = step_id
+                    active_tx["session_id"] = resolved_session_id
+                    return self.state_store.tx_event_append_and_state_save(
+                        tx_id=tx_id,
+                        ticket_id=ticket_id,
+                        event_type=event_type,
+                        phase=phase,
+                        step_id=step_id,
+                        actor=actor,
+                        session_id=resolved_session_id,
+                        payload=payload,
+                        state=tx_state,
+                    )
+
         rebuild = self.state_rebuilder.rebuild_tx_state()
         if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
             state = rebuild["state"]
-            active_tx = state.get("active_tx")
-            if isinstance(active_tx, dict):
-                active_tx["tx_id"] = tx_id
-                active_tx["ticket_id"] = ticket_id
-                active_tx["status"] = phase
-                active_tx["phase"] = phase
-                active_tx["current_step"] = step_id
-                active_tx["session_id"] = resolved_session_id
-            return self.state_store.tx_event_append_and_state_save(
-                tx_id=tx_id,
-                ticket_id=ticket_id,
-                event_type=event_type,
-                phase=phase,
-                step_id=step_id,
-                actor=actor,
-                session_id=resolved_session_id,
-                payload=payload,
-                state=state,
+            integrity = (
+                state.get("integrity")
+                if isinstance(state.get("integrity"), dict)
+                else {}
             )
+            if integrity.get("drift_detected") is not True:
+                active_tx = state.get("active_tx")
+                if isinstance(active_tx, dict):
+                    active_tx["tx_id"] = tx_id
+                    active_tx["ticket_id"] = ticket_id
+                    active_tx["status"] = phase
+                    active_tx["phase"] = phase
+                    active_tx["current_step"] = step_id
+                    active_tx["session_id"] = resolved_session_id
+                return self.state_store.tx_event_append_and_state_save(
+                    tx_id=tx_id,
+                    ticket_id=ticket_id,
+                    event_type=event_type,
+                    phase=phase,
+                    step_id=step_id,
+                    actor=actor,
+                    session_id=resolved_session_id,
+                    payload=payload,
+                    state=state,
+                )
 
         event = self.state_store.tx_event_append(
             tx_id=tx_id,
@@ -416,7 +471,14 @@ class OpsTools:
         )
         rebuild = self.state_rebuilder.rebuild_tx_state()
         if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
-            self.state_store.tx_state_save(rebuild["state"])
+            rebuilt_state = rebuild["state"]
+            integrity = (
+                rebuilt_state.get("integrity")
+                if isinstance(rebuilt_state.get("integrity"), dict)
+                else {}
+            )
+            if integrity.get("drift_detected") is not True:
+                self.state_store.tx_state_save(rebuilt_state)
         return event
 
     def ops_start_task(
@@ -602,6 +664,17 @@ class OpsTools:
             return rebuild
 
         state = rebuild.get("state") or {}
+        integrity = (
+            state.get("integrity") if isinstance(state.get("integrity"), dict) else {}
+        )
+        if integrity.get("drift_detected") is True:
+            return {
+                "ok": False,
+                "reason": "rebuild integrity drift detected",
+                "last_applied_seq": state.get("last_applied_seq"),
+                "integrity": integrity,
+            }
+
         active_tx = (
             state.get("active_tx") if isinstance(state.get("active_tx"), dict) else {}
         )

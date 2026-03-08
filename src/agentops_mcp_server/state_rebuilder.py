@@ -580,11 +580,18 @@ class StateRebuilder:
         integrity = state.get("integrity")
         if not isinstance(integrity, dict):
             return False
-        if not isinstance(integrity.get("rebuilt_from_seq"), int):
+        rebuilt_from_seq = integrity.get("rebuilt_from_seq")
+        drift_detected = integrity.get("drift_detected")
+        active_tx_source = integrity.get("active_tx_source")
+        if not isinstance(rebuilt_from_seq, int):
+            return False
+        if not isinstance(drift_detected, bool):
+            return False
+        if not isinstance(active_tx_source, str) or not active_tx_source.strip():
             return False
         if not isinstance(integrity.get("state_hash"), str):
             return False
-        if state.get("last_applied_seq") < integrity.get("rebuilt_from_seq"):
+        if state.get("last_applied_seq") < rebuilt_from_seq:
             return False
         active_tx = state.get("active_tx")
         if not isinstance(active_tx, dict):
@@ -596,10 +603,17 @@ class StateRebuilder:
         if not isinstance(active_status, str) or not active_status.strip():
             return False
         if active_tx_id == "none":
-            if state.get("last_applied_seq") != 0:
-                return False
             if active_status != "planned":
                 return False
+            if active_tx_source != "none":
+                return False
+            if drift_detected and "rebuild_warning" not in state:
+                return False
+        else:
+            if active_tx_source not in {"materialized", "active_candidate"}:
+                return False
+        if not drift_detected and "rebuild_warning" in state:
+            return False
         return integrity.get("state_hash") == self._compute_state_hash(state)
 
     def _record_rebuild_drift_error(
@@ -717,12 +731,25 @@ class StateRebuilder:
                 active_tx["next_action"] = self._derive_next_action(active_tx)
             integrity = existing_state.get("integrity")
             if isinstance(integrity, dict):
+                integrity["rebuilt_from_seq"] = existing_state.get(
+                    "last_applied_seq", 0
+                )
+                integrity["active_tx_source"] = "materialized"
+                if (
+                    isinstance(active_tx, dict)
+                    and active_tx.get("tx_id") == "none"
+                    and active_tx.get("status") == "planned"
+                ):
+                    integrity["active_tx_source"] = "none"
                 existing_state["updated_at"] = datetime.now(timezone.utc).isoformat()
                 integrity["state_hash"] = self._compute_state_hash(existing_state)
             return {
                 "ok": True,
                 "state": existing_state,
                 "last_applied_seq": existing_state.get("last_applied_seq"),
+                "rebuilt_from_seq": existing_state.get("integrity", {}).get(
+                    "rebuilt_from_seq"
+                ),
                 "event_log_path": str(resolved_event_log),
                 "source": "materialized",
             }
@@ -886,12 +913,6 @@ class StateRebuilder:
         if invalid_reason:
             drift_detected = True
             drift_reason = invalid_reason
-        elif last_valid_seq > 0 and not candidates and terminal_tx_ids:
-            drift_detected = True
-            drift_reason = (
-                "no active transaction materialized despite canonical events up to a "
-                "terminal boundary"
-            )
         elif (
             selected_active_tx is not None
             and selected_active_tx.get("_last_event_seq") != last_valid_seq

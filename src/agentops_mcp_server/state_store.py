@@ -710,14 +710,162 @@ class StateStore:
             payload=payload,
             event_id=event_id,
         )
-        next_state["last_applied_seq"] = event_result["seq"]
+        event_seq = event_result["seq"]
+        next_state["last_applied_seq"] = event_seq
         integrity = next_state.get("integrity")
-        if isinstance(integrity, dict):
-            integrity["rebuilt_from_seq"] = event_result["seq"]
-        self.tx_state_save(next_state)
+        if not isinstance(integrity, dict):
+            integrity = {}
+            next_state["integrity"] = integrity
+        integrity["rebuilt_from_seq"] = event_seq
+        integrity["drift_detected"] = False
+        if not isinstance(integrity.get("active_tx_source"), str) or not integrity.get(
+            "active_tx_source"
+        ):
+            integrity["active_tx_source"] = "materialized"
+
+        try:
+            self.tx_state_save(next_state)
+        except Exception as exc:
+            self.log_tool_error(
+                tool_name="tx_event_append_and_state_save",
+                tool_input={
+                    "tx_id": tx_id,
+                    "ticket_id": ticket_id,
+                    "event_type": event_type,
+                    "phase": phase,
+                    "step_id": step_id,
+                    "session_id": session_id,
+                    "event_id": event_id,
+                },
+                tool_output={
+                    "error": "event append succeeded but tx_state synchronization failed",
+                    "reason": str(exc),
+                    "validation_point": "tx_event_append_and_state_save",
+                    "event_sequence": {
+                        "last_logged_seq": event_seq,
+                        "seq": event_seq,
+                    },
+                    "expected_state": {
+                        "last_applied_seq": event_seq,
+                        "rebuilt_from_seq": event_seq,
+                        "tx_id": tx_id,
+                        "ticket_id": ticket_id,
+                        "status": phase,
+                        "phase": phase,
+                        "current_step": step_id,
+                    },
+                    "observed_state": {
+                        "tx_state_path": str(self.repo_context.tx_state),
+                    },
+                },
+            )
+            raise RuntimeError(
+                "canonical event appended but tx_state synchronization failed"
+            ) from exc
+
+        saved_state = self.read_json_file(self.repo_context.tx_state)
+        if not isinstance(saved_state, dict):
+            self.log_tool_error(
+                tool_name="tx_event_append_and_state_save",
+                tool_input={
+                    "tx_id": tx_id,
+                    "ticket_id": ticket_id,
+                    "event_type": event_type,
+                    "phase": phase,
+                    "step_id": step_id,
+                    "session_id": session_id,
+                    "event_id": event_id,
+                },
+                tool_output={
+                    "error": "event append succeeded but tx_state could not be reloaded",
+                    "validation_point": "tx_event_append_and_state_save",
+                    "event_sequence": {
+                        "last_logged_seq": event_seq,
+                        "seq": event_seq,
+                    },
+                    "expected_state": {
+                        "last_applied_seq": event_seq,
+                        "rebuilt_from_seq": event_seq,
+                        "tx_id": tx_id,
+                        "ticket_id": ticket_id,
+                        "status": phase,
+                        "phase": phase,
+                        "current_step": step_id,
+                    },
+                    "observed_state": {
+                        "tx_state_path": str(self.repo_context.tx_state),
+                    },
+                },
+            )
+            raise RuntimeError(
+                "canonical event appended but tx_state synchronization could not be verified"
+            )
+
+        saved_active_tx = (
+            saved_state.get("active_tx")
+            if isinstance(saved_state.get("active_tx"), dict)
+            else {}
+        )
+        saved_integrity = (
+            saved_state.get("integrity")
+            if isinstance(saved_state.get("integrity"), dict)
+            else {}
+        )
+
+        if (
+            saved_state.get("last_applied_seq") != event_seq
+            or saved_integrity.get("rebuilt_from_seq") != event_seq
+            or saved_active_tx.get("tx_id") != tx_id
+            or saved_active_tx.get("ticket_id") != ticket_id
+            or saved_active_tx.get("status") != phase
+            or saved_active_tx.get("phase") != phase
+            or saved_active_tx.get("current_step") != step_id
+        ):
+            self.log_tool_error(
+                tool_name="tx_event_append_and_state_save",
+                tool_input={
+                    "tx_id": tx_id,
+                    "ticket_id": ticket_id,
+                    "event_type": event_type,
+                    "phase": phase,
+                    "step_id": step_id,
+                    "session_id": session_id,
+                    "event_id": event_id,
+                },
+                tool_output={
+                    "error": "event append succeeded but materialized tx_state drifted",
+                    "validation_point": "tx_event_append_and_state_save",
+                    "event_sequence": {
+                        "last_logged_seq": event_seq,
+                        "seq": event_seq,
+                    },
+                    "expected_state": {
+                        "last_applied_seq": event_seq,
+                        "rebuilt_from_seq": event_seq,
+                        "tx_id": tx_id,
+                        "ticket_id": ticket_id,
+                        "status": phase,
+                        "phase": phase,
+                        "current_step": step_id,
+                    },
+                    "observed_state": {
+                        "last_applied_seq": saved_state.get("last_applied_seq"),
+                        "rebuilt_from_seq": saved_integrity.get("rebuilt_from_seq"),
+                        "tx_id": saved_active_tx.get("tx_id"),
+                        "ticket_id": saved_active_tx.get("ticket_id"),
+                        "status": saved_active_tx.get("status"),
+                        "phase": saved_active_tx.get("phase"),
+                        "current_step": saved_active_tx.get("current_step"),
+                    },
+                },
+            )
+            raise RuntimeError(
+                "canonical event appended but tx_state synchronization drifted"
+            )
+
         return {
             "ok": True,
-            "seq": event_result["seq"],
+            "seq": event_seq,
             "event_id": event_result["event_id"],
             "path": str(self.repo_context.tx_state),
         }

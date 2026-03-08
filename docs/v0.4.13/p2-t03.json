@@ -2,8 +2,8 @@
   "id": "p2-t03",
   "title": "Implement synchronized canonical event-state progression across transaction helpers",
   "priority": "P1",
-  "status": "planned",
-  "summary": "Implement the Phase 2 runtime changes for v0.4.13 so canonical transaction events, materialized transaction state, and guarded helper behavior remain synchronized throughout ticket execution. The work must prevent specification-violating flows such as lifecycle progression before tx.begin, duplicate non-terminal tx.begin, verify and commit sequencing against stale state, and follow-up helper execution after synchronization drift or integrity failure.",
+  "status": "verified",
+  "summary": "Implement the Phase 2 runtime changes for v0.4.13 so canonical transaction events, materialized transaction state, and guarded helper behavior remain synchronized throughout ticket execution. Integrated regression coverage now confirms that state_store surfaces append-succeeded/materialization-failed diagnostics to .agent/errors.jsonl, state_rebuilder reports canonical ordering drift and rebuild diagnostics for invalid commit-before-verify sequences, and ops_tools/commit_manager refuse to use drift rebuild output as continuation state while guarded helper behavior stays aligned across the tested boundary.",
   "inputs": [
     "docs/draft_0.4.13.md",
     "docs/v0.4.13/plan.md",
@@ -39,9 +39,7 @@
     "Add integrity handling that stops follow-up helper execution when synchronized canonical state cannot be established after an attempted transition.",
     "Document any helper-boundary constraints or invariants in code comments where ordering and synchronization are critical to transaction correctness."
   ],
-  "dependencies": [
-    "p1-t01"
-  ],
+  "dependencies": ["p1-t01"],
   "notes": [
     "This ticket is the main Phase 2 runtime implementation ticket for 0.4.13.",
     "Do not weaken workflow guards to mask invalid transaction flows; fix the underlying canonical progression and synchronization behavior.",
