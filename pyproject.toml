@@ -3,7 +3,7 @@ name = "agentops-mcp-server"
 authors = [
     {name = "Rio Fujita", email = "rifujita@microsoft.com"},
 ]
-version = "0.4.5"
+version = "0.4.6"
 license = {file = "LICENSE"}
 description = "Simple MCP server for AgentOps with Zed"
 readme = "README.md"
