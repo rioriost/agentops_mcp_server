@@ -1,0 +1,48 @@
+{
+  "id": "p1-t02",
+  "title": "Decide whether ticket persistence is protocol or convention",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Define the 0.5.0 product and protocol decision for planning artifacts and ticket persistence so the documented workflow, generated rules, and MCP server capabilities describe the same operating model. This ticket must resolve whether plan generation, tickets_list maintenance, per-ticket JSON persistence, and synchronized status updates are first-class server-supported protocol behavior or external client-side convention, then align the implementation-facing documentation accordingly.",
+  "inputs": [
+    "docs/draft_0.5.0.md",
+    "docs/v0.5.0/plan.md",
+    "docs/v0.5.0/tickets_list.json",
+    ".rules",
+    "zed-agentops-init.sh",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/server.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py"
+  ],
+  "outputs": [
+    "A clear 0.5.0 decision on whether ticket persistence is protocol or convention",
+    "A documented contract describing the responsibilities of the MCP server versus the client for plan and ticket artifacts",
+    "Implementation guidance for follow-up tickets so rules, bootstrap behavior, and server capabilities remain aligned"
+  ],
+  "acceptance_criteria": [
+    "The ticket explicitly decides whether planning artifact generation and ticket persistence are mandatory server-supported protocol behavior or external operating convention.",
+    "The decision covers at least plan generation, tickets_list persistence, per-ticket JSON persistence, and synchronized status updates between ticket files and tickets_list metadata.",
+    "The resulting contract clearly states what an MCP client may rely on the server to support directly and what remains client-managed convention, if any.",
+    "If ticket persistence remains protocol, the documented outcome identifies the first-class server capabilities that must exist to support and validate it.",
+    "If ticket persistence becomes convention, the documented outcome identifies the workflow language in rules and generated bootstrap material that must be weakened or clarified.",
+    "The decision is specific enough to drive follow-up implementation or rules-alignment tickets without ambiguity about ownership of ticket-state persistence."
+  ],
+  "tasks": [
+    "Review the 0.5.0 draft sections covering planning flow, ticket persistence, lifecycle bookkeeping, and client/server interoperability.",
+    "Compare the current rules and bootstrap expectations with the actual server surface to identify which ticket-oriented behaviors are implemented, partially implemented, or absent.",
+    "Define the boundary between protocol obligations and operating convention for plan and ticket artifacts.",
+    "Choose one of the two 0.5.0 directions: first-class protocol support or explicit convention-only treatment.",
+    "Document the consequences of that choice for rules text, generated workspace rules, server APIs, and downstream implementation planning.",
+    "Record the decision in a form that follow-up tickets can treat as the authoritative ownership model for ticket persistence."
+  ],
+  "dependencies": [
+    "p1-t01"
+  ],
+  "notes": [
+    "This ticket is a design-decision and alignment ticket, not the implementation ticket for all planning and persistence features.",
+    "The main goal is to eliminate the current hybrid state where rules describe mandatory ticket persistence behavior that the server does not fully support.",
+    "Keep the outcome explicit enough that later tickets can either implement missing server-side capabilities or revise the documented workflow to match reality.",
+    "The decision should preserve the broader 0.5.0 goal of making the documented workflow and implemented workflow the same thing."
+  ]
+}

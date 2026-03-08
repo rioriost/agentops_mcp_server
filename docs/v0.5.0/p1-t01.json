@@ -1,0 +1,42 @@
+{
+  "id": "p1-t01",
+  "title": "Align repository rules and bootstrap-generated rules from one canonical source",
+  "priority": "P0",
+  "status": "done",
+  "summary": "Eliminate workflow-critical contradictions between the repository `.rules` document and the rules text emitted by `zed-agentops-init.sh` so clients initialize workspaces with the same operating contract the repository currently intends. This ticket should make the authoritative rules source explicit, synchronize bootstrap output with it, and prevent future drift in start/resume, ticket-selection, initialization, and resumability requirements.",
+  "inputs": [
+    "docs/draft_0.5.0.md",
+    "docs/v0.5.0/plan.md",
+    "docs/v0.5.0/tickets_list.json",
+    ".rules",
+    "zed-agentops-init.sh"
+  ],
+  "outputs": [
+    "One canonical workflow rules source for repository and bootstrap use",
+    "Synchronized repository `.rules` and bootstrap-generated rules text for workflow-critical sections",
+    "Clear implementation notes or documentation describing how future rule updates avoid drift"
+  ],
+  "acceptance_criteria": [
+    "The repository `.rules` and the rules text produced by `zed-agentops-init.sh` are identical for workflow-critical sections covering workspace initialization, resume behavior, active transaction handling, ticket selection, persistence expectations, verify, commit, and handoff flow.",
+    "There is a clearly defined authoritative source for workflow rules rather than two independently edited copies.",
+    "A newly initialized workspace receives rules that match the repository’s current intended protocol without weaker or missing resume constraints.",
+    "The stricter start/resume requirements described in the 0.5.0 draft are preserved consistently across repository and bootstrap artifacts.",
+    "Any implementation comments or documentation needed to keep the two rule surfaces synchronized are added in the same change."
+  ],
+  "tasks": [
+    "Compare the repository `.rules` with the rules payload embedded in `zed-agentops-init.sh` and identify all workflow-relevant differences.",
+    "Choose and implement one canonical source strategy, such as generating bootstrap rules from the repository rules text or extracting both from a shared template.",
+    "Update the bootstrap path so newly initialized workspaces receive the same workflow contract the repository defines.",
+    "Verify that resume-first behavior, non-terminal transaction exclusivity, and next-ticket selection rules are preserved exactly.",
+    "Document the maintenance approach so future edits do not reintroduce silent drift between repository and bootstrap rules."
+  ],
+  "dependencies": [],
+  "notes": [
+    "This ticket addresses Priority 0 from the 0.5.0 draft and should be completed before workflow-level API or ticket-persistence changes rely on the clarified rules contract.",
+    "Keep the focus on workflow-critical alignment rather than broad wording cleanup.",
+    "If exact textual identity is not practical for the full files, the workflow-critical sections still need one canonical source and deterministic synchronization.",
+    "The canonical source should live in a single implementation-owned template/module that both repository rules maintenance and bootstrap output derive from, rather than keeping two independently edited rule copies.",
+    "Document the maintenance strategy in the implementation notes so future rule updates change the canonical source first and then regenerate or sync every derived rule surface from it.",
+    "This ticket is about contract alignment, not about changing the transaction engine semantics unless required to match the intended rules."
+  ]
+}

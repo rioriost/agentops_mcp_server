@@ -1,0 +1,76 @@
+{
+  "version": "0.5.0",
+  "source": "draft_0.5.0.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P0",
+      "title": "Align repository rules and bootstrap-generated rules from one canonical source",
+      "status": "done",
+      "file": "v0.5.0/p1-t01.json"
+    },
+    {
+      "id": "p1-t02",
+      "priority": "P1",
+      "title": "Decide whether ticket persistence is protocol or convention",
+      "status": "planned",
+      "file": "v0.5.0/p1-t02.json"
+    },
+    {
+      "id": "p1-t03",
+      "priority": "P1",
+      "title": "Implement or revise ticket persistence requirements to match the chosen protocol model",
+      "status": "planned",
+      "file": "v0.5.0/p1-t03.json"
+    },
+    {
+      "id": "p2-t01",
+      "priority": "P1",
+      "title": "Align lifecycle APIs with the documented status machine",
+      "status": "planned",
+      "file": "v0.5.0/p2-t01.json"
+    },
+    {
+      "id": "p2-t02",
+      "priority": "P1",
+      "title": "Implement strict commit gating and repo-state enforcement",
+      "status": "verified",
+      "file": "v0.5.0/p2-t02.json"
+    },
+    {
+      "id": "p3-t01",
+      "priority": "P2",
+      "title": "Add ergonomic first-class file intent helper support",
+      "status": "planned",
+      "file": "v0.5.0/p3-t01.json"
+    },
+    {
+      "id": "p4-t01",
+      "priority": "P2",
+      "title": "Improve file intent ergonomics with first-class helper workflows",
+      "status": "planned",
+      "file": "v0.5.0/p4-t01.json"
+    },
+    {
+      "id": "p4-t02",
+      "priority": "P3",
+      "title": "Normalize bootstrap state shape and clarify version surfaces",
+      "status": "planned",
+      "file": "v0.5.0/p4-t02.json"
+    },
+    {
+      "id": "p5-t01",
+      "priority": "P1",
+      "title": "Add interoperability verification coverage and workflow alignment documentation",
+      "status": "planned",
+      "file": "v0.5.0/p5-t01.json"
+    },
+    {
+      "id": "p5-t02",
+      "priority": "P2",
+      "title": "Add regression coverage for workflow alignment and protocol enforcement",
+      "status": "planned",
+      "file": "v0.5.0/p5-t02.json"
+    }
+  ]
+}

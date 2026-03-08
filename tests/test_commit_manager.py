@@ -1,5 +1,6 @@
 import json
 import subprocess
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -34,9 +35,10 @@ class DummyGitRepo:
 
 
 class DummyVerifyRunner:
-    def __init__(self, result):
+    def __init__(self, result, verify_path="verify"):
         self.result = result
         self.calls = []
+        self.verify_path = Path(verify_path)
 
     def run_verify(self, timeout_sec=None):
         self.calls.append(timeout_sec)
@@ -917,6 +919,160 @@ def test_repo_commit_with_verify_updates_verify_state(tmp_path, monkeypatch):
     active_tx = tx_state["active_tx"]
     assert active_tx["verify_state"]["status"] == "passed"
     assert active_tx["status"] == "verified"
+
+
+def test_repo_verify_success_records_canonical_verify_events(tmp_path):
+    from agentops_mcp_server.repo_tools import RepoTools
+
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+
+    state_store.tx_event_append(
+        tx_id="tx-1",
+        ticket_id="p4-t3",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="commit",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "p4-t3", "ticket_title": "p4-t3"},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+    _write_tx_state(state_store, verify_state_status="not_started")
+
+    verify_runner = DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"})
+    tools = RepoTools(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        verify_runner,
+        state_store,
+        state_rebuilder,
+    )
+
+    result = tools.repo_verify(timeout_sec=7)
+
+    assert result["ok"] is True
+    assert verify_runner.calls == [7]
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert [event["event_type"] for event in events] == [
+        "tx.begin",
+        "tx.verify.start",
+        "tx.verify.pass",
+    ]
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    active_tx = tx_state["active_tx"]
+    assert active_tx["verify_state"]["status"] == "passed"
+    assert active_tx["status"] == "verified"
+    assert active_tx["phase"] == "verified"
+
+
+def test_repo_verify_failure_records_canonical_verify_fail_event(tmp_path):
+    from agentops_mcp_server.repo_tools import RepoTools
+
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+
+    state_store.tx_event_append(
+        tx_id="tx-1",
+        ticket_id="p4-t3",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="commit",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "p4-t3", "ticket_title": "p4-t3"},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+    _write_tx_state(state_store, verify_state_status="not_started")
+
+    verify_runner = DummyVerifyRunner(
+        {"ok": False, "returncode": 2, "stdout": "", "stderr": "nope"}
+    )
+    tools = RepoTools(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        verify_runner,
+        state_store,
+        state_rebuilder,
+    )
+
+    result = tools.repo_verify(timeout_sec=3)
+
+    assert result["ok"] is False
+    assert verify_runner.calls == [3]
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert [event["event_type"] for event in events] == [
+        "tx.begin",
+        "tx.verify.start",
+        "tx.verify.fail",
+    ]
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    active_tx = tx_state["active_tx"]
+    assert active_tx["verify_state"]["status"] == "failed"
+    assert active_tx["status"] == "checking"
+    assert active_tx["phase"] == "checking"
+
+
+def test_repo_verify_terminal_transaction_is_rejected(tmp_path):
+    from agentops_mcp_server.repo_tools import RepoTools
+
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+
+    state_store.tx_event_append(
+        tx_id="tx-1",
+        ticket_id="p4-t3",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="commit",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "p4-t3", "ticket_title": "p4-t3"},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+    _write_tx_state(
+        state_store,
+        status="done",
+        phase="done",
+        verify_state_status="passed",
+        commit_state_status="passed",
+    )
+
+    verify_runner = DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"})
+    tools = RepoTools(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        verify_runner,
+        state_store,
+        state_rebuilder,
+    )
+
+    with pytest.raises(ValueError, match="cannot verify a terminal transaction"):
+        tools.repo_verify(timeout_sec=1)
+
+    assert verify_runner.calls == []
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert [event["event_type"] for event in events] == ["tx.begin"]
 
 
 def test_diff_summary_handles_exception():

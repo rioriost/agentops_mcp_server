@@ -1,0 +1,53 @@
+{
+  "id": "p1-t03",
+  "title": "Implement or revise ticket persistence requirements to match the chosen protocol model",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Execute the 0.5.0 follow-up work required after the ticket-persistence boundary decision so the documented workflow, generated rules, and server-supported behavior describe the same reality. Depending on the Phase 1 decision, this ticket must either implement first-class ticket persistence support with synchronized planning artifacts and status updates, or revise the rules and bootstrap contract so ticket persistence is clearly treated as external convention rather than mandatory protocol.",
+  "inputs": [
+    "docs/draft_0.5.0.md",
+    "docs/v0.5.0/plan.md",
+    "docs/v0.5.0/tickets_list.json",
+    "docs/v0.5.0/p1-t01.json",
+    "docs/v0.5.0/p1-t02.json",
+    ".rules",
+    "zed-agentops-init.sh",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/server.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py"
+  ],
+  "outputs": [
+    "Workflow contract and implementation aligned with the chosen 0.5.0 ticket-persistence model",
+    "Either first-class server-supported ticket persistence behavior or revised rules and bootstrap language that remove unsupported mandatory guarantees",
+    "Clear ownership of plan.md, tickets_list.json, per-ticket files, and status synchronization responsibilities across server and client"
+  ],
+  "acceptance_criteria": [
+    "The implementation and documentation no longer leave an ambiguous hybrid state where .rules requires mandatory ticket persistence behavior that the server does not support.",
+    "If the chosen 0.5.0 direction is protocol support, the server exposes or clearly defines first-class support for the required planning artifacts, including plan.md, tickets_list.json, per-ticket JSON files, and synchronized status updates where the rules require them.",
+    "If the chosen 0.5.0 direction is convention, the repository rules and generated bootstrap rules are revised so ticket persistence is no longer described as mandatory server-backed protocol behavior.",
+    "The final contract clearly states whether clients may rely on the server to create, update, validate, and synchronize ticket artifacts, or whether those responsibilities remain external workflow discipline.",
+    "Workflow-critical rule text, bootstrap-generated rules, and implementation-facing documentation all reflect the same ticket-persistence ownership model.",
+    "Any server-supported ticket status model remains explicit and consistent with the documented lifecycle states used elsewhere in the 0.5.0 workflow.",
+    "The resulting behavior is specific enough for downstream lifecycle, commit, interoperability, and regression-coverage tickets to build on without re-deciding ticket artifact ownership."
+  ],
+  "tasks": [
+    "Review the protocol-versus-convention decision recorded by p1-t02 and translate it into concrete implementation or rules-alignment work.",
+    "Identify every workflow location where ticket persistence is currently described, implied, generated, or depended on across .rules, bootstrap output, planning artifacts, and server-facing documentation.",
+    "If the direction is first-class protocol support, define the required artifact schemas, lifecycle update rules, synchronization guarantees, and validation expectations for ticket metadata.",
+    "If the direction is convention, revise rules and generated bootstrap language so ticket persistence requirements are presented as external operating practice rather than guaranteed server behavior.",
+    "Align any lifecycle or status references so ticket-related state progression does not conflict with the broader 0.5.0 workflow status model.",
+    "Document the final ownership boundary for creating, updating, synchronizing, and validating planning and ticket artifacts so clients can follow the contract safely."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02"
+  ],
+  "notes": [
+    "This ticket is the execution ticket for the decision made in p1-t02; it should not reopen the protocol-boundary debate unless implementation findings force a documented change.",
+    "The central goal is to eliminate the worst current state: rules that sound mandatory while server support remains incomplete or undefined.",
+    "If first-class ticket persistence is implemented, keep the model narrow, explicit, and synchronized with lifecycle semantics rather than introducing a broad project-management subsystem.",
+    "If ticket persistence remains convention, be precise about what the server does support so clients still have a reliable workflow contract.",
+    "This ticket should leave no ambiguity about whether ticket files are protocol artifacts, helper-managed artifacts, or purely client-managed documentation."
+  ]
+}

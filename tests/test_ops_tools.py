@@ -838,6 +838,22 @@ def test_ops_end_task_requires_prior_tx_begin(
         ops.ops_end_task(summary="done", session_id="s1")
 
 
+def test_ops_end_task_rejects_done_before_commit_finished(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "cannot mark task done before commit is finished; "
+            "complete commit workflow first"
+        ),
+    ):
+        ops.ops_end_task(summary="done", task_id="t-1", status="done", session_id="s1")
+
+
 def test_ops_end_task_mismatch_error_includes_recovery_guidance(
     repo_context, state_store, state_rebuilder
 ):
@@ -870,6 +886,18 @@ def test_ops_end_task_emits_terminal_event_and_updates_state(
     _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
 
     ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    tx_state["active_tx"]["status"] = "committed"
+    tx_state["active_tx"]["phase"] = "committed"
+    tx_state["active_tx"]["commit_state"] = {
+        "status": "passed",
+        "last_result": {"sha": "abc123"},
+    }
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
     result = ops.ops_end_task(
         summary="done",
         next_action="next",
@@ -908,7 +936,13 @@ def test_ops_end_task_uses_ticket_id_when_tx_id_is_none(
         session_id="s1",
     )
 
-    with pytest.raises(ValueError, match="tx.begin required before other events"):
+    with pytest.raises(
+        ValueError,
+        match=(
+            "cannot mark task done before commit is finished; "
+            "complete commit workflow first"
+        ),
+    ):
         ops.ops_end_task(summary="done", task_id="t-1", session_id="s1")
 
 
@@ -1753,6 +1787,17 @@ def test_ops_end_task_defaults_to_done_phase_and_omits_blank_next_action(
 ):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
     _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    tx_state["active_tx"]["status"] = "committed"
+    tx_state["active_tx"]["phase"] = "committed"
+    tx_state["active_tx"]["commit_state"] = {
+        "status": "passed",
+        "last_result": {"sha": "abc123"},
+    }
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
     result = ops.ops_end_task(summary="done", next_action="   ", session_id="s1")
 

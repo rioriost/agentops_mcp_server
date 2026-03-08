@@ -1,0 +1,52 @@
+{
+  "id": "p2-t02",
+  "title": "Implement strict commit gating and repo-state enforcement",
+  "priority": "P1",
+  "status": "verified",
+  "summary": "Implement the Phase 2 commit workflow changes for v0.5.0 so commit operations reflect the rules-defined work loop more explicitly and safely. The work should require successful verification before commit, make repository-state awareness part of commit decisioning, and prevent commit attempts when there are no changes to record, turning current helper behavior into a clearer protocol-level guarantee.",
+  "inputs": [
+    "docs/draft_0.5.0.md",
+    "docs/v0.5.0/plan.md",
+    "docs/v0.5.0/tickets_list.json",
+    "docs/v0.5.0/p1-t01.json",
+    "docs/v0.5.0/p1-t02.json",
+    "docs/v0.5.0/p1-t03.json",
+    "docs/v0.5.0/p2-t01.json",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "tests/test_commit_manager.py",
+    "tests/test_ops_tools.py"
+  ],
+  "outputs": [
+    "Commit workflow that explicitly requires verified transaction state before commit start",
+    "Repository-state-aware commit gating that checks whether changes exist before attempting git commit",
+    "Clear failure behavior and diagnostics when commit is attempted without verification or without pending changes",
+    "Regression coverage for verified-state and repository-state commit preconditions"
+  ],
+  "acceptance_criteria": [
+    "Commit start is rejected when the active transaction has not reached verified state through the canonical verify flow.",
+    "Commit workflow checks repository change state before attempting a commit and refuses to proceed when there is nothing to commit.",
+    "The no-changes case is treated as an explicit workflow precondition failure rather than relying on a downstream git failure message.",
+    "Commit helpers expose enough observable context to show that verified state and repository-state gating were evaluated before commit start.",
+    "Commit behavior remains aligned with canonical event ordering, including verify pass before commit start and commit result after commit start.",
+    "Regression tests cover commit rejection for unverified state and commit rejection when the repository has no changes."
+  ],
+  "tasks": [
+    "Review the current commit helper and repository-state tooling paths to identify where commit preconditions are implicit rather than explicitly enforced.",
+    "Implement explicit gating that requires the active transaction to be in verified state before commit can begin.",
+    "Integrate repository status inspection into commit decisioning so the workflow can determine whether changes exist before invoking git commit.",
+    "Return direct workflow-level failures for no-changes and not-verified cases instead of depending on lower-level git errors.",
+    "Ensure commit-related diagnostics and summaries make the precondition evaluation visible enough for client and operator understanding.",
+    "Add or extend regression tests that assert commit rejection for unverified transactions and for repositories with no pending changes."
+  ],
+  "dependencies": ["p1-t01", "p1-t02", "p1-t03", "p2-t01"],
+  "notes": [
+    "This ticket corresponds to the 0.5.0 draft gap that identifies commit workflow enforcement as weaker than the rules describe.",
+    "Keep the implementation strict: the goal is to elevate commit policy from possible helper behavior to an enforced protocol property.",
+    "Prefer explicit precondition checks with actionable diagnostics over allowing commit attempts to fail later at the git layer.",
+    "Ensure any repository-state snapshot used for commit gating is consistent with the transaction context seen by the commit helper."
+  ]
+}

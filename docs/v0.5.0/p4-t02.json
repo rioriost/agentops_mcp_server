@@ -1,0 +1,66 @@
+{
+  "id": "p4-t02",
+  "title": "Normalize bootstrap state shape and clarify version surfaces",
+  "priority": "P3",
+  "status": "planned",
+  "summary": "Implement the Phase 6 consistency work for v0.5.0 so workspace bootstrap artifacts, runtime materialized state, and externally visible version identifiers present one coherent model. The work should eliminate avoidable drift between init-generated state and rebuilt state, clarify the meaning of release versus schema versus server versioning, and remove low-priority protocol confusion that makes client/server workflow interpretation harder than necessary.",
+  "inputs": [
+    "docs/draft_0.5.0.md",
+    "docs/v0.5.0/plan.md",
+    "docs/v0.5.0/tickets_list.json",
+    "docs/v0.5.0/p1-t01.json",
+    "docs/v0.5.0/p1-t02.json",
+    "docs/v0.5.0/p1-t03.json",
+    "docs/v0.5.0/p2-t01.json",
+    "docs/v0.5.0/p2-t02.json",
+    "docs/v0.5.0/p3-t01.json",
+    "docs/v0.5.0/p4-t01.json",
+    "zed-agentops-init.sh",
+    ".rules",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/server.py",
+    "src/agentops_mcp_server/__init__.py",
+    "pyproject.toml"
+  ],
+  "outputs": [
+    "Normalized bootstrap transaction state shape that matches the runtime canonical model closely enough to avoid unnecessary interpretation drift",
+    "Clear and documented version surface definitions for release version, server/package version, and transaction/schema version",
+    "Reduced client confusion around initialization defaults and version reporting across bootstrap and runtime paths"
+  ],
+  "acceptance_criteria": [
+    "The baseline tx_state generated during workspace initialization uses a normalized shape that is compatible with and closely aligned to the richer runtime-rebuilt state shape.",
+    "Fields that are expected during normal runtime interpretation, including drift and active-transaction-source metadata where appropriate, are either initialized consistently or explicitly documented as intentionally absent until runtime materialization.",
+    "Bootstrap and runtime state handling do not require clients to infer whether missing fields reflect old initialization behavior or meaningful state.",
+    "The project defines the distinct meaning of release/draft version, server or package version, and transaction/schema version in a way that is visible and internally consistent.",
+    "Publicly surfaced version information does not misleadingly suggest that unrelated version concepts are the same thing.",
+    "Any workflow rules or initialization text that mention versioning or baseline state are updated to match the implemented behavior.",
+    "Low-priority protocol wording that references unsupported or confusing version/time-related contracts is either aligned to reality or removed."
+  ],
+  "tasks": [
+    "Review the draft's secondary alignment issues on bootstrap state normalization and version-surface confusion and translate them into concrete implementation work.",
+    "Compare the tx_state shape created by workspace bootstrap with the richer state shape produced by runtime rebuild and materialization paths.",
+    "Define a normalized baseline state contract that preserves compatibility while reducing shape drift between initialization and runtime artifacts.",
+    "Update bootstrap generation so initialized state files reflect the normalized contract without pretending to know runtime-only facts.",
+    "Review server, package, schema, and release version reporting surfaces and define one clear meaning for each.",
+    "Update visible version strings, documentation, or server metadata where necessary so operators and clients can distinguish the relevant version concepts.",
+    "Review adjacent rule or bootstrap wording for low-priority confusing references, including unsupported time/version contract language, and align it with actual server behavior.",
+    "Confirm that the resulting bootstrap artifacts and version surfaces remain coherent with the broader v0.5.0 workflow model."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03",
+    "p2-t01",
+    "p2-t02",
+    "p3-t01",
+    "p4-t01"
+  ],
+  "notes": [
+    "This ticket addresses consistency and clarity, not a redesign of the canonical transaction model.",
+    "Prefer normalization and explicit documentation over adding speculative bootstrap data that only runtime replay can know with confidence.",
+    "Keep the distinction between canonical artifacts, derived artifacts, and user-facing metadata explicit while improving the initial defaults.",
+    "Use the draft's 'Initial tx_state.json shape is compatible but not fully normalized', 'Version surfaces are potentially confusing', and 'Time lookup rules mention a contract not implemented by this server' sections as the primary guidance for this ticket.",
+    "This is intentionally lower priority than rule synchronization, ticket protocol decisions, lifecycle API clarity, commit gating, and file-intent ergonomics."
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "id": "p5-t01",
+  "title": "Add interoperability verification coverage and workflow alignment documentation",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Add verification coverage and release-facing documentation for v0.5.0 so the documented client/server workflow can be tested and explained as one coherent operating model. The work should confirm that workflow-critical rules, generated scaffolding, lifecycle semantics, commit gating, file-intent ergonomics, bootstrap normalization, version-surface clarity, and ticket-related expectations are either enforced consistently or documented precisely where protocol support ends and convention begins.",
+  "inputs": [
+    "docs/draft_0.5.0.md",
+    "docs/v0.5.0/plan.md",
+    "docs/v0.5.0/tickets_list.json",
+    "docs/v0.5.0/p1-t01.json",
+    "docs/v0.5.0/p1-t02.json",
+    "docs/v0.5.0/p1-t03.json",
+    "docs/v0.5.0/p2-t01.json",
+    "docs/v0.5.0/p2-t02.json",
+    "docs/v0.5.0/p3-t01.json",
+    "docs/v0.5.0/p4-t01.json",
+    "docs/v0.5.0/p4-t02.json",
+    ".rules",
+    "zed-agentops-init.sh",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/server.py",
+    "tests/test_ops_tools.py",
+    "tests/test_commit_manager.py",
+    "tests/test_state_store.py",
+    "tests/test_state_rebuilder.py"
+  ],
+  "outputs": [
+    "Verification coverage for workflow-critical client/server interoperability behavior",
+    "Documentation that explains the supported lifecycle and ticket-workflow contract for v0.5.0",
+    "Evidence that mandatory workflow requirements are either server-supported or explicitly documented as convention",
+    "Release-facing explanation of how rules, generated bootstrap behavior, and runtime semantics align for the supported v0.5.0 workflow"
+  ],
+  "acceptance_criteria": [
+    "Tests or equivalent verification checks cover workflow-critical alignment between repository rules and generated initialization rules for the sections treated as protocol-critical in v0.5.0.",
+    "Verification coverage confirms the documented canonical lifecycle model for start, progress/update, verify, commit, and terminal completion as exposed to clients.",
+    "Verification coverage confirms commit is blocked when verify has not passed and when there are no changes to commit.",
+    "Verification coverage confirms any supported ergonomic file-intent helper workflow preserves canonical ordering and validation guarantees.",
+    "Verification coverage confirms bootstrap-generated state and runtime-expected state remain aligned closely enough for predictable client reasoning, or documentation explicitly states the intended normalized differences.",
+    "Verification coverage or release-facing documentation confirms version surfaces remain clear and non-misleading across release, server/package, and schema contexts.",
+    "Verification coverage confirms clients can complete all mandatory supported v0.5.0 workflow steps using server-supported primitives without relying on undocumented behavior.",
+    "If ticket persistence remains mandatory protocol in v0.5.0, verification coverage confirms the corresponding server-supported workflow and synchronization expectations.",
+    "If ticket persistence is intentionally treated as convention rather than protocol, the documentation states that boundary explicitly and consistently.",
+    "Release-facing documentation explains what is enforced by the server, what is provided as helper behavior, and what remains client-side operating convention.",
+    "Repository verification passes with the new interoperability coverage and documentation updates in place."
+  ],
+  "tasks": [
+    "Review the final v0.5.0 plan and completed implementation tickets to identify which workflow requirements are protocol-enforced versus documented convention.",
+    "Add or extend verification coverage for workflow-critical alignment between repository rules, generated initialization rules, and runtime lifecycle behavior.",
+    "Add or extend verification coverage for explicit commit gating on verified state and presence of changes to commit.",
+    "Add or extend verification coverage for the supported client-facing lifecycle path so the documented workflow is backed by executable checks where feasible.",
+    "Add or extend verification coverage for any supported ergonomic file-intent helper workflow and its invalid-ordering rejection behavior.",
+    "Add or extend verification coverage or contract checks for normalized bootstrap state expectations and version-surface clarity where those are part of the supported v0.5.0 contract.",
+    "Document the final v0.5.0 interoperability model, including lifecycle semantics, ticket expectations, commit policy, bootstrap/version consistency, and any protocol-versus-convention boundary.",
+    "Update release-facing docs so operators and client implementers can understand which behaviors are guaranteed by the server and which remain external workflow discipline.",
+    "Run repository verification and capture concise evidence that interoperability coverage and documentation remain consistent with the implemented workflow."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03",
+    "p2-t01",
+    "p2-t02",
+    "p3-t01",
+    "p4-t01",
+    "p4-t02"
+  ],
+  "notes": [
+    "This ticket closes the loop on v0.5.0 by proving and documenting the final client/server contract rather than introducing another major workflow redesign.",
+    "Keep the focus on interoperability-critical behavior described in docs/draft_0.5.0.md: rule alignment, lifecycle clarity, commit gating, file-intent ergonomics, ticket-protocol boundary clarity, bootstrap normalization, and version-surface coherence.",
+    "Prefer concise verification evidence and release-facing explanation over large internal narrative dumps.",
+    "If some behaviors cannot be covered by automated checks directly, document the manual verification rationale and the exact boundary of support.",
+    "The goal of this ticket is to ensure the documented workflow and the implemented workflow are observably the same thing for the supported v0.5.0 surface."
+  ]
+}

@@ -1,0 +1,151 @@
+from __future__ import annotations
+
+from textwrap import dedent
+
+CANONICAL_WORKFLOW_RULES = (
+    dedent(
+        """\
+    # AgentOps (strict rules)
+    # Goal: Maximize resumability and stable execution under session interruption.
+
+    ## Start (mandatory)
+    - Before any canonical restore or file-backed tool execution, call `workspace_initialize(cwd)` exactly once for the current project directory.
+    - `workspace_initialize(cwd)` rules:
+      - `cwd` must be the project directory for this MCP server session
+      - `cwd` must not be `/`
+      - same-root reinitialization is allowed as a no-op
+      - rebinding to a different root is invalid
+    - Read/restore in this order after successful workspace initialization:
+      1) tx_state (materialized transaction state)
+      2) tx_event_log (transaction event log replay if needed)
+      3) handoff (derived-only, never canonical)
+    - Resume decisions must use canonical tx_state + tx_event_log only; handoff is derived.
+    - Treat `.agent/handoff.json` as derived-only.
+    - Canonical transaction log handling:
+      - missing `.agent/tx_event_log.jsonl` means the workspace is uninitialized or damaged
+      - present-but-empty `.agent/tx_event_log.jsonl` is a valid initialized zero-event baseline equivalent to `zed-agentops-init.sh`
+      - malformed or non-parseable log content remains a strict replay/integrity failure and must not be treated like an empty log
+    - If resume state is incomplete:
+      - run ops_resume_brief (or equivalent) and emit a short brief
+    - If `active_tx.status` is not `done` or `blocked`, resume that active transaction first.
+    - Do not start a new ticket while a non-terminal active transaction exists.
+    - Select the next executable ticket only when there is no active transaction to resume.
+    - Identify active ticket (status != done) and resume it.
+    - Root-dependent tools must not run before workspace initialization completes successfully.
+
+    ## Planning flow (mandatory)
+    - User provides docs/draft.md.
+    - Generate docs/__version__/plan.md with phases.
+    - Split phases into tasks and generate:
+      - docs/__version__/tickets_list.json (metadata)
+      - docs/__version__/pX-tY.json (full ticket with status/inputs/outputs/deps)
+    - Ticket status enum: planned, in-progress, checking, verified, committed, done, blocked.
+    - Ticket status persistence is mandatory throughout execution, not optional bookkeeping.
+    - Every ticket status change must be persisted to both:
+      - the per-ticket JSON file, and
+      - docs/__version__/tickets_list.json.
+    - The per-ticket JSON file and docs/__version__/tickets_list.json must stay synchronized with each other for the same ticket.
+
+    ## Work loop (mandatory)
+    - Tickets are the only unit of work.
+    - Canonical ordering is strict:
+      - `tx.begin` before task lifecycle events
+      - `tx.verify.start` before `tx.verify.pass` or `tx.verify.fail`
+      - `tx.verify.pass` before `tx.file_intent.update` with `state=verified`
+      - file intent updates require a previously registered file intent for the same path
+      - commit operations require a valid verify sequence and existing transaction context
+    - For any code change:
+      1) Set status -> in-progress (emit tx.begin if new)
+         - Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json when work begins.
+      2) Register file intents before mutation
+      3) Implement smallest safe change
+      4) Update semantic_summary (required) and user_intent only on explicit user resume intent; persist tx_state after mutation
+      5) Run `repo_verify` (runs `.zed/scripts/verify`)
+         - If fails: fix and repeat (update semantic summary)
+      6) Set status -> checking
+         - Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json.
+         - Compare acceptance_criteria AND plan.md to avoid omissions
+      7) Set status -> verified
+         - Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json.
+      8) Commit changes (emit tx.commit.start/done|fail)
+      9) Set status -> committed
+         - Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json.
+      10) Set status -> done (emit tx.end.done|blocked)
+         - Persist the terminal ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json.
+    - Runtime transaction status/phase and persisted ticket-document status must stay synchronized at each ticket lifecycle transition and must not be reconciled later as optional follow-up bookkeeping.
+
+    ## Persistence & logging (mandatory)
+    - Always record events for plan/task/progress/verify/commit.
+    - Canonical write ordering: event append → tx_state update → cursor persist.
+    - semantic_summary is required for non-terminal tx; user_intent is only set on explicit user resume intent.
+    - Keep log outputs short (summaries over full diffs).
+    - Prefer diff stats over full diffs.
+    - Failed tool executions should be persisted to `.agent/errors.jsonl` when runtime support is available.
+    - Error records should include at least:
+      - tool name
+      - tool input
+      - tool output or error
+      - timestamp
+
+    ## Handoff & session safety (mandatory)
+    - When a tool execution adds/modifies files:
+      1) ops_compact_context (compact context)
+      2) ops_capture_state (tx_state capture)
+      3) ops_handoff_export (handoff summary)
+
+    ## Tooling (mandatory)
+    - Prefer MCP tools if available.
+    - Required input contracts:
+      - `workspace_initialize`
+        - `cwd` is required and must be a project directory path
+        - `cwd` must not be `/`
+      - `tx_event_append`
+        - `actor` is required and must be an object
+        - `payload` is required and must be an object
+        - `session_id` is required and must be non-empty
+      - `tx_state_save`
+        - `state` is required and must be a valid transaction state object
+        - do not persist incomplete or invalid transaction snapshots
+      - task lifecycle tools
+        - do not call task start/update/end before `tx.begin`
+      - time lookup
+        - supported `timezone` values are `utc` or `local` only
+    - Prefer MCP tools if available.
+    - Use:
+      - workspace_initialize
+      - commit_if_verified
+      - tx_event_append
+      - tx_state_save
+      - tx_state_rebuild
+      - repo_verify
+      - repo_commit
+      - repo_status_summary
+      - repo_commit_message_suggest
+      - session_capture_context
+      - tests_suggest
+      - tests_suggest_from_failures
+      - ops_compact_context
+      - ops_handoff_export
+      - ops_resume_brief
+      - ops_start_task
+      - ops_update_task
+      - ops_end_task
+      - ops_capture_state
+      - ops_task_summary
+      - ops_observability_summary
+
+    ## Commit rules (mandatory)
+    - After verify: check repo status; commit only if changes exist.
+    - Commit message: ~80 chars, add scope if useful.
+
+    ## Token discipline (mandatory)
+    - Keep outputs short; avoid large logs.
+    - Prefer summaries and diff stats.
+    """
+    ).strip()
+    + "\n"
+)
+
+
+def canonical_workflow_rules() -> str:
+    return CANONICAL_WORKFLOW_RULES

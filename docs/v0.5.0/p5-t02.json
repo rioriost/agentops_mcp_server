@@ -1,0 +1,77 @@
+{
+  "id": "p5-t02",
+  "title": "Add regression coverage for workflow alignment and protocol enforcement",
+  "priority": "P2",
+  "status": "planned",
+  "summary": "Add final regression coverage for v0.5.0 so the documented client/server workflow contract remains aligned with the implemented protocol surface. This ticket should lock in the 0.5.0 decisions around rules synchronization, ticket-protocol boundaries, lifecycle semantics, commit gating, file-intent ergonomics, bootstrap normalization, and version-surface clarity while ensuring future drift is detectable through focused automated checks.",
+  "inputs": [
+    "docs/draft_0.5.0.md",
+    "docs/v0.5.0/plan.md",
+    "docs/v0.5.0/tickets_list.json",
+    "docs/v0.5.0/p1-t01.json",
+    "docs/v0.5.0/p1-t02.json",
+    "docs/v0.5.0/p1-t03.json",
+    "docs/v0.5.0/p2-t01.json",
+    "docs/v0.5.0/p2-t02.json",
+    "docs/v0.5.0/p3-t01.json",
+    "docs/v0.5.0/p4-t01.json",
+    "docs/v0.5.0/p4-t02.json",
+    "docs/v0.5.0/p5-t01.json",
+    ".rules",
+    "zed-agentops-init.sh",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/server.py",
+    "tests/test_ops_tools.py",
+    "tests/test_commit_manager.py",
+    "tests/test_state_store.py",
+    "tests/test_state_rebuilder.py"
+  ],
+  "outputs": [
+    "Regression coverage for workflow-critical rule alignment and protocol enforcement",
+    "Verification evidence that documented workflow behavior matches implemented server behavior",
+    "Protection against future drift between workflow rules, generated bootstrap behavior, runtime semantics, and bootstrap/version surfaces"
+  ],
+  "acceptance_criteria": [
+    "Verification coverage exists for workflow-critical alignment between repository `.rules` and generated rules content in `zed-agentops-init.sh`.",
+    "Verification coverage confirms the supported client-facing lifecycle model for start, progress/update, verify, commit, and terminal completion.",
+    "Verification coverage confirms commit is blocked when verify has not passed.",
+    "Verification coverage confirms commit is blocked when there are no changes to commit.",
+    "Verification coverage confirms any supported file-intent helper workflow preserves canonical ordering and validation guarantees.",
+    "Verification coverage confirms bootstrap-generated state and runtime-expected state remain aligned closely enough for predictable client reasoning, or documentation explicitly states the intended normalized differences.",
+    "Verification coverage or documentation confirms version surfaces remain clear and non-misleading across release, server/package, and schema contexts.",
+    "If ticket persistence remains protocol in v0.5.0, verification coverage confirms the supported ticket-artifact behavior and synchronization guarantees.",
+    "If ticket persistence is convention rather than protocol in v0.5.0, release-facing documentation and checks do not overstate server guarantees.",
+    "Repository verification passes with the new regression coverage in place."
+  ],
+  "tasks": [
+    "Review the completed v0.5.0 tickets and identify the final supported workflow contract that must be protected by tests.",
+    "Add or extend regression checks that detect drift between repository rules and generated bootstrap rules for workflow-critical sections.",
+    "Add or extend regression coverage for the supported lifecycle path and any explicit status-transition semantics introduced in v0.5.0.",
+    "Add or extend regression coverage for commit precondition enforcement, including verified-state and no-changes rejection behavior.",
+    "Add or extend regression coverage for any ergonomic file-intent helper workflow introduced by v0.5.0 and its invalid-ordering rejection behavior.",
+    "Add or extend regression coverage or contract checks for normalized bootstrap state expectations and version-surface clarity where those are part of the supported 0.5.0 contract.",
+    "If ticket persistence is protocol, add or extend regression coverage for ticket artifact creation, status synchronization, and runtime consistency expectations.",
+    "If ticket persistence is convention, ensure regression checks and docs confirm the boundary without overstating protocol guarantees.",
+    "Run repository verification and record concise evidence that the final workflow contract is enforced."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03",
+    "p2-t01",
+    "p2-t02",
+    "p3-t01",
+    "p4-t01",
+    "p4-t02",
+    "p5-t01"
+  ],
+  "notes": [
+    "This ticket is the final lock-in step for v0.5.0 and should be completed after the workflow-shaping tickets have settled the supported contract.",
+    "Keep the focus on workflow-critical interoperability behavior identified in `draft_0.5.0.md`, not on unrelated broad test expansion.",
+    "Prefer concise, high-signal regression coverage over large narrative outputs.",
+    "The goal is to ensure the documented workflow and the implemented workflow remain observably the same thing for the supported v0.5.0 surface."
+  ]
+}

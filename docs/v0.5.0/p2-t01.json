@@ -1,0 +1,55 @@
+{
+  "id": "p2-t01",
+  "title": "Align lifecycle APIs with the documented status machine",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Implement the Phase 3 work for v0.5.0 so the client-facing lifecycle API matches the documented workflow status machine more explicitly. The goal is to remove ambiguity between task helpers and canonical transaction progression by making start, update, verify, commit, and terminal completion behave as a coherent lifecycle contract that clients can follow safely under the 0.5.0 rules.",
+  "inputs": [
+    "docs/draft_0.5.0.md",
+    "docs/v0.5.0/plan.md",
+    "docs/v0.5.0/p1-t01.json",
+    "docs/v0.5.0/p1-t02.json",
+    "docs/v0.5.0/p1-t03.json",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "tests/test_ops_tools.py",
+    "tests/test_state_store.py",
+    "tests/test_commit_manager.py"
+  ],
+  "outputs": [
+    "A clearer client-facing lifecycle interface that maps explicitly to the documented top-level workflow states",
+    "Runtime enforcement that keeps lifecycle helper behavior aligned with canonical transaction and verification/commit state",
+    "Updated tests and documentation showing how lifecycle operations advance through in-progress, checking, verified, committed, done, and blocked states"
+  ],
+  "acceptance_criteria": [
+    "The implementation exposes a clear canonical lifecycle model for start, progress/update, verify, commit, and terminal completion that clients can use without inferring hidden status transitions.",
+    "Task start semantics are aligned with entering `in-progress` work rather than accepting overly loose lifecycle meaning.",
+    "Task update semantics either become an explicit status transition mechanism or are clearly constrained and documented as non-authoritative progress reporting.",
+    "Intermediate workflow states such as `checking`, `verified`, and `committed` are represented and enforced consistently at the client-facing lifecycle layer.",
+    "Task end semantics remain limited to terminal outcomes and do not leave ambiguity about how non-terminal lifecycle transitions are expressed.",
+    "Lifecycle helper behavior remains synchronized with canonical transaction state, verification state, and commit state so clients do not observe conflicting workflow status.",
+    "Regression tests cover the intended lifecycle status progression and reject invalid or ambiguous lifecycle transitions."
+  ],
+  "tasks": [
+    "Review the current lifecycle helper surface and identify where start, update, and end semantics diverge from the documented 0.5.0 status machine.",
+    "Decide and implement the intended lifecycle API model: either a strict status-transition interface or clearly documented thin helpers over the lower-level event model.",
+    "Ensure the lifecycle layer expresses or derives the top-level states `in-progress`, `checking`, `verified`, `committed`, `done`, and `blocked` in a predictable way.",
+    "Tighten lifecycle helper preconditions so client-visible transitions stay consistent with canonical transaction ordering, verification progression, and commit progression.",
+    "Update helper documentation, code comments, and any operator-facing descriptions needed to explain the canonical lifecycle contract.",
+    "Add or extend regression coverage for valid lifecycle progression, invalid intermediate transitions, and synchronization between lifecycle helpers and canonical transaction state."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03"
+  ],
+  "notes": [
+    "This ticket addresses the draft finding that the task lifecycle tools do not yet fully model the rules' explicit status machine.",
+    "The implementation should remove client ambiguity without weakening the transaction/event invariants established in earlier releases.",
+    "If the final design keeps lifecycle helpers as convenience wrappers, the code and documentation must say so explicitly and preserve one clear canonical interface.",
+    "Keep the lifecycle API aligned with the broader 0.5.0 goal of making the documented workflow and implemented workflow the same thing."
+  ]
+}

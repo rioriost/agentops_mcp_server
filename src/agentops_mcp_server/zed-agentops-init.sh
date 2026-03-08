@@ -133,9 +133,19 @@ fi
 
 # --- .rules ---
 SOURCE_RULES="${PWD}/.rules"
+SOURCE_RULES_PY="${PWD}/src/agentops_mcp_server/workflow_rules.py"
 if [ -f "$SOURCE_RULES" ]; then
   cp "$SOURCE_RULES" "$SOURCE_RULES.bak"
 fi
+if [ -f "$SOURCE_RULES_PY" ]; then
+  python - <<'PY' > "$SOURCE_RULES"
+from pathlib import Path
+
+namespace = {}
+exec(Path("src/agentops_mcp_server/workflow_rules.py").read_text(), namespace)
+print(namespace["canonical_workflow_rules"](), end="")
+PY
+else
 cat <<'RULES' > "$SOURCE_RULES"
 # AgentOps (strict rules)
 # Goal: Maximize resumability and stable execution under session interruption.
@@ -159,6 +169,9 @@ cat <<'RULES' > "$SOURCE_RULES"
   - malformed or non-parseable log content remains a strict replay/integrity failure and must not be treated like an empty log
 - If resume state is incomplete:
   - run ops_resume_brief (or equivalent) and emit a short brief
+- If `active_tx.status` is not `done` or `blocked`, resume that active transaction first.
+- Do not start a new ticket while a non-terminal active transaction exists.
+- Select the next executable ticket only when there is no active transaction to resume.
 - Identify active ticket (status != done) and resume it.
 - Root-dependent tools must not run before workspace initialization completes successfully.
 
@@ -263,7 +276,6 @@ cat <<'RULES' > "$SOURCE_RULES"
   - ops_task_summary
   - ops_observability_summary
 
-
 ## Commit rules (mandatory)
 - After verify: check repo status; commit only if changes exist.
 - Commit message: ~80 chars, add scope if useful.
@@ -272,6 +284,7 @@ cat <<'RULES' > "$SOURCE_RULES"
 - Keep outputs short; avoid large logs.
 - Prefer summaries and diff stats.
 RULES
+fi
 
 if [ -e "$root/.rules" ] && [ ! -f "$root/.rules" ]; then
   echo "Skipping .rules (path exists and is not a file)."

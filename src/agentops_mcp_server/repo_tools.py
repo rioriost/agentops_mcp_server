@@ -8,12 +8,232 @@ from .verify_runner import VerifyRunner
 
 
 class RepoTools:
-    def __init__(self, git_repo: GitRepo, verify_runner: VerifyRunner) -> None:
+    def __init__(
+        self,
+        git_repo: GitRepo,
+        verify_runner: VerifyRunner,
+        state_store: Any | None = None,
+        state_rebuilder: Any | None = None,
+    ) -> None:
         self.git_repo = git_repo
         self.verify_runner = verify_runner
+        self.state_store = state_store
+        self.state_rebuilder = state_rebuilder
+
+    def _load_tx_context(self) -> Optional[Dict[str, str]]:
+        if self.state_store is None:
+            return None
+        tx_state = self.state_store.read_json_file(
+            self.state_store.repo_context.tx_state
+        )
+        if not isinstance(tx_state, dict):
+            return None
+        active_tx = tx_state.get("active_tx")
+        if not isinstance(active_tx, dict):
+            return None
+
+        tx_id = active_tx.get("tx_id")
+        ticket_id = active_tx.get("ticket_id")
+        session_id = active_tx.get("session_id")
+        phase = active_tx.get("phase") or active_tx.get("status") or "in-progress"
+        step_id = active_tx.get("current_step") or "verify"
+
+        if not isinstance(tx_id, str) or not tx_id.strip() or tx_id.strip() == "none":
+            return None
+        if (
+            not isinstance(ticket_id, str)
+            or not ticket_id.strip()
+            or ticket_id.strip() == "none"
+        ):
+            return None
+        if not isinstance(session_id, str) or not session_id.strip():
+            return None
+        if not isinstance(phase, str) or not phase.strip():
+            phase = "in-progress"
+        if not isinstance(step_id, str) or not step_id.strip():
+            step_id = "verify"
+
+        return {
+            "tx_id": tx_id.strip(),
+            "ticket_id": ticket_id.strip(),
+            "session_id": session_id.strip(),
+            "phase": phase.strip(),
+            "step_id": step_id.strip(),
+        }
+
+    def _emit_tx_event(
+        self,
+        *,
+        event_type: str,
+        payload: Dict[str, Any],
+        phase_override: Optional[str] = None,
+        step_id_override: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        context = self._load_tx_context()
+        if not context or self.state_store is None:
+            return None
+
+        phase = phase_override or context["phase"]
+        step_id = step_id_override or context["step_id"]
+        actor = {"tool": "repo_tools"}
+
+        tx_state = self.state_store.read_json_file(
+            self.state_store.repo_context.tx_state
+        )
+        if isinstance(tx_state, dict):
+            active_tx = tx_state.get("active_tx")
+            if isinstance(active_tx, dict):
+                active_tx["tx_id"] = context["tx_id"]
+                active_tx["ticket_id"] = context["ticket_id"]
+                active_tx["status"] = phase
+                active_tx["phase"] = phase
+                active_tx["current_step"] = step_id
+                active_tx["session_id"] = context["session_id"]
+                if event_type == "tx.verify.start":
+                    active_tx["verify_state"] = {
+                        "status": "running",
+                        "last_result": payload,
+                    }
+                    active_tx["next_action"] = "tx.verify.pass"
+                elif event_type == "tx.verify.pass":
+                    active_tx["verify_state"] = {
+                        "status": "passed",
+                        "last_result": payload,
+                    }
+                    active_tx["semantic_summary"] = "Verification passed"
+                    active_tx["next_action"] = "tx.commit.start"
+                elif event_type == "tx.verify.fail":
+                    active_tx["verify_state"] = {
+                        "status": "failed",
+                        "last_result": payload,
+                    }
+                    active_tx["semantic_summary"] = "Verification failed"
+                    active_tx["next_action"] = "fix and re-verify"
+            return self.state_store.tx_event_append_and_state_save(
+                tx_id=context["tx_id"],
+                ticket_id=context["ticket_id"],
+                event_type=event_type,
+                phase=phase,
+                step_id=step_id,
+                actor=actor,
+                session_id=context["session_id"],
+                payload=payload,
+                state=tx_state,
+            )
+
+        if self.state_rebuilder is not None:
+            rebuild = self.state_rebuilder.rebuild_tx_state()
+            if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
+                state = rebuild["state"]
+                integrity = (
+                    state.get("integrity")
+                    if isinstance(state.get("integrity"), dict)
+                    else {}
+                )
+                if integrity.get("drift_detected") is not True:
+                    active_tx = state.get("active_tx")
+                    if isinstance(active_tx, dict):
+                        active_tx["tx_id"] = context["tx_id"]
+                        active_tx["ticket_id"] = context["ticket_id"]
+                        active_tx["status"] = phase
+                        active_tx["phase"] = phase
+                        active_tx["current_step"] = step_id
+                        active_tx["session_id"] = context["session_id"]
+                        if event_type == "tx.verify.start":
+                            active_tx["verify_state"] = {
+                                "status": "running",
+                                "last_result": payload,
+                            }
+                            active_tx["next_action"] = "tx.verify.pass"
+                        elif event_type == "tx.verify.pass":
+                            active_tx["verify_state"] = {
+                                "status": "passed",
+                                "last_result": payload,
+                            }
+                            active_tx["semantic_summary"] = "Verification passed"
+                            active_tx["next_action"] = "tx.commit.start"
+                        elif event_type == "tx.verify.fail":
+                            active_tx["verify_state"] = {
+                                "status": "failed",
+                                "last_result": payload,
+                            }
+                            active_tx["semantic_summary"] = "Verification failed"
+                            active_tx["next_action"] = "fix and re-verify"
+                    return self.state_store.tx_event_append_and_state_save(
+                        tx_id=context["tx_id"],
+                        ticket_id=context["ticket_id"],
+                        event_type=event_type,
+                        phase=phase,
+                        step_id=step_id,
+                        actor=actor,
+                        session_id=context["session_id"],
+                        payload=payload,
+                        state=state,
+                    )
+
+        return self.state_store.tx_event_append(
+            tx_id=context["tx_id"],
+            ticket_id=context["ticket_id"],
+            event_type=event_type,
+            phase=phase,
+            step_id=step_id,
+            actor=actor,
+            session_id=context["session_id"],
+            payload=payload,
+        )
 
     def repo_verify(self, timeout_sec: Optional[int] = None) -> Dict[str, Any]:
-        return self.verify_runner.run_verify(timeout_sec=timeout_sec)
+        context = self._load_tx_context()
+        if context is None or self.state_store is None:
+            return self.verify_runner.run_verify(timeout_sec=timeout_sec)
+
+        active_tx = self.state_store.read_json_file(
+            self.state_store.repo_context.tx_state
+        )
+        active = active_tx.get("active_tx") if isinstance(active_tx, dict) else {}
+        if isinstance(active, dict):
+            status = active.get("status")
+            if isinstance(status, str) and status.strip() in {"done", "blocked"}:
+                raise ValueError("cannot verify a terminal transaction")
+
+        self._emit_tx_event(
+            event_type="tx.verify.start",
+            payload={"command": str(self.state_store.repo_context.verify)},
+            phase_override="checking",
+            step_id_override=context["step_id"],
+        )
+
+        result = self.verify_runner.run_verify(timeout_sec=timeout_sec)
+
+        if result.get("ok"):
+            self._emit_tx_event(
+                event_type="tx.verify.pass",
+                payload={
+                    "ok": True,
+                    "returncode": result.get("returncode"),
+                    "summary": result.get("stdout") or "verify passed",
+                },
+                phase_override="verified",
+                step_id_override=context["step_id"],
+            )
+        else:
+            details = (
+                (result.get("stderr") or "").strip()
+                or (result.get("stdout") or "").strip()
+                or "verify failed"
+            )
+            self._emit_tx_event(
+                event_type="tx.verify.fail",
+                payload={
+                    "ok": False,
+                    "returncode": result.get("returncode"),
+                    "error": details,
+                },
+                phase_override="checking",
+                step_id_override=context["step_id"],
+            )
+
+        return result
 
     def repo_status_summary(self) -> Dict[str, Any]:
         return {
@@ -91,5 +311,5 @@ class RepoTools:
         }
 
         if run_verify:
-            context["verify"] = self.verify_runner.run_verify()
+            context["verify"] = self.repo_verify()
         return context

@@ -638,6 +638,15 @@ class OpsTools:
         tx_phase = (
             status.strip() if isinstance(status, str) and status.strip() else "done"
         )
+        if not isinstance(session_id, str) or not session_id.strip():
+            raise ValueError("session_id is required")
+        if tx_phase == "done":
+            active_phase = active_tx.get("phase")
+            if not isinstance(active_phase, str) or active_phase.strip() != "committed":
+                raise ValueError(
+                    "cannot mark task done before commit is finished; "
+                    "complete commit workflow first"
+                )
         tx_step_id = resolved_task_id or "task"
         end_type = "tx.end.blocked" if tx_phase == "blocked" else "tx.end.done"
         end_payload = {"summary": payload.get("summary", "")}
