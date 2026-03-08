@@ -2,7 +2,7 @@
   "id": "p2-t03",
   "title": "Implement synchronized canonical event-state progression across transaction helpers",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Implement the Phase 2 runtime changes for v0.4.13 so canonical transaction events, materialized transaction state, and guarded helper behavior remain synchronized throughout ticket execution. Integrated regression coverage now confirms that state_store surfaces append-succeeded/materialization-failed diagnostics to .agent/errors.jsonl, state_rebuilder reports canonical ordering drift and rebuild diagnostics for invalid commit-before-verify sequences, and ops_tools/commit_manager refuse to use drift rebuild output as continuation state while guarded helper behavior stays aligned across the tested boundary.",
   "inputs": [
     "docs/draft_0.4.13.md",
