@@ -2,7 +2,7 @@
   "id": "p1-t01",
   "title": "Define the explicit transaction state machine contract",
   "priority": "P1",
-  "status": "planned",
+  "status": "done",
   "summary": "Define the Phase 1 contract for v0.4.13 that makes transaction-aware task management explicit as a state machine. The contract must define valid and forbidden transaction transitions, separate new-start from resume behavior, and clarify the synchronization guarantees required between canonical transaction events and materialized transaction state so that a single ticket is managed as one coherent transaction from start to terminal completion.",
   "inputs": [
     "docs/draft_0.4.13.md",
@@ -42,6 +42,7 @@
     "Do not weaken strict workflow guards or transaction validation rules as part of this ticket.",
     "Keep the contract explicit enough that all runtime helpers can share one transaction model instead of reconstructing behavior from distributed assumptions.",
     "Use the observed failures as concrete examples of specification-violating flows that the contract must classify and forbid.",
-    "The contract should support deterministic resumability by requiring that one ticket remains one coherent transaction lineage until it reaches a terminal outcome."
+    "The contract should support deterministic resumability by requiring that one ticket remains one coherent transaction lineage until it reaches a terminal outcome.",
+    "Completion note: plan.md now captures the explicit lifecycle states, verify and commit sub-states, allowed and forbidden transitions, synchronization invariants, integrity-failure boundaries, and resume semantics that guided downstream implementation tickets p2-t02 through p4-t05 to completion."
   ]
 }

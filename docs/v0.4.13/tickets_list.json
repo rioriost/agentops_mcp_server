@@ -6,7 +6,7 @@
       "id": "p1-t01",
       "priority": "P1",
       "title": "Define the explicit transaction state machine contract",
-      "status": "planned",
+      "status": "done",
       "file": "v0.4.13/p1-t01.json"
     },
     {
