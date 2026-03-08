@@ -636,7 +636,6 @@ def test_rotate_journal_if_prev_week(state_rebuilder, repo_context):
     now = datetime.now(timezone.utc)
     current_week = state_rebuilder.week_start_utc(now)
     last_week_start = current_week - timedelta(days=7)
-    last_week_end = current_week - timedelta(seconds=1)
 
     last_week_ts = (last_week_start + timedelta(hours=1)).isoformat()
     current_week_ts = (current_week + timedelta(hours=1)).isoformat()
