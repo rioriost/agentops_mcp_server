@@ -309,12 +309,7 @@ else
     '}' > "$AGENT_DIR/tx_state.json"
 fi
 
-# --- legacy journal ---
-if [ -f "$AGENT_DIR/journal.jsonl" ]; then
-  echo "Skipping .agent/journal.jsonl (already exists)."
-else
-  touch "$AGENT_DIR/journal.jsonl"
-fi
+
 
 if (( update_mode == 1 )); then
   echo "Skipping .zed scaffold (update mode)."

@@ -1,0 +1,37 @@
+{
+  "id": "p1-t1",
+  "title": "Stop creating legacy journal during initialization while preserving legacy detection",
+  "priority": "P1",
+  "status": "done",
+  "summary": "Apply a small v0.4.9 initialization fix so `zed-agentops-init.sh` no longer creates `.agent/journal.jsonl`, while keeping legacy filename knowledge in runtime code for compatibility checks and migration-aware behavior.",
+  "inputs": [
+    "docs/v0.4.9/plan.md",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "src/agentops_mcp_server/repo_context.py",
+    "tests/test_init.py",
+    "tests/test_repo_context.py"
+  ],
+  "outputs": [
+    "Updated initialization script that does not create `.agent/journal.jsonl`",
+    "Retained legacy artifact filename mapping for `journal.jsonl`",
+    "Regression coverage for the initialization contract"
+  ],
+  "acceptance_criteria": [
+    "`zed-agentops-init.sh` does not create `.agent/journal.jsonl` for newly initialized workspaces.",
+    "Legacy filename knowledge for `journal.jsonl` remains available in Python code for compatibility and detection purposes.",
+    "Initialization-related tests assert the canonical and derived artifact set without requiring creation of the legacy journal file.",
+    "The change remains scoped to the small v0.4.9 fix and does not alter canonical transaction artifact behavior."
+  ],
+  "tasks": [
+    "Remove the legacy journal creation block from `zed-agentops-init.sh`.",
+    "Keep the legacy artifact mapping for `journal.jsonl` in runtime code unchanged unless a narrow adjustment is required.",
+    "Update or extend tests so the script contract explicitly excludes creation of `.agent/journal.jsonl` while still recognizing it as a legacy artifact when relevant.",
+    "Verify that canonical initialization artifacts remain `.agent/tx_event_log.jsonl` and `.agent/tx_state.json`, with derived artifacts unchanged."
+  ],
+  "dependencies": [],
+  "notes": [
+    "This ticket intentionally avoids using `docs/draft.md`; the user requested a small direct v0.4.9 fix.",
+    "Do not remove legacy filename knowledge entirely; only stop generating the file during initialization.",
+    "Keep the change minimal and focused on initialization behavior plus any directly related test expectations."
+  ]
+}

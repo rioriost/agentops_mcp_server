@@ -1,0 +1,13 @@
+{
+  "version": "0.4.9",
+  "source": null,
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P1",
+      "title": "Stop creating legacy journal.jsonl during initialization",
+      "status": "done",
+      "file": "v0.4.9/p1-t01.json"
+    }
+  ]
+}

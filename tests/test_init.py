@@ -65,6 +65,9 @@ def test_init_script_contains_canonical_artifacts_and_rules():
     assert ".agent/tx_state.json" in content
     assert ".agent/handoff.json" in content
     assert ".agent/observability_summary.json" in content
+    assert "journal.jsonl" not in content
+    assert 'touch "$AGENT_DIR/journal.jsonl"' not in content
+    assert "Skipping .agent/journal.jsonl" not in content
     assert "handoff.md" not in content
 
     assert "work-in-progress.md" not in content
