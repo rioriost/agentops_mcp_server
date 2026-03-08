@@ -27,6 +27,7 @@ def _append_tx_event(state_store, **overrides):
 
 
 def _append_raw_tx_event(repo_context, event):
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
     with repo_context.tx_event_log.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(event) + "\n")
 
@@ -317,7 +318,7 @@ def test_rebuild_tx_state_missing_file_intent_truncates(
     assert rebuild["ok"] is True
     assert rebuild["last_applied_seq"] == 1
     assert rebuild["state"]["rebuild_warning"] == "file intent missing for path"
-    assert rebuild["state"]["rebuild_invalid_seq"] == 2
+    assert rebuild["state"]["rebuild_invalid_seq"] == 1
     assert (
         rebuild["state"]["rebuild_invalid_event"]["event_type"]
         == "tx.file_intent.update"
@@ -398,8 +399,147 @@ def test_rebuild_tx_state_recovers_latest_active_tx_after_stale_terminal_begin(
     assert "rebuild_invalid_seq" not in rebuild["state"]
     assert rebuild["state"]["active_tx"]["tx_id"] == "tx-new"
     assert rebuild["state"]["active_tx"]["ticket_id"] == "p2-t3"
-    assert rebuild["state"]["active_tx"]["status"] == "in-progress"
-    assert rebuild["state"]["active_tx"]["current_step"] == "p2-t3"
+    assert rebuild["state"]["integrity"]["drift_detected"] is False
+    assert rebuild["state"]["integrity"]["active_tx_source"] == "active_candidate"
+
+
+def test_rebuild_tx_state_prefers_latest_non_terminal_tx_across_sessions(
+    repo_context, state_store, state_rebuilder
+):
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 1,
+            "event_id": "evt-s1-begin",
+            "tx_id": "tx-s1-old",
+            "ticket_id": "p1-t1",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"ticket_id": "p1-t1", "ticket_title": "old tx"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-s1-end",
+            "tx_id": "tx-s1-old",
+            "ticket_id": "p1-t1",
+            "event_type": "tx.end.done",
+            "phase": "done",
+            "step_id": "p1-t1",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"summary": "done"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 3,
+            "event_id": "evt-s2-begin",
+            "tx_id": "tx-s2-active",
+            "ticket_id": "p2-t3",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a2"},
+            "session_id": "s2",
+            "payload": {"ticket_id": "p2-t3", "ticket_title": "active tx"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 4,
+            "event_id": "evt-s2-step",
+            "tx_id": "tx-s2-active",
+            "ticket_id": "p2-t3",
+            "event_type": "tx.step.enter",
+            "phase": "in-progress",
+            "step_id": "p2-t3",
+            "actor": {"agent_id": "a2"},
+            "session_id": "s2",
+            "payload": {"step_id": "p2-t3", "description": "task started"},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 4
+    assert rebuild["state"]["active_tx"]["tx_id"] == "tx-s2-active"
+    assert rebuild["state"]["active_tx"]["ticket_id"] == "p2-t3"
+    assert rebuild["state"]["active_tx"]["session_id"] == "s2"
+    assert rebuild["state"]["integrity"]["drift_detected"] is False
+    assert rebuild["state"]["integrity"]["active_tx_source"] == "active_candidate"
+
+
+def test_rebuild_tx_state_marks_drift_when_applied_seq_has_no_active_tx(
+    repo_context, state_rebuilder
+):
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 1,
+            "event_id": "evt-begin",
+            "tx_id": "tx-1",
+            "ticket_id": "p2-t3",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"ticket_id": "p2-t3", "ticket_title": "tx"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-end",
+            "tx_id": "tx-1",
+            "ticket_id": "p2-t3",
+            "event_type": "tx.end.done",
+            "phase": "done",
+            "step_id": "p2-t3",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"summary": "done"},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 2
+    assert rebuild["state"]["active_tx"]["tx_id"] == "none"
+    assert rebuild["state"]["integrity"]["drift_detected"] is True
+    assert rebuild["state"]["integrity"]["active_tx_source"] == "none"
+    assert (
+        rebuild["state"]["rebuild_warning"]
+        == "no active transaction materialized despite canonical events up to a terminal boundary"
+    )
+    assert rebuild["state"]["rebuild_invalid_seq"] == 2
+    assert rebuild["state"]["rebuild_observed_mismatch"]["last_applied_seq"] == 2
+    assert rebuild["state"]["rebuild_observed_mismatch"]["active_tx_id"] == "none"
+    assert rebuild["state"]["rebuild_observed_mismatch"]["active_ticket_id"] == "none"
+    assert rebuild["state"]["rebuild_observed_mismatch"]["terminal_tx_ids"] == ["tx-1"]
+    assert rebuild["state"]["rebuild_observed_mismatch"]["known_tx_ids"] == ["tx-1"]
+    assert rebuild["state"]["rebuild_observed_mismatch"]["last_seen_event_by_tx"] == {
+        "tx-1": 2
+    }
+    assert rebuild["state"]["rebuild_observed_mismatch"]["begin_seq_by_tx"] == {
+        "tx-1": 1
+    }
+    assert rebuild["state"]["rebuild_observed_mismatch"]["last_session_by_tx"] == {
+        "tx-1": "s1"
+    }
+    assert rebuild["state"]["active_tx"]["status"] == "planned"
+    assert rebuild["state"]["active_tx"]["current_step"] == "none"
 
 
 def test_rebuild_tx_state_allows_tx_begin_after_terminal_for_same_tx(
@@ -468,11 +608,19 @@ def test_rebuild_tx_state_allows_tx_begin_after_terminal_for_same_tx(
 
     assert rebuild["ok"] is True
     assert rebuild["last_applied_seq"] == 5
-    assert "rebuild_warning" not in rebuild["state"]
+    assert rebuild["state"]["rebuild_warning"] == (
+        "no active transaction materialized despite canonical events up to a terminal boundary"
+    )
+    assert rebuild["state"]["rebuild_invalid_seq"] == 5
+    assert rebuild["state"]["rebuild_observed_mismatch"]["last_applied_seq"] == 5
+    assert rebuild["state"]["rebuild_observed_mismatch"]["active_tx_id"] == "none"
+    assert rebuild["state"]["rebuild_observed_mismatch"]["active_ticket_id"] == "none"
     assert rebuild["state"]["active_tx"]["tx_id"] == "none"
     assert rebuild["state"]["active_tx"]["ticket_id"] == "none"
     assert rebuild["state"]["active_tx"]["status"] == "planned"
     assert rebuild["state"]["active_tx"]["current_step"] == "none"
+    assert rebuild["state"]["integrity"]["drift_detected"] is True
+    assert rebuild["state"]["integrity"]["active_tx_source"] == "none"
 
 
 def test_rebuild_tx_state_preserves_user_intent(

@@ -20,7 +20,7 @@
       "id": "p2-t03",
       "priority": "P1",
       "title": "Correct active transaction rebuild and resume selection behavior",
-      "status": "planned",
+      "status": "committed",
       "file": "v0.4.12/p2-t03.json"
     },
     {

@@ -275,6 +275,65 @@ def test_log_tool_error_writes_errors_jsonl(tmp_path):
     assert lines[0]["ts"]
 
 
+def test_log_tool_error_writes_rebuild_drift_context(tmp_path):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+
+    tool_input = {
+        "start_seq": 0,
+        "end_seq": None,
+        "event_log_path": str(tmp_path / ".agent" / "tx_event_log.jsonl"),
+    }
+    tool_output = {
+        "error": "no active transaction materialized despite canonical events up to a terminal boundary",
+        "ts": "2026-03-08T00:00:00+00:00",
+        "observed_mismatch": {
+            "drift_reason": "no active transaction materialized despite canonical events up to a terminal boundary",
+            "event_log_path": str(tmp_path / ".agent" / "tx_event_log.jsonl"),
+            "last_applied_seq": 2,
+            "active_tx_id": "none",
+            "active_ticket_id": "none",
+            "terminal_tx_ids": ["tx-1"],
+            "known_tx_ids": ["tx-1"],
+            "last_seen_event_by_tx": {"tx-1": 2},
+            "begin_seq_by_tx": {"tx-1": 1},
+            "last_session_by_tx": {"tx-1": "s1"},
+        },
+    }
+
+    result = state_store.log_tool_error(
+        tool_name="rebuild_tx_state",
+        tool_input=tool_input,
+        tool_output=tool_output,
+    )
+
+    assert result["ok"] is True
+
+    lines = [
+        json.loads(line)
+        for line in repo_context.errors.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(lines) == 1
+    assert lines[0]["tool_name"] == "rebuild_tx_state"
+    assert lines[0]["tool_input"] == tool_input
+    assert lines[0]["tool_output"]["error"] == tool_output["error"]
+    assert lines[0]["tool_output"]["observed_mismatch"]["last_applied_seq"] == 2
+    assert lines[0]["tool_output"]["observed_mismatch"]["active_tx_id"] == "none"
+    assert lines[0]["tool_output"]["observed_mismatch"]["active_ticket_id"] == "none"
+    assert lines[0]["tool_output"]["observed_mismatch"]["terminal_tx_ids"] == ["tx-1"]
+    assert lines[0]["tool_output"]["observed_mismatch"]["known_tx_ids"] == ["tx-1"]
+    assert lines[0]["tool_output"]["observed_mismatch"]["last_seen_event_by_tx"] == {
+        "tx-1": 2
+    }
+    assert lines[0]["tool_output"]["observed_mismatch"]["begin_seq_by_tx"] == {
+        "tx-1": 1
+    }
+    assert lines[0]["tool_output"]["observed_mismatch"]["last_session_by_tx"] == {
+        "tx-1": "s1"
+    }
+
+
 def test_log_tool_error_requires_initialized_root(tmp_path):
     repo_context = RepoContext(Path("/"))
     state_store = StateStore(repo_context)

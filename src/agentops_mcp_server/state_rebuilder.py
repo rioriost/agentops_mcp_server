@@ -4,7 +4,7 @@ import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .repo_context import RepoContext
 from .state_store import (
@@ -12,6 +12,7 @@ from .state_store import (
     FILE_INTENT_STATE_ORDER,
     TX_EVENT_TYPES,
     StateStore,
+    now_iso,
 )
 
 
@@ -145,7 +146,12 @@ class StateRebuilder:
             "schema_version": "0.4.0",
             "active_tx": self._init_active_tx("", "", "planned", "none"),
             "last_applied_seq": 0,
-            "integrity": {"state_hash": "", "rebuilt_from_seq": 0},
+            "integrity": {
+                "state_hash": "",
+                "rebuilt_from_seq": 0,
+                "drift_detected": False,
+                "active_tx_source": "none",
+            },
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -580,7 +586,78 @@ class StateRebuilder:
             return False
         if state.get("last_applied_seq") < integrity.get("rebuilt_from_seq"):
             return False
+        active_tx = state.get("active_tx")
+        if not isinstance(active_tx, dict):
+            return False
+        active_tx_id = active_tx.get("tx_id")
+        active_status = active_tx.get("status")
+        if not isinstance(active_tx_id, str) or not active_tx_id.strip():
+            return False
+        if not isinstance(active_status, str) or not active_status.strip():
+            return False
+        if active_tx_id == "none":
+            if state.get("last_applied_seq") != 0:
+                return False
+            if active_status != "planned":
+                return False
         return integrity.get("state_hash") == self._compute_state_hash(state)
+
+    def _record_rebuild_drift_error(
+        self,
+        *,
+        resolved_event_log: Path,
+        last_valid_seq: int,
+        invalid_reason: str,
+        invalid_event: Optional[Dict[str, Any]],
+        terminal_tx_ids: Set[str],
+        last_seen_event_by_tx: Dict[str, int],
+        begin_seq_by_tx: Dict[str, int],
+        last_session_by_tx: Dict[str, str],
+        tx_states: Dict[str, Dict[str, Any]],
+        selected_active_tx: Optional[Dict[str, Any]],
+        drift_reason: str,
+    ) -> Dict[str, Any]:
+        observed_mismatch = {
+            "drift_reason": drift_reason,
+            "event_log_path": str(resolved_event_log),
+            "last_applied_seq": last_valid_seq,
+            "active_tx_id": (
+                selected_active_tx.get("tx_id")
+                if isinstance(selected_active_tx, dict)
+                else "none"
+            ),
+            "active_ticket_id": (
+                selected_active_tx.get("ticket_id")
+                if isinstance(selected_active_tx, dict)
+                else "none"
+            ),
+            "terminal_tx_ids": sorted(terminal_tx_ids),
+            "known_tx_ids": sorted(
+                tx_id for tx_id in tx_states.keys() if isinstance(tx_id, str)
+            ),
+            "last_seen_event_by_tx": dict(sorted(last_seen_event_by_tx.items())),
+            "begin_seq_by_tx": dict(sorted(begin_seq_by_tx.items())),
+            "last_session_by_tx": dict(sorted(last_session_by_tx.items())),
+        }
+        if invalid_reason:
+            observed_mismatch["invalid_reason"] = invalid_reason
+        if isinstance(invalid_event, dict):
+            observed_mismatch["invalid_event"] = invalid_event
+
+        self.state_store.log_tool_error(
+            tool_name="rebuild_tx_state",
+            tool_input={
+                "start_seq": 0,
+                "end_seq": None,
+                "event_log_path": str(resolved_event_log),
+            },
+            tool_output={
+                "error": drift_reason,
+                "ts": now_iso(),
+                "observed_mismatch": observed_mismatch,
+            },
+        )
+        return observed_mismatch
 
     def rebuild_tx_state(
         self,
@@ -669,11 +746,15 @@ class StateRebuilder:
 
         tx_states: Dict[str, Dict[str, Any]] = {}
         tx_contexts: Dict[str, Dict[str, Any]] = {}
-        applied_event_ids: set[str] = set()
+        applied_event_ids: Set[str] = set()
         dropped_events = 0
         last_valid_seq = replay_start
         invalid_reason = ""
         invalid_event: Optional[Dict[str, Any]] = None
+        last_seen_event_by_tx: Dict[str, int] = {}
+        begin_seq_by_tx: Dict[str, int] = {}
+        last_session_by_tx: Dict[str, str] = {}
+        terminal_tx_ids: Set[str] = set()
 
         for event in events:
             if not isinstance(event, dict):
@@ -726,13 +807,26 @@ class StateRebuilder:
                 break
 
             self._apply_tx_event_to_state(active_tx, event)
-            if isinstance(event.get("seq"), int):
-                active_tx["_last_event_seq"] = event.get("seq")
-                last_valid_seq = event.get("seq")
+            seq_value = event.get("seq") if isinstance(event.get("seq"), int) else None
+            if seq_value is not None:
+                active_tx["_last_event_seq"] = seq_value
+                last_valid_seq = seq_value
+                if isinstance(tx_id, str) and tx_id:
+                    last_seen_event_by_tx[tx_id] = seq_value
+                    if event_type == "tx.begin":
+                        begin_seq_by_tx[tx_id] = seq_value
+            if (
+                isinstance(event.get("session_id"), str)
+                and event.get("session_id").strip()
+            ):
+                if isinstance(tx_id, str) and tx_id:
+                    last_session_by_tx[tx_id] = event.get("session_id").strip()
             if isinstance(event.get("event_type"), str) and event.get(
                 "event_type"
             ).startswith("tx.end."):
                 active_tx["_terminal"] = True
+                if isinstance(tx_id, str) and tx_id:
+                    terminal_tx_ids.add(tx_id)
             tx_states[tx_id] = active_tx
             if isinstance(event_id, str):
                 applied_event_ids.add(event_id)
@@ -745,6 +839,10 @@ class StateRebuilder:
                 if isinstance(invalid_tx_id, str) and invalid_tx_id in tx_states:
                     tx_states.pop(invalid_tx_id, None)
                     tx_contexts.pop(invalid_tx_id, None)
+                    last_seen_event_by_tx.pop(invalid_tx_id, None)
+                    begin_seq_by_tx.pop(invalid_tx_id, None)
+                    last_session_by_tx.pop(invalid_tx_id, None)
+                    terminal_tx_ids.discard(invalid_tx_id)
                 state["rebuild_invalid_event"] = invalid_event
                 if isinstance(invalid_event.get("seq"), int):
                     state["rebuild_invalid_seq"] = invalid_event.get("seq")
@@ -753,10 +851,25 @@ class StateRebuilder:
             for tx in tx_states.values()
             if isinstance(tx, dict) and not tx.get("_terminal")
         ]
+
+        selected_active_tx: Optional[Dict[str, Any]] = None
+        active_tx_source = "none"
+        drift_detected = False
+        drift_reason = ""
+
         if candidates:
-            active_tx = max(
-                candidates, key=lambda item: item.get("_last_event_seq", -1)
+            selected_active_tx = max(
+                candidates,
+                key=lambda item: (
+                    item.get("_last_event_seq", -1),
+                    begin_seq_by_tx.get(item.get("tx_id"), -1),
+                    item.get("tx_id", ""),
+                ),
             )
+            active_tx_source = "active_candidate"
+
+        if selected_active_tx is not None:
+            active_tx = json.loads(json.dumps(selected_active_tx, ensure_ascii=False))
             active_tx.pop("_last_event_seq", None)
             active_tx.pop("_terminal", None)
             if not active_tx.get("semantic_summary"):
@@ -770,8 +883,46 @@ class StateRebuilder:
                 state["active_tx"]
             )
 
+        if invalid_reason:
+            drift_detected = True
+            drift_reason = invalid_reason
+        elif last_valid_seq > 0 and not candidates and terminal_tx_ids:
+            drift_detected = True
+            drift_reason = (
+                "no active transaction materialized despite canonical events up to a "
+                "terminal boundary"
+            )
+        elif (
+            selected_active_tx is not None
+            and selected_active_tx.get("_last_event_seq") != last_valid_seq
+        ):
+            drift_detected = True
+            drift_reason = (
+                "selected active transaction does not match the latest canonical event "
+                "sequence"
+            )
+
+        if drift_detected:
+            state["rebuild_warning"] = drift_reason
+            state["rebuild_invalid_seq"] = last_valid_seq
+            state["rebuild_observed_mismatch"] = self._record_rebuild_drift_error(
+                resolved_event_log=resolved_event_log,
+                last_valid_seq=last_valid_seq,
+                invalid_reason=invalid_reason,
+                invalid_event=invalid_event,
+                terminal_tx_ids=terminal_tx_ids,
+                last_seen_event_by_tx=last_seen_event_by_tx,
+                begin_seq_by_tx=begin_seq_by_tx,
+                last_session_by_tx=last_session_by_tx,
+                tx_states=tx_states,
+                selected_active_tx=selected_active_tx,
+                drift_reason=drift_reason,
+            )
+
         state["last_applied_seq"] = last_valid_seq
         state["integrity"]["rebuilt_from_seq"] = last_valid_seq
+        state["integrity"]["drift_detected"] = drift_detected
+        state["integrity"]["active_tx_source"] = active_tx_source
         state["updated_at"] = datetime.now(timezone.utc).isoformat()
         state["integrity"]["state_hash"] = self._compute_state_hash(state)
 
