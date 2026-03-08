@@ -34,7 +34,7 @@
       "id": "p4-t05",
       "priority": "P1",
       "title": "Add regression coverage for invalid transaction flows and integrity enforcement",
-      "status": "verified",
+      "status": "done",
       "file": "v0.4.13/p4-t05.json"
     }
   ]

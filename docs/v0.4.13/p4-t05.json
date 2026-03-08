@@ -2,7 +2,7 @@
   "id": "p4-t05",
   "title": "Add regression coverage for invalid transaction flows and integrity enforcement",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Add regression coverage for the v0.4.13 transaction state machine hardening work so specification-violating transaction flows are detected early, rejected deterministically, and logged with actionable integrity diagnostics. The checks should lock the intended behavior for lifecycle ordering, resume semantics, verify/commit sequencing, rebuild integrity, and event/state synchronization across the canonical transaction workflow.",
   "inputs": [
     "docs/draft_0.4.13.md",
