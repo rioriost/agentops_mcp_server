@@ -66,7 +66,7 @@ zed-agentops-init.sh --update my_project
 
 Zed の設定に MCP サーバーを追加してください。
 
-例:
+最小構成の MCP サーバー設定例:
 
 ```json
 {
@@ -80,7 +80,80 @@ Zed の設定に MCP サーバーを追加してください。
 }
 ```
 
-その後、必要に応じて Zed 側でツール権限を設定してください。
+加えて、Agent Panel でよく使う AgentOps ツールをあらかじめ許可したい場合は、`settings.json` の権限設定に次のような項目を含められます。
+
+```json
+{
+  "terminal": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:workspace_initialize": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:tx_event_append": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:tx_state_save": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:tx_state_rebuild": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:session_capture_context": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:repo_verify": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:repo_commit": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:repo_status_summary": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:repo_commit_message_suggest": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:tests_suggest": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:tests_suggest_from_failures": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:commit_if_verified": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_compact_context": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_handoff_export": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_resume_brief": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_start_task": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_update_task": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_end_task": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_capture_state": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_task_summary": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_observability_summary": {
+    "default": "allow"
+  }
+}
+```
+
+権限設定は、必要に応じてご自身のセキュリティ方針に合わせて調整してください。
 
 ## 基本的な使い方
 

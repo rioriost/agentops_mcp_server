@@ -65,7 +65,7 @@ It also:
 
 Add the MCP server to your Zed settings.
 
-Example:
+Minimal MCP server example:
 
 ```json
 {
@@ -79,7 +79,80 @@ Example:
 }
 ```
 
-You can then grant tool permissions in Zed according to your preferences.
+If you also want to pre-allow commonly used AgentOps tools in the Agent Panel, your `settings.json` can include entries like this under your tool permissions:
+
+```json
+{
+  "terminal": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:workspace_initialize": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:tx_event_append": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:tx_state_save": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:tx_state_rebuild": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:session_capture_context": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:repo_verify": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:repo_commit": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:repo_status_summary": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:repo_commit_message_suggest": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:tests_suggest": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:tests_suggest_from_failures": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:commit_if_verified": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_compact_context": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_handoff_export": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_resume_brief": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_start_task": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_update_task": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_end_task": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_capture_state": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_task_summary": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_observability_summary": {
+    "default": "allow"
+  }
+}
+```
+
+Adjust permissions to match your own security preferences.
 
 ## Typical usage flow
 
