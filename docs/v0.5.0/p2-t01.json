@@ -2,7 +2,7 @@
   "id": "p2-t01",
   "title": "Align lifecycle APIs with the documented status machine",
   "priority": "P1",
-  "status": "planned",
+  "status": "verified",
   "summary": "Implement the Phase 3 work for v0.5.0 so the client-facing lifecycle API matches the documented workflow status machine more explicitly. The goal is to remove ambiguity between task helpers and canonical transaction progression by making start, update, verify, commit, and terminal completion behave as a coherent lifecycle contract that clients can follow safely under the 0.5.0 rules.",
   "inputs": [
     "docs/draft_0.5.0.md",
@@ -41,11 +41,7 @@
     "Update helper documentation, code comments, and any operator-facing descriptions needed to explain the canonical lifecycle contract.",
     "Add or extend regression coverage for valid lifecycle progression, invalid intermediate transitions, and synchronization between lifecycle helpers and canonical transaction state."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02",
-    "p1-t03"
-  ],
+  "dependencies": ["p1-t01", "p1-t02", "p1-t03"],
   "notes": [
     "This ticket addresses the draft finding that the task lifecycle tools do not yet fully model the rules' explicit status machine.",
     "The implementation should remove client ambiguity without weakening the transaction/event invariants established in earlier releases.",

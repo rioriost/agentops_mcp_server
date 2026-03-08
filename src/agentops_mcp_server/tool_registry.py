@@ -197,7 +197,7 @@ def build_tool_registry(
             "handler": ops_resume_brief,
         },
         "ops_start_task": {
-            "description": "Record task start",
+            "description": "Record lifecycle start as a wrapper over canonical transaction state",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -212,7 +212,7 @@ def build_tool_registry(
             "handler": ops_start_task,
         },
         "ops_update_task": {
-            "description": "Record task update",
+            "description": "Record lifecycle progress as a wrapper over canonical transaction state",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -228,7 +228,7 @@ def build_tool_registry(
             "handler": ops_update_task,
         },
         "ops_end_task": {
-            "description": "Record task end",
+            "description": "Record terminal lifecycle outcome as a wrapper over canonical transaction state",
             "input_schema": {
                 "type": "object",
                 "properties": {
