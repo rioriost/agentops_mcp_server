@@ -1,5 +1,6 @@
 import json
 import subprocess
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -321,6 +322,57 @@ def test_repo_commit_verify_failure_raises():
         RuntimeError, match="verify.start not recorded; tx_state missing"
     ):
         manager.repo_commit(run_verify=True)
+
+
+def test_commit_if_verified_logs_verify_failure_diagnostics(tmp_path, monkeypatch):
+    def test_commit_if_verified_synchronizes_verify_start_state(tmp_path, monkeypatch):
+        repo_context = RepoContext(tmp_path)
+        state_store = StateStore(repo_context)
+        state_rebuilder = StateRebuilder(repo_context, state_store)
+        state_store.tx_event_append(
+            tx_id="tx-1",
+            ticket_id="p4-t3",
+            event_type="tx.begin",
+            phase="in-progress",
+            step_id="commit",
+            actor={"tool": "test"},
+            session_id="s1",
+            payload={"ticket_id": "p4-t3", "ticket_title": "p4-t3"},
+        )
+        rebuild = state_rebuilder.rebuild_tx_state()
+        state_store.tx_state_save(rebuild["state"])
+        _write_tx_state(state_store, verify_state_status="running")
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner(
+            {"ok": False, "returncode": 1, "stderr": "nope", "stdout": ""}
+        ),
+        state_store,
+        state_rebuilder,
+    )
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: None)
+
+    with pytest.raises(RuntimeError, match="verify failed"):
+        manager.commit_if_verified("message", timeout_sec=5)
+
+    errors = [
+        json.loads(line)
+        for line in repo_context.errors.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert errors
+    last_error = errors[-1]
+    assert last_error["tool_name"] == "repo_verify"
+    assert last_error["tool_output"]["error"] == "nope"
+    assert last_error["tool_output"]["diagnostics"]["validation_point"] == "repo_verify"
+    assert (
+        last_error["tool_output"]["diagnostics"]["active_tx_context"]["tx_id"] == "tx-1"
+    )
+    assert (
+        last_error["tool_output"]["diagnostics"]["session_context"]["active_session_id"]
+        == "s1"
+    )
 
 
 def test_commit_if_verified_synchronizes_verify_start_state(tmp_path, monkeypatch):

@@ -2,7 +2,7 @@
   "id": "p3-t05",
   "title": "Add regression coverage for tx state synchronization and guard consistency",
   "priority": "P1",
-  "status": "planned",
+  "status": "verified",
   "summary": "Add regression coverage for the v0.4.12 canonical synchronization fix so the event log, materialized transaction state, rebuild behavior, and guarded workflow operations remain consistent. The checks should reproduce the mismatch patterns observed during the 0.4.11 analysis and prevent future regressions in task lifecycle, verify, commit, rebuild, capture, and structured error logging behavior.",
   "inputs": [
     "docs/draft_0.4.12.md",
@@ -41,11 +41,7 @@
     "Add or extend tests for structured synchronization failure logging in .agent/errors.jsonl.",
     "Run verification and confirm the v0.4.12 synchronization contract is protected by automated checks."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p2-t02",
-    "p2-t03"
-  ],
+  "dependencies": ["p1-t01", "p2-t02", "p2-t03"],
   "notes": [
     "Keep the checks focused on canonical synchronization behavior rather than weakening workflow guards.",
     "Prefer tests that lock the intended interaction between tx_event_log, tx_state, rebuild, and guard enforcement directly.",

@@ -115,6 +115,23 @@ def test_ops_start_task_rejects_mismatched_task_id(
         ops.ops_start_task(title="Build", task_id="t-2", session_id="s1")
 
 
+def test_ops_start_task_mismatch_error_includes_recovery_guidance(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: active_tx=t-1, requested_task=t-2, "
+            "active_ticket=t-1, status=in-progress, next_action=tx.verify.start. "
+            "Resume or complete the active transaction before starting a new ticket."
+        ),
+    ):
+        ops.ops_start_task(title="Build", task_id="t-2", session_id="s1")
+
+
 def test_ops_start_task_records_step_after_prior_tx_begin(
     repo_context, state_store, state_rebuilder
 ):
@@ -213,6 +230,28 @@ def test_ops_update_task_rejects_mismatched_task_id(
         )
 
 
+def test_ops_update_task_mismatch_error_includes_recovery_guidance(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: active_tx=t-1, requested_tx=t-2, "
+            "active_ticket=t-1, status=in-progress, next_action=tx.verify.start. "
+            "Resume or complete the active transaction before starting a new ticket."
+        ),
+    ):
+        ops.ops_update_task(
+            status="checking",
+            note="step",
+            task_id="t-2",
+            session_id="s1",
+        )
+
+
 def test_ops_resume_brief_reports_active_transaction_guidance(
     repo_context, state_store, state_rebuilder
 ):
@@ -277,6 +316,23 @@ def test_ops_end_task_requires_prior_tx_begin(
 
     with pytest.raises(ValueError, match="tx.begin required before other events"):
         ops.ops_end_task(summary="done", session_id="s1")
+
+
+def test_ops_end_task_mismatch_error_includes_recovery_guidance(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: active_tx=t-1, requested_tx=t-2, "
+            "active_ticket=t-1, status=in-progress, next_action=tx.verify.start. "
+            "Resume or complete the active transaction before starting a new ticket."
+        ),
+    ):
+        ops.ops_end_task(summary="done", task_id="t-2", session_id="s1")
 
 
 def test_ops_end_task_requires_session_id(repo_context, state_store, state_rebuilder):

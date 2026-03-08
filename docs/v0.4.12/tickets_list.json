@@ -34,7 +34,7 @@
       "id": "p3-t05",
       "priority": "P1",
       "title": "Add regression coverage for tx state synchronization and guard consistency",
-      "status": "planned",
+      "status": "verified",
       "file": "v0.4.12/p3-t05.json"
     }
   ]
