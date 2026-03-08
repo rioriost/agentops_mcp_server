@@ -2,8 +2,8 @@
   "id": "p2-t03",
   "title": "Align .rules and zed-agentops-init.sh with startup contract",
   "priority": "P1",
-  "status": "planned",
-  "summary": "Update the rule template and initialization script so the generated startup guidance and initialized artifacts match the zero-event baseline contract used by runtime code.",
+  "status": "done",
+  "summary": "The checked-in `.rules` file and the rule template embedded in `zed-agentops-init.sh` now align with the documented zero-event startup contract: an empty canonical event log is a valid initialized baseline, derived handoff state remains secondary, and strict transaction ordering is preserved while still allowing the first planning task to bootstrap correctly through `tx.begin`.",
   "inputs": [
     "docs/draft.md",
     "docs/v0.4.8/plan.md",
@@ -29,13 +29,14 @@
     "Verify that initialization behavior for canonical and derived .agent artifacts matches runtime expectations.",
     "Add or update tests that lock the alignment between script content, rule content, and startup contract language."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p2-t02"
-  ],
+  "dependencies": ["p1-t01", "p2-t02"],
   "notes": [
     "Do not weaken strict transaction ordering globally; only clarify and align bootstrap behavior for the initial baseline.",
     "Treat .agent/handoff.json as derived-only and keep canonical transaction files as the source of truth.",
-    "Keep the script and rule text concise, explicit, and stable enough for automated planning and resume flows."
+    "Keep the script and rule text concise, explicit, and stable enough for automated planning and resume flows.",
+    "Alignment result: both the checked-in `.rules` file and the `zed-agentops-init.sh` template explicitly describe the restore order, the derived-only status of `.agent/handoff.json`, and the rule that a present-but-empty `.agent/tx_event_log.jsonl` is a valid initialized zero-event baseline.",
+    "Alignment result: the generated rule text preserves the strict ordering invariant that `tx.begin` must precede later lifecycle events, while the startup contract remains compatible with the runtime bootstrap behavior documented in p1-t01 and p2-t02.",
+    "Initialization alignment: the script defines canonical artifacts for `.agent/tx_event_log.jsonl` and `.agent/tx_state.json`, and derived artifacts for `.agent/handoff.json` and `.agent/observability_summary.json`, matching the intended startup contract.",
+    "Regression alignment: script-content expectations in `tests/test_init.py` already assert the canonical artifact set, derived handoff guidance, and key startup-ordering language, which locks the documented contract to the packaged initialization template."
   ]
 }
