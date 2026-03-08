@@ -1,0 +1,48 @@
+{
+  "id": "p2-t02",
+  "title": "Implement canonical event-to-state synchronization for transaction progression",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Implement the Phase 2 runtime changes for v0.4.12 so canonical transaction events and materialized transaction state stay synchronized throughout execution. The work should ensure that event append, tx_state updates, and guarded workflow behavior remain aligned for tx.begin, verify, commit, and terminal transitions, preventing valid follow-up operations from failing against stale or incomplete state.",
+  "inputs": [
+    "docs/draft_0.4.12.md",
+    "docs/v0.4.12/plan.md",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/repo_context.py",
+    ".agent/errors.jsonl",
+    ".agent/tx_event_log.jsonl",
+    ".agent/tx_state.json",
+    ".agent/tx_state.pre-rebuild-backup.json"
+  ],
+  "outputs": [
+    "Runtime implementation that keeps tx_event_log and tx_state synchronized for canonical transaction transitions",
+    "Guard behavior that evaluates a consistent active transaction and verify/commit state",
+    "Clearer integrity handling for event append success followed by state update failure"
+  ],
+  "acceptance_criteria": [
+    "After tx.begin is emitted, subsequent task lifecycle operations recognize the same transaction as active without requiring manual recovery.",
+    "After verify events are emitted successfully, commit gating recognizes the transaction as verified from synchronized canonical state.",
+    "Canonical event append and tx_state persistence remain coupled strongly enough that later guarded operations do not observe stale lifecycle state.",
+    "The implementation prevents silent drift where last_applied_seq appears current but active_tx content reflects an older or empty state.",
+    "Integrity failures are surfaced explicitly when canonical event progression cannot be materialized into tx_state."
+  ],
+  "tasks": [
+    "Review the current event append, state save, rebuild, and guard paths to identify where canonical state synchronization can be lost.",
+    "Implement synchronization changes so tx.begin, verify, commit, and terminal events materialize the expected tx_state before downstream guarded operations run.",
+    "Tighten integrity handling so event-log progress cannot silently outpace the persisted active transaction state.",
+    "Ensure task lifecycle tools, verify helpers, and commit helpers interpret the same active transaction and lifecycle position.",
+    "Document any required implementation constraints in code comments or helper boundaries where synchronization sequencing is critical."
+  ],
+  "dependencies": [
+    "p1-t01"
+  ],
+  "notes": [
+    "This ticket is the implementation counterpart to the Phase 1 contract for canonical synchronization.",
+    "Do not weaken workflow guards to mask synchronization bugs; fix the underlying state progression instead.",
+    "Treat event append and tx_state persistence as one canonical progression path wherever possible.",
+    "Use the observed 0.4.11 failure patterns as concrete guidance for what must no longer be possible after this ticket."
+  ]
+}

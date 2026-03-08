@@ -1,0 +1,54 @@
+{
+  "id": "p3-t05",
+  "title": "Add regression coverage for tx state synchronization and guard consistency",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Add regression coverage for the v0.4.12 canonical synchronization fix so the event log, materialized transaction state, rebuild behavior, and guarded workflow operations remain consistent. The checks should reproduce the mismatch patterns observed during the 0.4.11 analysis and prevent future regressions in task lifecycle, verify, commit, rebuild, capture, and structured error logging behavior.",
+  "inputs": [
+    "docs/draft_0.4.12.md",
+    "docs/v0.4.12/plan.md",
+    "docs/v0.4.12/p1-t01.json",
+    "docs/v0.4.12/p2-t02.json",
+    "docs/v0.4.12/p2-t03.json",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/state_store.py",
+    "tests/test_commit_manager.py",
+    "tests/test_ops_tools.py",
+    "tests/test_state_rebuilder.py",
+    "tests/test_state_store.py"
+  ],
+  "outputs": [
+    "Regression checks for event-log and tx-state synchronization",
+    "Regression checks for guarded workflow consistency across begin, verify, commit, rebuild, and end transitions",
+    "Verification evidence that v0.4.12 synchronization fixes remain enforced"
+  ],
+  "acceptance_criteria": [
+    "Tests cover a transaction with tx.begin in the event log being recognized as active by subsequent task lifecycle operations.",
+    "Tests cover successful verify events being recognized by commit gating through synchronized canonical state.",
+    "Tests cover rebuild materializing the latest active transaction correctly after tx.end.done or tx.end.blocked followed by a newer tx.begin.",
+    "Tests cover rejection or explicit integrity signaling when event progression and tx_state persistence drift apart.",
+    "Tests cover last_applied_seq and active transaction content remaining consistent with the latest applied canonical events.",
+    "Tests cover structured error logging for synchronization or workflow guard failures strongly enough to diagnose root cause from .agent artifacts.",
+    "Repository verification passes with the new regression coverage in place."
+  ],
+  "tasks": [
+    "Identify the existing test modules that should own synchronization, rebuild, guard, capture, and error-logging coverage.",
+    "Add or extend tests that reproduce the observed begin, verify, and commit mismatch failure modes from the 0.4.11 analysis.",
+    "Add or extend tests for rebuild behavior so the latest active transaction is materialized correctly from the event log.",
+    "Add or extend tests that assert synchronized state requirements for guarded task lifecycle, verify, and commit operations.",
+    "Add or extend tests for structured synchronization failure logging in .agent/errors.jsonl.",
+    "Run verification and confirm the v0.4.12 synchronization contract is protected by automated checks."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p2-t02",
+    "p2-t03"
+  ],
+  "notes": [
+    "Keep the checks focused on canonical synchronization behavior rather than weakening workflow guards.",
+    "Prefer tests that lock the intended interaction between tx_event_log, tx_state, rebuild, and guard enforcement directly.",
+    "Use this ticket to prevent recurrence of the specific mismatch patterns observed while completing v0.4.11 work."
+  ]
+}

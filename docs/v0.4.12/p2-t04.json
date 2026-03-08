@@ -1,0 +1,56 @@
+{
+  "id": "p2-t04",
+  "title": "Improve synchronization failure diagnostics and structured error logging",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Improve the 0.4.12 observability path so synchronization failures between `.agent/tx_event_log.jsonl` and `.agent/tx_state.json` become directly diagnosable. This ticket focuses on making guard-triggered failures, integrity mismatches, and state-materialization problems produce structured diagnostics that clearly describe the expected transaction state, the observed transaction state, the relevant event sequence, and the active transaction context.",
+  "inputs": [
+    "docs/draft_0.4.12.md",
+    "docs/v0.4.12/plan.md",
+    "docs/v0.4.12/p1-t01.json",
+    "docs/v0.4.12/p2-t02.json",
+    "docs/v0.4.12/p2-t03.json",
+    ".agent/errors.jsonl",
+    ".agent/tx_event_log.jsonl",
+    ".agent/tx_state.json",
+    ".agent/tx_state.pre-rebuild-backup.json",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "tests/test_state_store.py",
+    "tests/test_state_rebuilder.py",
+    "tests/test_ops_tools.py",
+    "tests/test_commit_manager.py"
+  ],
+  "outputs": [
+    "Structured diagnostics for synchronization and integrity failures",
+    "Clearer `.agent/errors.jsonl` records for guard-triggered failures tied to tx-state drift",
+    "Implementation guidance and regression coverage for synchronization observability"
+  ],
+  "acceptance_criteria": [
+    "Synchronization failures record enough structured context to identify expected state, observed state, relevant event sequence, active ticket id, and session context.",
+    "Guard-triggered failures caused by event-log / tx-state drift are logged distinctly enough to separate true sequencing violations from stale-state or rebuild problems.",
+    "Diagnostics make clear whether the failure occurred during event append, tx-state materialization, rebuild, capture, task lifecycle handling, verification, or commit gating.",
+    "The logging behavior remains compatible with resumability and does not replace canonical state with best-effort diagnostic state.",
+    "Regression tests cover synchronization failure logging strongly enough to prevent future loss of actionable diagnostic context."
+  ],
+  "tasks": [
+    "Review the current `.agent/errors.jsonl` behavior and identify which synchronization and guard failure paths lack actionable structured detail.",
+    "Define the required diagnostic fields for synchronization failures, including expected state, observed state, event sequence, active transaction context, and validation point.",
+    "Update error-reporting paths so synchronization and integrity failures are recorded consistently across rebuild, capture, task lifecycle, verify, and commit flows.",
+    "Ensure downstream guard errors preserve enough context to distinguish stale-state mismatches from real workflow-order violations.",
+    "Add or extend regression tests that lock the required `.agent/errors.jsonl` structure and synchronization failure observability."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p2-t02",
+    "p2-t03"
+  ],
+  "notes": [
+    "This ticket is focused on observability and diagnostics, not on weakening strict workflow guard behavior.",
+    "Prefer explicit structured mismatch reporting over ambiguous downstream error strings with missing transaction context.",
+    "Keep `.agent/errors.jsonl` as a diagnostic artifact and preserve `.agent/tx_event_log.jsonl` plus `.agent/tx_state.json` as the canonical sources of truth.",
+    "Coordinate closely with the synchronization and rebuild fixes so the resulting diagnostics reflect the final canonical transaction model."
+  ]
+}

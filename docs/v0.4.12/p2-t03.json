@@ -1,0 +1,52 @@
+{
+  "id": "p2-t03",
+  "title": "Harden rebuild logic and synchronization failure observability",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Fix the rebuild and diagnostic paths so the materialized transaction state remains consistent with the canonical event log and synchronization failures become directly diagnosable. This ticket focuses on correctly selecting the active transaction during rebuild, preventing misleading last_applied_seq state snapshots, and improving structured error reporting for guard failures tied to event-log / tx-state drift.",
+  "inputs": [
+    "docs/draft_0.4.12.md",
+    "docs/v0.4.12/plan.md",
+    "docs/v0.4.12/p1-t01.json",
+    "docs/v0.4.12/p2-t02.json",
+    ".agent/errors.jsonl",
+    ".agent/tx_event_log.jsonl",
+    ".agent/tx_state.json",
+    ".agent/tx_state.pre-rebuild-backup.json",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "tests/test_state_rebuilder.py",
+    "tests/test_state_store.py",
+    "tests/test_ops_tools.py"
+  ],
+  "outputs": [
+    "Rebuild logic that materializes the latest active transaction consistently from the canonical event log",
+    "Improved synchronization and integrity diagnostics for tx-state / event-log drift",
+    "Structured error reporting and regression coverage for rebuild and observability failure modes"
+  ],
+  "acceptance_criteria": [
+    "Rebuild logic correctly materializes the latest active transaction when tx.end.done or tx.end.blocked is followed by a later tx.begin.",
+    "The system does not write or preserve a tx_state snapshot whose last_applied_seq appears current while active_tx content is stale, empty, or inconsistent with the latest canonical events.",
+    "Synchronization and integrity failures produce clear structured diagnostics that identify the relevant event sequence, active transaction context, and observed mismatch.",
+    "Guard-triggered failures tied to event-log / tx-state drift are recorded in .agent/errors.jsonl with enough context to support root-cause diagnosis.",
+    "Regression tests cover stale active transaction rebuilds, incorrect no-active-transaction fallback, and synchronization observability for the observed failure modes."
+  ],
+  "tasks": [
+    "Review state_rebuilder and related state materialization paths to identify how active transaction selection can drift from the latest canonical event sequence.",
+    "Fix rebuild handling for terminal events followed by a later tx.begin so the later transaction becomes active reliably.",
+    "Tighten integrity handling so last_applied_seq cannot advance without active_tx and related lifecycle state being updated consistently.",
+    "Improve synchronization failure diagnostics and structured error logging for rebuild, capture, and guard-failure paths.",
+    "Add or extend regression tests covering rebuild correctness, active transaction handoff, and synchronization observability."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p2-t02"
+  ],
+  "notes": [
+    "This ticket is focused on rebuild correctness and observability, not on relaxing workflow guards.",
+    "Prefer explicit integrity failures over silent fallback to a default no-active-transaction state when canonical events indicate an active transaction should exist.",
+    "Coordinate error-reporting changes with existing .agent/errors.jsonl behavior so failures remain structured and resumable.",
+    "Keep active transaction selection deterministic even when multiple session identifiers appear in the canonical event log."
+  ]
+}

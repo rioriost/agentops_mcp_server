@@ -1,0 +1,46 @@
+{
+  "id": "p1-t01",
+  "title": "Define the canonical tx-state synchronization contract",
+  "priority": "P1",
+  "status": "done",
+  "summary": "Define the v0.4.12 phase 1 contract that makes canonical synchronization between `.agent/tx_event_log.jsonl` and `.agent/tx_state.json` explicit and mandatory. The contract must state that materialized transaction state is updated immediately after each canonical transaction event, that guarded workflow operations depend on that synchronized state, and that rebuild and resume logic must materialize the latest active transaction deterministically.",
+  "inputs": [
+    "docs/draft_0.4.12.md",
+    "docs/v0.4.12/plan.md",
+    ".agent/errors.jsonl",
+    ".agent/tx_event_log.jsonl",
+    ".agent/tx_state.json",
+    ".agent/tx_state.pre-rebuild-backup.json",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py"
+  ],
+  "outputs": [
+    "Documented contract for mandatory synchronization between canonical event log and materialized transaction state",
+    "Defined expectations for guarded workflow operations to observe one consistent active transaction context",
+    "Defined active-transaction materialization and rebuild expectations for resume-safe recovery"
+  ],
+  "acceptance_criteria": [
+    "The phase 1 contract explicitly states that canonical event-log progression and materialized tx-state progression must remain synchronized, not best-effort.",
+    "The contract defines that each canonical transaction transition must update `.agent/tx_state.json` before downstream guarded operations rely on that transition.",
+    "The contract defines that guarded task, verify, and commit operations must evaluate the same canonical transaction context rather than diverging by component.",
+    "The contract defines that rebuild and resume logic must materialize the most recent active transaction from the event log, including `tx.end.*` followed by a later `tx.begin`.",
+    "The contract makes clear that synchronization failures are integrity failures that must be surfaced explicitly rather than deferred into later ambiguous guard errors."
+  ],
+  "tasks": [
+    "Review the observed 0.4.11 failure pattern across `.agent/errors.jsonl`, `.agent/tx_event_log.jsonl`, and `.agent/tx_state.json` to identify the contract gap.",
+    "Define the required synchronization rule between event append, tx-state update, and downstream workflow guards.",
+    "Define the expected relationship between active transaction selection, rebuild behavior, and resume behavior.",
+    "Define how task lifecycle, verification, and commit flows must depend on one synchronized canonical transaction context.",
+    "Document the phase 1 contract in a way that guides later implementation and regression-test tickets."
+  ],
+  "dependencies": [],
+  "notes": [
+    "This is a contract-definition ticket for phase 1, not the implementation ticket.",
+    "Do not weaken guard checks or relax canonical workflow rules as part of this ticket.",
+    "Keep the contract strict enough to prevent silent drift between the event log and materialized tx state.",
+    "Treat rebuild correctness and guarded-operation consistency as part of the same synchronization contract.",
+    "Phase 1 contract established from the observed 0.4.11 mismatch artifacts: event append and tx_state materialization must stay synchronized, guarded workflow helpers must evaluate the same canonical active transaction context, and rebuild/resume must materialize the latest active transaction deterministically."
+  ]
+}

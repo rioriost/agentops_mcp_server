@@ -1,0 +1,41 @@
+{
+  "version": "0.4.12",
+  "source": "draft_0.4.12.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P1",
+      "title": "Define canonical tx state synchronization contract",
+      "status": "done",
+      "file": "v0.4.12/p1-t01.json"
+    },
+    {
+      "id": "p2-t02",
+      "priority": "P1",
+      "title": "Fix event-log and tx-state synchronization across workflow transitions",
+      "status": "planned",
+      "file": "v0.4.12/p2-t02.json"
+    },
+    {
+      "id": "p2-t03",
+      "priority": "P1",
+      "title": "Correct active transaction rebuild and resume selection behavior",
+      "status": "planned",
+      "file": "v0.4.12/p2-t03.json"
+    },
+    {
+      "id": "p2-t04",
+      "priority": "P1",
+      "title": "Improve synchronization failure diagnostics and error logging",
+      "status": "planned",
+      "file": "v0.4.12/p2-t04.json"
+    },
+    {
+      "id": "p3-t05",
+      "priority": "P1",
+      "title": "Add regression coverage for tx state synchronization and guard consistency",
+      "status": "planned",
+      "file": "v0.4.12/p3-t05.json"
+    }
+  ]
+}
