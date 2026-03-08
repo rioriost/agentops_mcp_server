@@ -147,6 +147,10 @@ cat <<'RULES' > "$SOURCE_RULES"
   3) handoff (derived-only, never canonical)
 - Resume decisions must use canonical tx_state + tx_event_log only; handoff is derived.
 - Treat `.agent/handoff.json` as derived-only.
+- Canonical transaction log handling:
+  - missing `.agent/tx_event_log.jsonl` means the workspace is uninitialized or damaged
+  - present-but-empty `.agent/tx_event_log.jsonl` is a valid initialized zero-event baseline equivalent to `zed-agentops-init.sh`
+  - malformed or non-parseable log content remains a strict replay/integrity failure and must not be treated like an empty log
 - If resume state is incomplete:
   - run ops_resume_brief (or equivalent) and emit a short brief
 - Identify active ticket (status != done) and resume it.
@@ -161,6 +165,12 @@ cat <<'RULES' > "$SOURCE_RULES"
 
 ## Work loop (mandatory)
 - Tickets are the only unit of work.
+- Canonical ordering is strict:
+  - `tx.begin` before task lifecycle events
+  - `tx.verify.start` before `tx.verify.pass` or `tx.verify.fail`
+  - `tx.verify.pass` before `tx.file_intent.update` with `state=verified`
+  - file intent updates require a previously registered file intent for the same path
+  - commit operations require a valid verify sequence and existing transaction context
 - For any code change:
   1) Set status -> in-progress (emit tx.begin if new)
   2) Register file intents before mutation
@@ -189,6 +199,19 @@ cat <<'RULES' > "$SOURCE_RULES"
   3) ops_handoff_export (handoff summary)
 
 ## Tooling (mandatory)
+- Prefer MCP tools if available.
+- Required input contracts:
+  - `tx_event_append`
+    - `actor` is required and must be an object
+    - `payload` is required and must be an object
+    - `session_id` is required and must be non-empty
+  - `tx_state_save`
+    - `state` is required and must be a valid transaction state object
+    - do not persist incomplete or invalid transaction snapshots
+  - task lifecycle tools
+    - do not call task start/update/end before `tx.begin`
+  - time lookup
+    - supported `timezone` values are `utc` or `local` only
 - Prefer MCP tools if available.
 - Use:
   - commit_if_verified
@@ -251,14 +274,14 @@ else
     '  "schema_version": "0.4.0",' \
     "  \"updated_at\": \"$tx_state_ts\"," \
     '  "active_tx": {' \
-    '    "tx_id": "",' \
-    '    "ticket_id": "",' \
+    '    "tx_id": "none",' \
+    '    "ticket_id": "none",' \
     '    "status": "planned",' \
     '    "phase": "planned",' \
     '    "current_step": "none",' \
     '    "last_completed_step": "",' \
-    '    "next_action": "",' \
-    '    "semantic_summary": "Initialized transaction state",' \
+    '    "next_action": "tx.begin",' \
+    '    "semantic_summary": "No active transaction.",' \
     '    "user_intent": null,' \
     '    "verify_state": {"status": "not_started", "last_result": null},' \
     '    "commit_state": {"status": "not_started", "last_result": null},' \
