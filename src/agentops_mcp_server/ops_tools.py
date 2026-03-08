@@ -86,6 +86,53 @@ class OpsTools:
         active_tx = state.get("active_tx")
         return active_tx if isinstance(active_tx, dict) else {}
 
+    def _normalize_tx_identifier(self, value: Any) -> str:
+        if not isinstance(value, str):
+            return ""
+        normalized = value.strip()
+        if not normalized or normalized == "none":
+            return ""
+        return normalized
+
+    def _is_terminal_active_tx(self, active_tx: Dict[str, Any]) -> bool:
+        status = active_tx.get("status")
+        phase = active_tx.get("phase")
+        if isinstance(status, str) and status.strip() in {"done", "blocked"}:
+            return True
+        if isinstance(phase, str) and phase.strip() in {"done", "blocked"}:
+            return True
+        if active_tx.get("_terminal") is True:
+            return True
+        return False
+
+    def _active_tx_identity(self, active_tx: Dict[str, Any]) -> Dict[str, str]:
+        tx_id = self._normalize_tx_identifier(active_tx.get("tx_id"))
+        ticket_id = self._normalize_tx_identifier(active_tx.get("ticket_id"))
+        return {
+            "tx_id": tx_id,
+            "ticket_id": ticket_id,
+            "canonical_id": tx_id or ticket_id,
+        }
+
+    def _require_active_tx(
+        self, requested_task_id: Optional[str] = None, *, allow_resume: bool = False
+    ) -> Tuple[Dict[str, Any], str]:
+        active_tx = self._active_tx()
+        identity = self._active_tx_identity(active_tx)
+        canonical_id = identity["canonical_id"]
+        requested_id = self._normalize_tx_identifier(requested_task_id)
+
+        if not canonical_id or self._is_terminal_active_tx(active_tx):
+            raise ValueError("tx.begin required before other events")
+
+        if requested_id and requested_id != canonical_id:
+            raise self._active_tx_mismatch_error(requested_id, active_tx)
+
+        if requested_id and allow_resume:
+            return active_tx, requested_id
+
+        return active_tx, canonical_id
+
     def _extract_last_error(self, verify_state: Any, commit_state: Any) -> str:
         for source in (verify_state, commit_state):
             if not isinstance(source, dict):
@@ -398,15 +445,12 @@ class OpsTools:
             task_id.strip() if isinstance(task_id, str) and task_id.strip() else "task"
         )
         active_tx = self._active_tx()
-        active_tx_id = active_tx.get("tx_id")
-        resolved_task_id = (
-            task_id.strip() if isinstance(task_id, str) and task_id.strip() else ""
-        )
-        if (
-            not isinstance(active_tx_id, str)
-            or not active_tx_id.strip()
-            or active_tx_id.strip() == "none"
-        ):
+        identity = self._active_tx_identity(active_tx)
+        resolved_task_id = self._normalize_tx_identifier(task_id)
+        resolved_tx_id = identity["canonical_id"]
+        terminal_active_tx = self._is_terminal_active_tx(active_tx)
+
+        if not resolved_tx_id or terminal_active_tx:
             if not resolved_task_id:
                 raise ValueError("tx.begin required before other events")
             self._emit_tx_event(
@@ -419,17 +463,14 @@ class OpsTools:
                 session_id=session_id,
                 agent_id=agent_id,
             )
-            active_tx = self._active_tx()
-            active_tx_id = active_tx.get("tx_id")
-        if (
-            not isinstance(active_tx_id, str)
-            or not active_tx_id.strip()
-            or active_tx_id.strip() == "none"
-        ):
-            raise ValueError("tx.begin required before other events")
-        resolved_tx_id = active_tx_id.strip()
-        if resolved_task_id and resolved_task_id != resolved_tx_id:
-            raise self._active_tx_mismatch_error(resolved_task_id, active_tx)
+            active_tx, resolved_tx_id = self._require_active_tx(
+                resolved_task_id, allow_resume=True
+            )
+        else:
+            active_tx, resolved_tx_id = self._require_active_tx(
+                resolved_task_id, allow_resume=True
+            )
+
         self._emit_tx_event(
             event_type="tx.step.enter",
             payload={"step_id": tx_step_id, "description": "task started"},
@@ -463,12 +504,10 @@ class OpsTools:
             raise ValueError("status or note is required")
         event = None
 
-        resolved_task_id = task_id.strip() if isinstance(task_id, str) else ""
+        resolved_task_id = self._normalize_tx_identifier(task_id)
+        active_tx, active_tx_id = self._require_active_tx(resolved_task_id or None)
         if not resolved_task_id:
-            active_tx = self._active_tx()
-            active_tx_id = active_tx.get("tx_id")
-            if isinstance(active_tx_id, str) and active_tx_id.strip():
-                resolved_task_id = active_tx_id.strip()
+            resolved_task_id = active_tx_id
         if resolved_task_id and "task_id" not in payload:
             payload["task_id"] = resolved_task_id
 
@@ -527,12 +566,10 @@ class OpsTools:
             payload["task_id"] = task_id.strip()
         event = None
 
-        resolved_task_id = task_id.strip() if isinstance(task_id, str) else ""
+        resolved_task_id = self._normalize_tx_identifier(task_id)
+        active_tx, active_tx_id = self._require_active_tx(resolved_task_id or None)
         if not resolved_task_id:
-            active_tx = self._active_tx()
-            active_tx_id = active_tx.get("tx_id")
-            if isinstance(active_tx_id, str) and active_tx_id.strip():
-                resolved_task_id = active_tx_id.strip()
+            resolved_task_id = active_tx_id
         if resolved_task_id and "task_id" not in payload:
             payload["task_id"] = resolved_task_id
 

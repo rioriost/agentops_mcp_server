@@ -13,7 +13,7 @@
       "id": "p2-t02",
       "priority": "P1",
       "title": "Implement start/resume separation and transaction transition enforcement",
-      "status": "planned",
+      "status": "verified",
       "file": "v0.4.13/p2-t02.json"
     },
     {

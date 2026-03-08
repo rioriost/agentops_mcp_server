@@ -2,7 +2,7 @@
   "id": "p2-t02",
   "title": "Implement start/resume separation and transaction transition enforcement",
   "priority": "P1",
-  "status": "planned",
+  "status": "verified",
   "summary": "Implement the Phase 2 runtime changes for v0.4.13 so transaction start, resume, and lifecycle progression obey one explicit transaction state machine. The work must prevent duplicate non-terminal begin, ensure resume binds to the existing active transaction instead of creating a new one, and enforce canonical transition preconditions before lifecycle, verify, commit, and terminal events are emitted.",
   "inputs": [
     "docs/draft_0.4.13.md",
@@ -41,9 +41,7 @@
     "Return direct integrity failures when transition preconditions are not met rather than continuing into secondary downstream errors.",
     "Document any helper-level transition constraints needed to keep start/resume and event progression behavior consistent."
   ],
-  "dependencies": [
-    "p1-t01"
-  ],
+  "dependencies": ["p1-t01"],
   "notes": [
     "This ticket focuses on Phase 2 transition enforcement, not on weakening validator behavior.",
     "Treat duplicate non-terminal begin as a specification violation, not as a recoverable convenience path.",

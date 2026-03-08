@@ -1,4 +1,5 @@
 import json
+from typing import Any, Dict
 
 import pytest
 
@@ -51,6 +52,58 @@ def _begin_tx(
         payload={"ticket_id": tx_id, "ticket_title": title},
         state=rebuild["state"],
     )
+
+
+def _set_active_tx(
+    repo_context,
+    *,
+    tx_id: str = "t-1",
+    ticket_id: str = "t-1",
+    status: str = "in-progress",
+    phase: str = "in-progress",
+    current_step: str = "task",
+    session_id: str = "s1",
+) -> Dict[str, Any]:
+    tx_state = {
+        "schema_version": "0.4.0",
+        "active_tx": {
+            "tx_id": tx_id,
+            "ticket_id": ticket_id,
+            "status": status,
+            "phase": phase,
+            "current_step": current_step,
+            "last_completed_step": "",
+            "next_action": "tx.verify.start",
+            "semantic_summary": f"Entered step {current_step}",
+            "user_intent": None,
+            "session_id": session_id,
+            "verify_state": {
+                "status": "not_started",
+                "last_result": None,
+            },
+            "commit_state": {
+                "status": "not_started",
+                "last_result": None,
+            },
+            "file_intents": [],
+            "_last_event_seq": -1,
+            "_terminal": False,
+        },
+        "last_applied_seq": 0,
+        "integrity": {
+            "state_hash": "test-hash",
+            "rebuilt_from_seq": 0,
+            "drift_detected": False,
+            "active_tx_source": "materialized",
+        },
+        "updated_at": "2026-03-08T00:00:00+00:00",
+    }
+    repo_context.tx_state.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return tx_state
 
 
 def test_ops_compact_context_updates_journal(
@@ -159,6 +212,79 @@ def test_ops_start_task_records_step_after_prior_tx_begin(
     assert active_tx["current_step"] == "t-1"
     assert active_tx["session_id"] == "s1"
     assert tx_state["last_applied_seq"] == events[-1]["seq"]
+
+
+def test_ops_start_task_uses_ticket_id_when_tx_id_is_none(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _set_active_tx(
+        repo_context,
+        tx_id="none",
+        ticket_id="t-1",
+        status="in-progress",
+        phase="in-progress",
+        current_step="resume-step",
+        session_id="s1",
+    )
+
+    result = ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert [event["event_type"] for event in events] == ["tx.step.enter"]
+    assert events[0]["tx_id"] == "t-1"
+    assert events[0]["ticket_id"] == "t-1"
+    assert events[0]["payload"]["description"] == "task started"
+
+
+def test_ops_start_task_rejects_mismatch_against_active_ticket_id_when_tx_id_is_none(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _set_active_tx(
+        repo_context,
+        tx_id="none",
+        ticket_id="t-1",
+        status="in-progress",
+        phase="in-progress",
+        current_step="resume-step",
+        session_id="s1",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: active_tx=unknown, requested_task=t-2, "
+            "active_ticket=t-1, status=in-progress, next_action=tx.verify.start. "
+            "Resume or complete the active transaction before starting a new ticket."
+        ),
+    ):
+        ops.ops_start_task(title="Build", task_id="t-2", session_id="s1")
+
+
+def test_ops_update_task_uses_ticket_id_when_tx_id_is_none(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _set_active_tx(
+        repo_context,
+        tx_id="none",
+        ticket_id="t-1",
+        status="checking",
+        phase="checking",
+        current_step="resume-step",
+        session_id="s1",
+    )
+
+    result = ops.ops_update_task(status="checking", note="step", session_id="s1")
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert [event["event_type"] for event in events] == ["tx.step.enter"]
+    assert events[0]["tx_id"] == "t-1"
+    assert events[0]["ticket_id"] == "t-1"
+    assert events[0]["payload"]["description"] == "step"
 
 
 def test_ops_update_task_requires_prior_tx_begin(
@@ -370,6 +496,98 @@ def test_ops_end_task_emits_terminal_event_and_updates_state(
     last_seq = max(event["seq"] for event in events)
     assert tx_state["last_applied_seq"] == last_seq
     assert tx_state["integrity"]["rebuilt_from_seq"] == last_seq
+
+
+def test_ops_end_task_uses_ticket_id_when_tx_id_is_none(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _set_active_tx(
+        repo_context,
+        tx_id="none",
+        ticket_id="t-1",
+        status="checking",
+        phase="checking",
+        current_step="resume-step",
+        session_id="s1",
+    )
+
+    result = ops.ops_end_task(summary="done", task_id="t-1", session_id="s1")
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert [event["event_type"] for event in events] == ["tx.end.done"]
+    assert events[0]["tx_id"] == "t-1"
+    assert events[0]["ticket_id"] == "t-1"
+    assert events[0]["payload"]["summary"] == "done"
+
+
+def test_ops_start_task_restarts_after_terminal_active_tx(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="done",
+        phase="done",
+        current_step="complete",
+        session_id="s1",
+    )
+
+    result = ops.ops_start_task(title="Restart", task_id="t-2", session_id="s1")
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert [event["event_type"] for event in events] == ["tx.begin", "tx.step.enter"]
+    assert events[0]["tx_id"] == "t-2"
+    assert events[0]["ticket_id"] == "t-2"
+    assert events[1]["tx_id"] == "t-2"
+    assert events[1]["payload"]["step_id"] == "t-2"
+
+
+def test_ops_start_task_terminal_active_tx_without_task_id_requires_begin(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="done",
+        phase="done",
+        current_step="complete",
+        session_id="s1",
+    )
+
+    with pytest.raises(ValueError, match="tx.begin required before other events"):
+        ops.ops_start_task(title="Restart", session_id="s1")
+
+
+def test_ops_end_task_rejects_mismatch_against_active_ticket_id_when_tx_id_is_none(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _set_active_tx(
+        repo_context,
+        tx_id="none",
+        ticket_id="t-1",
+        status="checking",
+        phase="checking",
+        current_step="resume-step",
+        session_id="s1",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: active_tx=unknown, requested_task=t-2, "
+            "active_ticket=t-1, status=checking, next_action=tx.verify.start. "
+            "Resume or complete the active transaction before starting a new ticket."
+        ),
+    ):
+        ops.ops_end_task(summary="done", task_id="t-2", session_id="s1")
 
 
 def test_ops_task_summary_emits_journal(repo_context, state_store, state_rebuilder):
