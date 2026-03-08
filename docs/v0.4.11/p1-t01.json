@@ -2,7 +2,7 @@
   "id": "p1-t01",
   "title": "Define ticket status persistence and synchronization contract",
   "priority": "P1",
-  "status": "planned",
+  "status": "verified",
   "summary": "Define the v0.4.11 phase 1 contract that makes ticket status persistence explicitly mandatory. The contract must specify which planning artifacts are updated when ticket status changes, how those persisted statuses relate to runtime transaction state, and how the checked-in `.rules` file stays aligned with the `.rules` template embedded in `zed-agentops-init.sh`.",
   "inputs": [
     "docs/draft.md",
@@ -36,6 +36,7 @@
     "This is a contract-definition ticket for phase 1, not the implementation ticket.",
     "Do not change the ticket status enum as part of this ticket.",
     "Keep the contract strict enough to avoid divergent status persistence across planning artifacts and runtime state.",
-    "Treat script/template alignment as part of the same contract, since newly initialized projects must receive the same persistence rules."
+    "Treat script/template alignment as part of the same contract, since newly initialized projects must receive the same persistence rules.",
+    "Phase 1 contract draft now explicitly requires mandatory persistence to both versioned planning artifacts, synchronization with runtime status at each lifecycle transition, and rules/template alignment."
   ]
 }

@@ -6,7 +6,7 @@
       "id": "p1-t01",
       "priority": "P1",
       "title": "Define mandatory ticket status persistence and synchronization contract",
-      "status": "planned",
+      "status": "verified",
       "file": "v0.4.11/p1-t01.json"
     },
     {

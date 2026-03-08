@@ -40,15 +40,20 @@ As a result, resumability and operator trust are weakened because the versioned 
 - Preserve the existing strict transaction model and status enum.
 
 ## Proposed changes
-- Update `.rules` so it explicitly states that ticket status changes must be persisted to:
+- Update `.rules` so it explicitly states that ticket status persistence is mandatory, not optional bookkeeping.
+- Update `.rules` so it explicitly states that every ticket status change must be persisted to:
   - the per-ticket JSON file, and
   - `tickets_list.json`.
-- Update the `.rules` template embedded in `zed-agentops-init.sh` so newly initialized projects receive the same ticket status persistence requirements.
-- Clarify that ticket status updates in versioned docs are required throughout the work loop, not just at planning time.
-- Define the expected synchronization rule between:
-  - runtime transaction status/phase, and
-  - ticket-document status.
-- Define when status updates must occur during the canonical work loop.
+- Define that the persisted ticket-document status is the required versioned reflection of runtime execution status for the same ticket.
+- Define that runtime transaction status/phase and persisted ticket-document status must stay synchronized at each ticket lifecycle transition, rather than being reconciled later.
+- Define that status persistence in versioned planning artifacts is required throughout the canonical work loop, not just during planning.
+- Define the required persistence timing during the work loop:
+  - when a ticket enters `in-progress`,
+  - when it moves to `checking`,
+  - when it becomes `verified`,
+  - when it becomes `committed`,
+  - when it reaches `done` or `blocked`.
+- Update the checked-in `.rules` file and the `.rules` template embedded in `zed-agentops-init.sh` together so both artifacts express the same ticket status persistence contract.
 - Add regression tests or contract checks that lock the expected ticket status persistence behavior and keep the checked-in `.rules` file aligned with the init-script template.
 
 ## Non-goals
@@ -59,11 +64,12 @@ As a result, resumability and operator trust are weakened because the versioned 
 
 ## Goal
 - Ticket status persistence and synchronization are explicitly mandatory in the rules and implementation guidance.
+- The contract clearly defines which planning artifacts must be updated, when they must be updated during execution, and how they stay aligned with runtime transaction state.
 
 ## Acceptance criteria
 - `.rules` explicitly states that ticket status updates must be persisted to both per-ticket JSON files and `tickets_list.json`.
-- The `.rules` template embedded in `zed-agentops-init.sh` matches the checked-in `.rules` content for ticket status persistence requirements.
-- `.rules` makes clear that ticket status management is mandatory throughout execution, not optional bookkeeping.
-- The relationship between runtime transaction status and persisted ticket-document status is documented clearly enough to avoid divergent interpretations.
-- The work loop wording makes it clear when ticket status persistence must happen during execution.
+- `.rules` explicitly makes ticket status persistence mandatory throughout execution, not optional bookkeeping.
+- The required synchronization rule between runtime transaction status and persisted ticket-document status is documented clearly enough to avoid divergent interpretations.
+- The work loop wording makes it clear that ticket status persistence must occur at each canonical lifecycle transition.
+- The checked-in `.rules` file and the `.rules` template embedded in `zed-agentops-init.sh` are required to match for ticket status persistence requirements.
 - Tests or verification coverage are updated as needed to prevent regression in ticket status synchronization behavior and script/rules alignment.
