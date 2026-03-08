@@ -3,8 +3,8 @@ class AgentopsMcpServer < Formula
 
   desc "AgentOps MCP Server"
   homepage "https://github.com/rioriost/homebrew-agentops_mcp_server/"
-  url "https://files.pythonhosted.org/packages/d9/52/509e3d42d69e9183a64c28af3a428dbef7ae280e44c582c7e8e55c8e0f0d/agentops_mcp_server-0.4.12.tar.gz"
-  sha256 "35b948589a51e47e5a38d1a477b53b04cf38b784a01433b3d8939dfc90c75bb2"
+  url "https://files.pythonhosted.org/packages/ac/20/13077c15875b35f7363edf0f9c75a10de495a754f18a80b11a6baf2d186f/agentops_mcp_server-0.4.13.tar.gz"
+  sha256 "dd562f9e959d558b999132d5abf943160f1f895490e5a5f3045b22bd082a4dc7"
   license "MIT"
 
   depends_on "python@3.14"
