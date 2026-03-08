@@ -1,0 +1,33 @@
+{
+  "id": "p2-t2",
+  "phase": 2,
+  "title": "Align tool input handling for tx_event_append and tx_state_save",
+  "status": "planned",
+  "summary": "Adjust tx_event_append and tx_state_save input handling so initialization flows with empty logs are supported without weakening validation outside init scenarios.",
+  "inputs": ["docs/v0.4.5/plan.md", "docs/v0.4.5/p1-t2.json"],
+  "outputs": ["docs/v0.4.5/p2-t2.json"],
+  "acceptance_criteria": [
+    "Initialization paths handle required inputs for tx_event_append and tx_state_save without errors.",
+    "Any defaults or improved errors are limited to init-specific scenarios.",
+    "Validation remains strict for non-init tool usage."
+  ],
+  "deps": ["p1-t2"],
+  "steps": [
+    {
+      "id": "p2-t2-s1",
+      "description": "Identify where tool input validation blocks init flows."
+    },
+    {
+      "id": "p2-t2-s2",
+      "description": "Implement init-safe defaults or clearer errors for required inputs."
+    },
+    {
+      "id": "p2-t2-s3",
+      "description": "Add or update tests covering tool input handling in init scenarios."
+    }
+  ],
+  "notes": [
+    "Keep changes minimal and scoped to initialization handling.",
+    "Do not relax validation for normal tool usage."
+  ]
+}

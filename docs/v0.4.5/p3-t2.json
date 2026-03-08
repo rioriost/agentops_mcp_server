@@ -1,0 +1,33 @@
+{
+  "id": "p3-t2",
+  "phase": 3,
+  "title": "Add tests for rule-influenced expectations (if applicable)",
+  "status": "planned",
+  "summary": "Add targeted tests that validate behaviors influenced by updated .rules guidance for tx_event_append and tx_state_save inputs.",
+  "inputs": ["docs/v0.4.5/plan.md", "docs/v0.4.5/p3-t1.json"],
+  "outputs": ["docs/v0.4.5/p3-t2.json"],
+  "acceptance_criteria": [
+    "Tests cover rule-influenced expectations for required tool inputs.",
+    "At least one test exercises an init scenario impacted by .rules guidance.",
+    "Tests align with tool schemas and initialization behavior."
+  ],
+  "deps": ["p3-t1"],
+  "steps": [
+    {
+      "id": "p3-t2-s1",
+      "description": "Identify behaviors that should be validated based on updated .rules."
+    },
+    {
+      "id": "p3-t2-s2",
+      "description": "Add or update tests that confirm required inputs for tx_event_append/tx_state_save."
+    },
+    {
+      "id": "p3-t2-s3",
+      "description": "Verify tests align with initialization handling and do not weaken validation."
+    }
+  ],
+  "notes": [
+    "Keep tests minimal and focused on rule-influenced expectations.",
+    "If no executable rules validation exists, document rationale and skip with justification."
+  ]
+}

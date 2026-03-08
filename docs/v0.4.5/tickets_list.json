@@ -1,0 +1,87 @@
+{
+  "version": "0.4.5",
+  "title": "Bug fixes for tx_event_log initialization",
+  "tickets": [
+    {
+      "id": "p1-t1",
+      "phase": 1,
+      "title": "Inventory initialization and tx_event_log usage paths",
+      "status": "planned",
+      "inputs": ["docs/draft.md"],
+      "outputs": ["docs/v0.4.5/p1-t1.json"],
+      "deps": []
+    },
+    {
+      "id": "p1-t2",
+      "phase": 1,
+      "title": "Draft initialization handling plan and tool input alignment",
+      "status": "planned",
+      "inputs": ["docs/draft.md", "docs/v0.4.5/p1-t1.json"],
+      "outputs": ["docs/v0.4.5/p1-t2.json"],
+      "deps": ["p1-t1"]
+    },
+    {
+      "id": "p2-t1",
+      "phase": 2,
+      "title": "Implement empty-log initialization handling",
+      "status": "planned",
+      "inputs": ["docs/v0.4.5/plan.md"],
+      "outputs": ["docs/v0.4.5/p2-t1.json"],
+      "deps": ["p1-t2"]
+    },
+    {
+      "id": "p2-t2",
+      "phase": 2,
+      "title": "Align tool input handling for tx_event_append and tx_state_save",
+      "status": "planned",
+      "inputs": ["docs/v0.4.5/plan.md"],
+      "outputs": ["docs/v0.4.5/p2-t2.json"],
+      "deps": ["p1-t2"]
+    },
+    {
+      "id": "p2-t3",
+      "phase": 2,
+      "title": "Update init script or state defaults if needed",
+      "status": "planned",
+      "inputs": ["docs/v0.4.5/plan.md"],
+      "outputs": ["docs/v0.4.5/p2-t3.json"],
+      "deps": ["p1-t2"]
+    },
+    {
+      "id": "p3-t1",
+      "phase": 3,
+      "title": "Update .rules for tool input requirements",
+      "status": "planned",
+      "inputs": ["docs/v0.4.5/plan.md"],
+      "outputs": ["docs/v0.4.5/p3-t1.json"],
+      "deps": ["p2-t1", "p2-t2", "p2-t3"]
+    },
+    {
+      "id": "p3-t2",
+      "phase": 3,
+      "title": "Add tests for rule-influenced expectations (if applicable)",
+      "status": "planned",
+      "inputs": ["docs/v0.4.5/plan.md"],
+      "outputs": ["docs/v0.4.5/p3-t2.json"],
+      "deps": ["p3-t1"]
+    },
+    {
+      "id": "p4-t1",
+      "phase": 4,
+      "title": "Add unit/integration tests for empty log initialization",
+      "status": "planned",
+      "inputs": ["docs/v0.4.5/plan.md"],
+      "outputs": ["docs/v0.4.5/p4-t1.json"],
+      "deps": ["p3-t2"]
+    },
+    {
+      "id": "p4-t2",
+      "phase": 4,
+      "title": "Run verification suite and confirm coverage >= 90%",
+      "status": "planned",
+      "inputs": ["docs/v0.4.5/plan.md"],
+      "outputs": ["docs/v0.4.5/p4-t2.json"],
+      "deps": ["p4-t1"]
+    }
+  ]
+}

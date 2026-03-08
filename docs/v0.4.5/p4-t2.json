@@ -1,0 +1,33 @@
+{
+  "id": "p4-t2",
+  "phase": 4,
+  "title": "Run verification suite and confirm coverage >= 90%",
+  "status": "planned",
+  "summary": "Execute the verification suite and confirm test coverage meets or exceeds 90%, documenting results and any required follow-ups.",
+  "inputs": ["docs/v0.4.5/plan.md"],
+  "outputs": ["docs/v0.4.5/p4-t2.json"],
+  "acceptance_criteria": [
+    "Verification suite completes without failures.",
+    "Coverage report shows >= 90%.",
+    "Any failures or coverage regressions are captured with next steps."
+  ],
+  "deps": ["p4-t1"],
+  "steps": [
+    {
+      "id": "p4-t2-s1",
+      "description": "Run the project's verification suite according to .rules."
+    },
+    {
+      "id": "p4-t2-s2",
+      "description": "Check coverage output and confirm it is >= 90%."
+    },
+    {
+      "id": "p4-t2-s3",
+      "description": "Record results and note any remediation tasks if needed."
+    }
+  ],
+  "notes": [
+    "Use the standard verification workflow for this repository.",
+    "Keep log outputs summarized; prefer coverage percentages over full logs."
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "id": "p1-t2",
+  "phase": 1,
+  "title": "Draft initialization handling plan and tool input alignment",
+  "status": "in-progress",
+  "summary": "Plan: treat an empty tx_event_log.jsonl as “no events yet,” derive baseline tx_state via rebuild without requiring manual tx_event_append, and align tool input expectations by requiring actor (object), payload (object with required fields), and non-empty session_id for tx_event_append plus state for tx_state_save (typically from rebuild/ops_capture_state).",
+  "inputs": ["docs/draft.md", "docs/v0.4.5/p1-t1.json", "docs/v0.4.5/plan.md"],
+  "outputs": ["docs/v0.4.5/p1-t2.json"],
+  "acceptance_criteria": [
+    "Initialization behavior for empty tx_event_log.jsonl is defined with expected state outcomes.",
+    "Required inputs for tx_event_append and tx_state_save are specified for init scenarios.",
+    "Any defaults or improved error messaging are scoped to initialization paths.",
+    ".rules updates needed for tool input requirements are enumerated."
+  ],
+  "deps": ["p1-t1"],
+  "steps": [
+    {
+      "id": "p1-t2-s1",
+      "description": "Draft the initialization flow for empty tx_event_log.jsonl, including baseline state behavior."
+    },
+    {
+      "id": "p1-t2-s2",
+      "description": "Document required inputs and any defaults for tx_event_append/tx_state_save in init flows."
+    },
+    {
+      "id": "p1-t2-s3",
+      "description": "List .rules updates needed to enforce tool input requirements."
+    }
+  ],
+  "notes": [
+    "Init flow: empty log == no events; rebuild should return _init_tx_state and ops_capture_state can persist it.",
+    "Tool inputs: tx_event_append requires actor object, payload object (with required fields per event_type), and non-empty session_id; tx_state_save requires a full state object.",
+    "Rules update: add explicit required inputs and init guidance without relaxing normal validation."
+  ]
+}

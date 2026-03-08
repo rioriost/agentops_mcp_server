@@ -1,0 +1,35 @@
+{
+  "id": "p1-t1",
+  "phase": 1,
+  "title": "Inventory initialization and tx_event_log usage paths",
+  "status": "in-progress",
+  "summary": "Inventory findings: zed-agentops-init.sh touches .agent/tx_event_log.jsonl and seeds tx_state.json; RepoContext.set_repo_root wires tx_event_log paths; StateStore.tx_event_append/read_last_json_line/_tx_event_log_empty handle log IO; StateRebuilder.read_tx_event_log/read_recent_tx_events/_init_tx_state validate empty/missing logs; OpsTools._emit_tx_event rebuilds + tx_state_save; tool_registry requires actor/payload/session_id and tx_state_save requires state.",
+  "inputs": ["docs/draft.md", "docs/v0.4.5/plan.md"],
+  "outputs": ["docs/v0.4.5/p1-t1.json"],
+  "acceptance_criteria": [
+    "All tx_event_log readers/writers and init entry points are listed with file locations.",
+    "Empty-log handling paths are identified, including rebuild and state defaults.",
+    "Tool input validation touchpoints (tx_event_append, tx_state_save) are mapped to init flows."
+  ],
+  "deps": [],
+  "steps": [
+    {
+      "id": "p1-t1-s1",
+      "description": "Locate tx_event_log read/write and initialization paths in src/."
+    },
+    {
+      "id": "p1-t1-s2",
+      "description": "Document how empty or missing logs are handled in rebuild and state checks."
+    },
+    {
+      "id": "p1-t1-s3",
+      "description": "Map tool input validation requirements to init flows."
+    }
+  ],
+  "notes": [
+    "Key file: src/agentops_mcp_server/zed-agentops-init.sh (touches tx_event_log.jsonl, seeds tx_state.json).",
+    "RepoContext.set_repo_root wires tx_event_log; StateStore.tx_event_append/read_last_json_line/_tx_event_log_empty handle log IO.",
+    "StateRebuilder.read_tx_event_log/read_recent_tx_events/_init_tx_state/_validate_tx_event/_validate_tx_event_payload handle missing/empty logs and validation.",
+    "OpsTools._emit_tx_event performs tx_event_append + rebuild + tx_state_save; tool_registry enforces actor/payload/session_id/state."
+  ]
+}

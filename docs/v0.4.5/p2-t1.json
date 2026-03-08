@@ -1,0 +1,33 @@
+{
+  "id": "p2-t1",
+  "phase": 2,
+  "title": "Implement empty-log initialization handling",
+  "status": "planned",
+  "summary": "Ensure an empty tx_event_log.jsonl is treated as an initial state, allowing initialization to proceed without errors.",
+  "inputs": ["docs/v0.4.5/plan.md"],
+  "outputs": ["docs/v0.4.5/p2-t1.json"],
+  "acceptance_criteria": [
+    "Initialization succeeds when tx_event_log.jsonl exists but is empty.",
+    "Empty log is treated equivalently to no events yet.",
+    "Baseline tx_state is derived consistently without manual tx_event input."
+  ],
+  "deps": ["p1-t2"],
+  "steps": [
+    {
+      "id": "p2-t1-s1",
+      "description": "Identify code paths that treat empty logs differently from missing logs."
+    },
+    {
+      "id": "p2-t1-s2",
+      "description": "Implement init-safe handling for empty tx_event_log.jsonl."
+    },
+    {
+      "id": "p2-t1-s3",
+      "description": "Add minimal tests for empty-log initialization behavior."
+    }
+  ],
+  "notes": [
+    "Keep changes minimal and focused on init handling.",
+    "Avoid weakening validation outside initialization scenarios."
+  ]
+}

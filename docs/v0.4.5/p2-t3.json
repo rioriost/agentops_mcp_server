@@ -1,0 +1,33 @@
+{
+  "id": "p2-t3",
+  "phase": 2,
+  "title": "Update init script or state defaults if needed",
+  "status": "planned",
+  "summary": "Adjust zed-agentops-init.sh or baseline state defaults to ensure empty tx_event_log.jsonl is recognized as a valid initial state.",
+  "inputs": ["docs/v0.4.5/plan.md", "docs/v0.4.5/p2-t1.json", "docs/v0.4.5/p2-t2.json"],
+  "outputs": ["docs/v0.4.5/p2-t3.json"],
+  "acceptance_criteria": [
+    "Init script or baseline state defaults align with empty log handling.",
+    "No manual tx_event input is required to reach a valid baseline state.",
+    "Changes are limited to init/bootstrap paths."
+  ],
+  "deps": ["p1-t2"],
+  "steps": [
+    {
+      "id": "p2-t3-s1",
+      "description": "Review zed-agentops-init.sh and startup defaults for tx_event_log/tx_state handling."
+    },
+    {
+      "id": "p2-t3-s2",
+      "description": "Apply minimal updates to init script or defaults to align with empty log initialization behavior."
+    },
+    {
+      "id": "p2-t3-s3",
+      "description": "Add or adjust tests if init script changes impact behavior."
+    }
+  ],
+  "notes": [
+    "Prefer minimal changes that only affect initialization.",
+    "Document any assumptions about pre-created empty files."
+  ]
+}

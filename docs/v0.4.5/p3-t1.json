@@ -1,0 +1,33 @@
+{
+  "id": "p3-t1",
+  "phase": 3,
+  "title": "Update .rules for tool input requirements",
+  "status": "planned",
+  "summary": "Revise .rules to require actor/payload/session_id for tx_event_append and state for tx_state_save, with guidance for initialization flows.",
+  "inputs": ["docs/v0.4.5/plan.md"],
+  "outputs": ["docs/v0.4.5/p3-t1.json"],
+  "acceptance_criteria": [
+    ".rules explicitly lists required inputs for tx_event_append (actor, payload, session_id).",
+    ".rules explicitly lists required inputs for tx_state_save (state).",
+    "Rules guidance includes initialization-specific expectations without weakening validation elsewhere."
+  ],
+  "deps": ["p2-t1", "p2-t2", "p2-t3"],
+  "steps": [
+    {
+      "id": "p3-t1-s1",
+      "description": "Identify tool input requirements and map them to .rules guidance."
+    },
+    {
+      "id": "p3-t1-s2",
+      "description": "Update .rules with explicit required inputs and init flow notes."
+    },
+    {
+      "id": "p3-t1-s3",
+      "description": "Validate rules align with tool schemas and planned init behavior."
+    }
+  ],
+  "notes": [
+    "Keep changes minimal and focused on tool input requirements.",
+    "Avoid introducing ambiguous guidance that weakens validation."
+  ]
+}
