@@ -8,7 +8,7 @@
       "phase": 1,
       "priority": "P1",
       "title": "Inventory empty-log init flow, validation touchpoints, and ordering enforcement paths",
-      "status": "planned",
+      "status": "done",
       "file": "docs/v0.4.5/p1-t1.json"
     },
     {
@@ -16,7 +16,7 @@
       "phase": 1,
       "priority": "P1",
       "title": "Define the corrected behavior contract for initialization, validation, ordering, and state transitions",
-      "status": "planned",
+      "status": "done",
       "file": "docs/v0.4.5/p1-t2.json"
     },
     {
@@ -24,7 +24,7 @@
       "phase": 2,
       "priority": "P1",
       "title": "Implement empty-log-safe initialization and rebuild behavior",
-      "status": "planned",
+      "status": "in-progress",
       "file": "docs/v0.4.5/p2-t1.json"
     },
     {
@@ -32,7 +32,7 @@
       "phase": 2,
       "priority": "P1",
       "title": "Align required input validation and error messaging for transaction-related operations",
-      "status": "planned",
+      "status": "done",
       "file": "docs/v0.4.5/p2-t2.json"
     },
     {
@@ -40,7 +40,7 @@
       "phase": 2,
       "priority": "P1",
       "title": "Tighten transaction ordering and file-intent transition enforcement",
-      "status": "planned",
+      "status": "done",
       "file": "docs/v0.4.5/p2-t3.json"
     },
     {
@@ -48,7 +48,7 @@
       "phase": 2,
       "priority": "P1",
       "title": "Correct state transition and schema handling for verify, phase, and status consistency",
-      "status": "planned",
+      "status": "done",
       "file": "docs/v0.4.5/p2-t4.json"
     },
     {
@@ -56,7 +56,7 @@
       "phase": 3,
       "priority": "P2",
       "title": "Update .rules for init-safe empty-log handling and required tool input contracts",
-      "status": "planned",
+      "status": "done",
       "file": "docs/v0.4.5/p3-t1.json"
     },
     {
@@ -64,7 +64,7 @@
       "phase": 3,
       "priority": "P2",
       "title": "Update .rules for canonical transaction ordering, task lifecycle prerequisites, and commit gating expectations",
-      "status": "planned",
+      "status": "done",
       "file": "docs/v0.4.5/p3-t2.json"
     },
     {
@@ -88,7 +88,7 @@
       "phase": 4,
       "priority": "P1",
       "title": "Run verification and confirm coverage is at least 90%",
-      "status": "planned",
+      "status": "done",
       "file": "docs/v0.4.5/p4-t3.json"
     }
   ]
