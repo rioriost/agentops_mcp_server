@@ -2,7 +2,7 @@
   "id": "p1-t02",
   "title": "Decide whether ticket persistence is protocol or convention",
   "priority": "P1",
-  "status": "planned",
+  "status": "verified",
   "summary": "Define the 0.5.0 product and protocol decision for planning artifacts and ticket persistence so the documented workflow, generated rules, and MCP server capabilities describe the same operating model. This ticket must resolve whether plan generation, tickets_list maintenance, per-ticket JSON persistence, and synchronized status updates are first-class server-supported protocol behavior or external client-side convention, then align the implementation-facing documentation accordingly.",
   "inputs": [
     "docs/draft_0.5.0.md",
@@ -36,9 +36,7 @@
     "Document the consequences of that choice for rules text, generated workspace rules, server APIs, and downstream implementation planning.",
     "Record the decision in a form that follow-up tickets can treat as the authoritative ownership model for ticket persistence."
   ],
-  "dependencies": [
-    "p1-t01"
-  ],
+  "dependencies": ["p1-t01"],
   "notes": [
     "This ticket is a design-decision and alignment ticket, not the implementation ticket for all planning and persistence features.",
     "The main goal is to eliminate the current hybrid state where rules describe mandatory ticket persistence behavior that the server does not fully support.",

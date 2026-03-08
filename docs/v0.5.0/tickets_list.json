@@ -13,7 +13,7 @@
       "id": "p1-t02",
       "priority": "P1",
       "title": "Decide whether ticket persistence is protocol or convention",
-      "status": "planned",
+      "status": "verified",
       "file": "v0.5.0/p1-t02.json"
     },
     {
@@ -34,7 +34,7 @@
       "id": "p2-t02",
       "priority": "P1",
       "title": "Implement strict commit gating and repo-state enforcement",
-      "status": "verified",
+      "status": "done",
       "file": "v0.5.0/p2-t02.json"
     },
     {

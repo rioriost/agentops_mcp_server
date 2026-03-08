@@ -2,7 +2,7 @@
   "id": "p2-t02",
   "title": "Implement strict commit gating and repo-state enforcement",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Implement the Phase 2 commit workflow changes for v0.5.0 so commit operations reflect the rules-defined work loop more explicitly and safely. The work should require successful verification before commit, make repository-state awareness part of commit decisioning, and prevent commit attempts when there are no changes to record, turning current helper behavior into a clearer protocol-level guarantee.",
   "inputs": [
     "docs/draft_0.5.0.md",
