@@ -2,7 +2,7 @@
   "id": "p1-t02",
   "title": "Add shared response-building utilities for canonical workflow guidance",
   "priority": "P0",
-  "status": "planned",
+  "status": "done",
   "summary": "Introduce shared internal utilities that build standardized machine-readable success and failure responses for lifecycle-relevant MCP tools. This ticket establishes the implementation foundation for 0.5.4 by centralizing canonical workflow guidance generation so that lifecycle wrappers, verify/commit helpers, and state-facing tools can return consistent fields such as canonical status, canonical phase, next action, terminality, follow-up requirements, active transaction identity, and structured recovery guidance without duplicating logic across the codebase.",
   "inputs": [
     "docs/draft_0.5.4.md",

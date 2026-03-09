@@ -2,7 +2,7 @@
   "id": "p1-t01",
   "title": "Define the 0.5.4 workflow-guidance response schema and lifecycle error contract",
   "priority": "P0",
-  "status": "planned",
+  "status": "done",
   "summary": "Create the authoritative 0.5.4 contract for machine-readable lifecycle guidance so AI agents can determine canonical state transitions from `.rules` plus MCP tool responses without hidden assumptions. This ticket finalizes the normalized success and failure response schema for lifecycle-relevant tools, including canonical status/phase exposure, next-action guidance, terminality, follow-up obligations, active transaction identity, structured recovery/error semantics, stable error-code families, and backward-compatibility rules for legacy payload fields. Canonical history was repaired enough to unblock new work, and this ticket is now the active canonical task for defining the schema and implementation-ready contract notes that downstream 0.5.4 tickets will follow.",
   "inputs": [
     "docs/draft_0.5.4.md",

@@ -2,7 +2,7 @@
   "id": "p2-t02",
   "title": "Normalize structured lifecycle/state failures into machine-readable recovery guidance",
   "priority": "P1",
-  "status": "planned",
+  "status": "done",
   "summary": "Define and implement a consistent structured failure contract for lifecycle- and state-related MCP tool failures so that AI agents can branch on canonical recovery guidance without relying only on human-readable error strings. This ticket focuses on begin/resume conflicts, terminal-state violations, file-intent ordering failures, verify/commit precondition failures, and integrity-blocked state outcomes, while preserving strict canonical lifecycle validation.",
   "inputs": [
     "docs/draft_0.5.4.md",
@@ -44,12 +44,7 @@
     "Ensure integrity-blocked failures preserve diagnostic metadata and clearly indicate that unsafe canonical progression is blocked until repair or replacement of invalid history.",
     "Add regression tests that assert the presence and semantics of structured failure fields across representative lifecycle/state failure paths."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02",
-    "p1-t03",
-    "p2-t01"
-  ],
+  "dependencies": ["p1-t01", "p1-t02", "p1-t03", "p2-t01"],
   "notes": [
     "This ticket should preserve existing strictness while making failure semantics more operable for AI agents and client workflows.",
     "Where backward compatibility matters, legacy human-readable error text may remain, but structured fields should become the authoritative branching surface for agent behavior.",

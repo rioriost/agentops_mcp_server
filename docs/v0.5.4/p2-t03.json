@@ -2,7 +2,7 @@
   "id": "p2-t03",
   "title": "Clarify and enforce lifecycle field semantics across canonical responses",
   "priority": "P1",
-  "status": "planned",
+  "status": "done",
   "summary": "Align the implementation and response contract for canonical lifecycle fields so `status`, `phase`, `next_action`, and terminality are internally consistent, machine-readable, and safe for AI-agent branching. This ticket focuses on removing ambiguity in how lifecycle state is represented after wrapper and helper operations, especially around the distinction between non-terminal `committed` and terminal `done` or `blocked`.",
   "inputs": [
     "docs/draft_0.5.4.md",
@@ -44,13 +44,7 @@
     "Verify that helper flows preserve the explicit distinction between non-terminal `committed` and terminal `done` or `blocked`.",
     "Add regression tests that cover representative success and failure flows and assert correct terminal and non-terminal reporting."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02",
-    "p1-t03",
-    "p2-t01",
-    "p2-t02"
-  ],
+  "dependencies": ["p1-t01", "p1-t02", "p1-t03", "p2-t01", "p2-t02"],
   "notes": [
     "This ticket is not about redesigning the transaction model; it is about making the existing model easier for agents to consume correctly.",
     "The most important semantic distinction to preserve is that helper completion may leave canonical state at non-terminal `committed`, with explicit follow-up still required.",
