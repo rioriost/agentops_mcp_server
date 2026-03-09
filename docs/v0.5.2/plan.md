@@ -267,6 +267,14 @@ The intended lifecycle behavior is already present in the state machine; the cha
 - Avoid altering terminal semantics.
 - Keep the transaction model unchanged unless explicitly required.
 
+### Operational integrity follow-up note
+During 0.5.2 validation and state-capture attempts, the repository showed an existing transaction-log integrity drift caused by a `duplicate tx.begin` condition in `.agent/tx_event_log.jsonl`. This issue is not in scope for the 0.5.2 workflow contract clarification itself, but it should be investigated as follow-up work because it can interfere with reliable state capture and resume behavior.
+
+**Mitigation**
+- Treat the observed drift as a separate operational follow-up rather than folding it into the 0.5.2 workflow contract change set.
+- Open a dedicated investigation ticket to determine the source of the duplicate begin event and whether replay, validation, or lifecycle-guard logic needs adjustment.
+- Keep the 0.5.2 deliverables focused on rules, generated rules, tool responses, and regression coverage.
+
 ## Validation Plan
 After implementation, validation should include:
 
