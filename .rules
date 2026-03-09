@@ -74,6 +74,26 @@
      - If a client maintains ticket artifacts, it may also persist terminal status there.
 - Runtime transaction status/phase is canonical for server behavior.
 - Agents must use canonical transaction status/phase and `next_action` to determine whether follow-up lifecycle completion is still required after verify or commit helpers succeed.
+- Lifecycle-aware success responses should be treated as machine-readable workflow guidance, not prose-only hints.
+- When present, agents should branch primarily on fields such as:
+  - `canonical_status`
+  - `canonical_phase`
+  - `next_action`
+  - `terminal`
+  - `requires_followup`
+  - `followup_tool`
+  - `active_tx_id`
+  - `active_ticket_id`
+- Lifecycle- and state-related failure responses should remain machine-distinguishable when possible.
+- When present, agents should use fields such as:
+  - `error_code`
+  - `reason`
+  - `recoverable`
+  - `recommended_next_tool`
+  - `recommended_action`
+  - `integrity_status`
+  - `blocked`
+- Helper success does not by itself imply terminal completion; non-terminal `committed` must remain distinguishable from terminal `done` and `blocked`.
 - Client ticket-document status, when maintained, is derived workflow bookkeeping and may be synchronized by the client as a convention.
 
 ## Persistence & logging (mandatory)
@@ -110,6 +130,8 @@
     - do not persist incomplete or invalid transaction snapshots
   - task lifecycle tools
     - do not call task start/update/end before `tx.begin`
+    - `session_id` is required and must be non-empty when the lifecycle tool contract requires it
+    - preserve or recover the canonical active transaction session context before attempting lifecycle continuation
   - time lookup
     - supported `timezone` values are `utc` or `local` only
 - Prefer MCP tools if available.
