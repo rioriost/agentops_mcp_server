@@ -572,11 +572,12 @@ After `0.6.0`:
 
 ## Implementation Strategy
 
-### Phase 1: Define the resumable transaction protocol
+### Phase 1: Define the resumable transaction protocol, state machine, and persistence contract
 **Goals**
 - Define the canonical meaning of a transaction.
 - Define the transaction-centered protocol for ticket completion.
-- Define the core invariants and separation from planning identity.
+- Define the canonical state machine and continuation contract.
+- Define the minimal persistence, rebuild, and issuance contract required for deterministic continuation.
 
 **Tasks**
 - define transaction semantics as a durable execution attempt
@@ -585,48 +586,9 @@ After `0.6.0`:
 - define explicit terminal completion semantics
 - define commit as non-terminal
 - define the no-sentinel active-transaction policy
-
-**Deliverables**
-- authoritative transaction protocol contract
-- authoritative identity-role contract
-- canonical invariants for active transaction handling
-
-**Acceptance for phase**
-- the plan clearly defines what a transaction is in this project
-- the plan clearly distinguishes ticket identity from transaction identity
-- the plan clearly states that commit is non-terminal and end is explicit
-- the plan clearly constrains active transaction behavior
-
----
-
-### Phase 2: Define the state machine and continuation contract
-**Goals**
-- Make the work loop resumable from explicit states and explicit next actions.
-
-**Tasks**
 - define canonical statuses and their meanings
-- define expected state transitions
-- define checkpoint events needed for continuation
+- define checkpoint events needed for continuation, including `tx.step.enter` as the canonical progress-checkpoint event
 - define `next_action` semantics as the primary continuation guide
-- define idempotent continuation expectations for interrupted verify, commit, and end flows
-
-**Deliverables**
-- state-machine contract
-- checkpoint event contract
-- continuation / resume contract
-
-**Acceptance for phase**
-- every non-terminal state has a clear continuation meaning
-- resume can be described primarily in terms of active transaction state plus `next_action`
-- interrupted verify/commit/end flows are explicitly covered
-
----
-
-### Phase 3: Define persistence and rebuild responsibilities
-**Goals**
-- Keep persistence minimal, durable, and sufficient for deterministic continuation.
-
-**Tasks**
 - define the canonical role of `.agent/tx_state.json`
 - define the canonical role of `.agent/tx_event_log.jsonl`
 - define the canonical role of `.agent/tx_id_counter.json`
@@ -635,11 +597,23 @@ After `0.6.0`:
 - define malformed versus missing artifact behavior
 
 **Deliverables**
+- authoritative transaction protocol contract
+- authoritative identity-role contract
+- canonical invariants for active transaction handling
+- state-machine contract
+- checkpoint event contract
+- continuation / resume contract
 - persistence contract
 - rebuild contract
 - issuance metadata contract
 
 **Acceptance for phase**
+- the plan clearly defines what a transaction is in this project
+- the plan clearly distinguishes ticket identity from transaction identity
+- the plan clearly states that commit is non-terminal and end is explicit
+- the plan clearly constrains active transaction behavior
+- every non-terminal state has a clear continuation meaning
+- resume can be described primarily in terms of canonical transaction state plus top-level `next_action`
 - there is a clear canonical resume entrypoint
 - there is a clear authoritative append-only history source
 - there is a clear deterministic transaction issuance model
@@ -647,32 +621,47 @@ After `0.6.0`:
 
 ---
 
-### Phase 4: Simplify runtime identity and recovery behavior
+### Phase 2: Implement runtime identity and recovery simplifications
 **Goals**
-- Remove unnecessary heuristics from begin, resume, and active-transaction handling.
+- Replace ticket-derived transaction identity with issued transaction IDs.
+- Remove sentinel active-transaction semantics from normal flow.
+- Simplify resume behavior so it continues the exact active transaction.
+- Bound the role of session context without weakening exact active-transaction continuation.
 
 **Tasks**
 - replace ticket-derived transaction identity in new writes
+- implement issued monotonic `tx_id` allocation during canonical begin only
 - remove sentinel active transaction semantics from normal flow
+- adopt structural no-active representation based on `active_tx: null`
 - simplify exact active transaction continuation rules
+- make materialized transaction state the primary resume anchor
+- use event-history rebuild only when materialized state is missing, incomplete, or inconsistent
 - bound the role of session context in correctness-sensitive logic
-- define historical compatibility behavior for legacy transaction IDs
+- define and implement historical compatibility behavior for legacy transaction IDs, sentinel-bearing histories, and older session-oriented assumptions
 
 **Deliverables**
 - simplified identity policy
-- simplified recovery-selection policy
-- compatibility guidance for historical data
+- issued transaction ID behavior in runtime code
+- sentinel-free active-transaction handling in runtime code
+- simplified exact-active-transaction resume behavior
+- compatibility guidance and bounded compatibility behavior for historical data
 
 **Acceptance for phase**
 - new runtime behavior does not derive transaction identity from ticket identity
+- newly issued `tx_id` values are allocated only through canonical begin
 - active transaction selection is exact and deterministic
+- no-active state is represented structurally rather than by sentinel transaction identifiers
+- resume behavior treats healthy materialized state as the primary resume entrypoint
 - session context is bounded and no longer central to resumable correctness
+- historical compatibility remains bounded and does not weaken strict new runtime semantics
 
 ---
 
-### Phase 5: Harden with interruption-focused regression coverage
+### Phase 3: Harden with interruption-focused regression coverage and guidance
 **Goals**
 - Prove that the redesigned protocol survives interruption and resumes correctly.
+- Add regression coverage for exact-active-transaction continuation and bounded compatibility behavior.
+- Update documentation and operator guidance for the redesigned protocol.
 
 **Tasks**
 - add tests for interrupted in-progress transactions
@@ -681,7 +670,10 @@ After `0.6.0`:
 - add tests for interrupted post-commit pre-terminal flows
 - add tests for terminal re-entry and idempotent resume behavior
 - add tests for malformed versus missing issuance metadata
+- add tests for structural no-active representation and `tx.clear_active` behavior
 - add tests for compatibility with historical legacy logs
+- add tests for bounded compatibility behavior around legacy sentinel-bearing and older session-oriented histories
+- update operator and developer guidance for the redesigned transaction protocol
 
 **Deliverables**
 - interruption-focused regression suite
@@ -693,6 +685,7 @@ After `0.6.0`:
 - duplicate continuation does not corrupt transaction state
 - terminal transactions are not resumed as active work
 - historical logs remain replayable under the documented policy
+- no-active materialized-state behavior remains structurally explicit and stable under repeated resume
 
 ## Success Criteria
 `0.6.0` is successful when the system can be described simply as follows:

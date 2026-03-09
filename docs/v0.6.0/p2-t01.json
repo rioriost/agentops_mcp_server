@@ -39,7 +39,7 @@
     "The implementation does not start a new transaction while a non-terminal active transaction exists.",
     "Runtime comparison logic no longer relies on ticket-name-derived transaction identity in normal flow.",
     "Historical legacy transaction IDs remain replayable as opaque historical identifiers.",
-    "Newly issued transaction IDs use the documented JSON-facing representation consistently.",
+    "Newly issued transaction IDs use integer representation consistently in JSON-facing artifacts.",
     "Regression tests cover at least: new transaction issuance, resume reuse, no replacement IDs during continuation, and compatibility with legacy historical IDs.",
     "The implementation preserves canonical lifecycle ordering, resumability, replay integrity, and explicit terminal-state handling."
   ],
@@ -52,7 +52,7 @@
     "Ensure rebuild logic treats historical transaction IDs as opaque historical data rather than forcing them into the new issuance format.",
     "Update runtime validation and comparison logic so `ticket_id` and `tx_id` are handled as distinct identities with distinct roles.",
     "Remove or refactor runtime assumptions that transaction identity should embed ticket meaning in normal flow.",
-    "Update any serialization or materialized-state logic needed so newly issued transaction identifiers are stored consistently in JSON-facing artifacts.",
+    "Update any serialization or materialized-state logic needed so newly issued transaction identifiers are stored consistently as integers in JSON-facing artifacts, matching the Phase 1 JSON-facing contract.",
     "Add or update regression tests for new issued transaction creation, exact transaction reuse during resume, and compatibility with legacy historical transaction IDs.",
     "Document any bounded compatibility exceptions required so old histories remain replayable without weakening the new-write policy."
   ],
@@ -73,6 +73,7 @@
       "ticket_id": "Planning identity for the work item and not the runtime execution identifier.",
       "tx_id": "Exact runtime transaction identity for one durable execution attempt.",
       "new_write_policy": "All newly created transactions use issued monotonic `tx_id` values through the canonical transaction-begin issuance path.",
+      "json_facing_representation": "Newly issued `tx_id` values are represented as integers in JSON-facing artifacts, including materialized state and canonical event history.",
       "historical_policy": "Historical legacy transaction IDs remain readable as opaque historical identifiers."
     },
     "issuance_rules": [

@@ -39,6 +39,8 @@
     "Historical legacy transaction IDs remain replayable as opaque historical identifiers.",
     "Historical data that reflects older session-oriented assumptions remains readable under bounded compatibility handling without becoming the canonical model for new runtime behavior.",
     "Historical sentinel-bearing data, if present, remains bounded to compatibility handling and does not restore sentinel semantics to normal runtime flow.",
+    "Historical compatibility handling preserves readability of terminal materialized snapshots, including cases where terminal transaction context remains materialized before any post-terminal active-slot clearing behavior is applied.",
+    "Historical compatibility handling treats post-terminal active-slot clearing such as `tx.clear_active` as a bounded materialization concern and must not reinterpret it as a new lifecycle event or a replacement transaction.",
     "No new runtime write path treats planning artifacts, legacy session assumptions, or compatibility shims as canonical execution truth.",
     "Regression tests cover at least: session-present continuation, session-absent continuation where active transaction state is sufficient, historical legacy replay, and bounded compatibility behavior for older persistence assumptions.",
     "The implementation preserves canonical lifecycle ordering, resumability, replay integrity, explicit terminal-state handling, and the single-active-transaction invariant."
@@ -49,20 +51,13 @@
     "Ensure session-present and session-absent continuation paths both preserve the same exact active transaction semantics when canonical transaction state is sufficient.",
     "Update any session-related recovery or lookup logic so it does not override exact active-transaction continuation in normal flow.",
     "Define and implement bounded compatibility handling for historical data that reflects older session-oriented assumptions.",
-    "Define and implement bounded compatibility handling for legacy transaction IDs and any historical sentinel-bearing material that may still appear in replayed data.",
+    "Define and implement bounded compatibility handling for legacy transaction IDs, historical terminal materialized snapshots, and any historical sentinel-bearing material that may still appear in replayed data.",
     "Ensure compatibility logic remains read-oriented for old histories and does not weaken the strict new-write rules of the 0.6.0 runtime model.",
     "Update validation and error behavior so ambiguous or malformed historical compatibility inputs fail clearly when no safe deterministic continuation is possible.",
     "Add or update regression tests covering session-bounded correctness, session-optional continuation, historical replay, and compatibility behavior for older persistence assumptions.",
     "Document the bounded role of `session_id` and the bounded role of historical compatibility logic so future changes do not re-promote them into the primary correctness model."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02",
-    "p1-t03",
-    "p2-t01",
-    "p2-t02",
-    "p2-t03"
-  ],
+  "dependencies": ["p1-t01", "p1-t02", "p1-t03", "p2-t01", "p2-t02", "p2-t03"],
   "notes": [
     "This ticket is runtime implementation work, not only contract-definition work.",
     "The most important outcome is that session context remains useful without becoming the canonical source of truth for resumable correctness.",
@@ -83,6 +78,8 @@
     "compatibility_rules": {
       "legacy_tx_ids": "Historical legacy transaction identifiers remain replayable as opaque historical state.",
       "legacy_session_assumptions": "Historical data that encodes older session-oriented assumptions remains readable only under bounded compatibility handling.",
+      "legacy_terminal_snapshots": "Historical terminal materialized snapshots remain readable as bounded compatibility input, including shapes where terminal transaction context remains materialized before active-slot clearing occurs.",
+      "legacy_tx_clear_active_behavior": "Historical or transitional `tx.clear_active`-style active-slot clearing behavior must be treated as a bounded materialization compatibility concern and must not be promoted into a replacement canonical lifecycle event.",
       "legacy_sentinel_data": "Historical sentinel-bearing state may be handled only as bounded compatibility input and must not redefine new runtime semantics.",
       "no_forced_rewrite": "Forward migration does not require in-place rewrite of historical logs or materialized artifacts.",
       "new_write_policy": "New runtime behavior must remain transaction-centered, exact-identity-first, and sentinel-free even when compatibility handling exists."
@@ -97,6 +94,8 @@
       "session-absent continuation still succeeds when canonical transaction state is sufficient",
       "legacy transaction IDs remain replayable",
       "older session-oriented histories remain bounded to compatibility handling",
+      "historical terminal snapshots remain readable without reactivating terminal work",
+      "`tx.clear_active`-style compatibility handling does not create a replacement lifecycle event",
       "compatibility logic does not reintroduce heuristic active-transaction selection"
     ],
     "design_bias": {

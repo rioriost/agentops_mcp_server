@@ -31,33 +31,28 @@
   ],
   "acceptance_criteria": [
     "Normal runtime behavior no longer uses sentinel transaction identifiers such as `none` to represent missing active work.",
-    "The absence of active work is represented structurally in canonical transaction state rather than by fake `tx_id` text.",
+    "The absence of active work is represented structurally in canonical transaction state as `active_tx: null`, rather than by fake `tx_id` text or placeholder active-transaction objects.",
     "Begin-required logic no longer depends on sentinel transaction identifiers in normal flow.",
     "Resume logic no longer treats sentinel transaction identifiers as a normal source of truth for active-transaction decisions.",
     "Verify, commit, and terminal continuation logic no longer depends on sentinel transaction identifiers in normal flow.",
     "Runtime checks distinguish clearly between no active transaction, active non-terminal transaction, and terminal historical transaction state.",
     "Historical legacy data containing sentinel-like values remains readable only under bounded compatibility handling and does not reintroduce sentinel semantics into new runtime behavior.",
-    "Regression tests cover at least: no active transaction representation, begin from no-active state, resume from active state, and compatibility behavior for legacy sentinel-bearing historical data if such data exists.",
+    "Regression tests cover at least: `active_tx: null` no-active representation, begin from no-active state, resume from active state, and compatibility behavior for legacy sentinel-bearing historical data if such data exists.",
     "The implementation preserves canonical lifecycle ordering, resumability, replay integrity, and explicit terminal-state handling."
   ],
   "tasks": [
     "Identify runtime code paths that use sentinel transaction identifiers such as `none` to represent missing active work or to branch normal lifecycle behavior.",
-    "Define and implement a structural no-active-transaction representation in canonical transaction state.",
+    "Define and implement the canonical structural no-active-transaction representation in transaction state as `active_tx: null`, matching the Phase 1 no-active invariant.",
     "Update begin-required checks so they depend on structural absence of active work rather than sentinel transaction text.",
     "Update resume checks so they use exact active transaction presence and status rather than sentinel-based normalization.",
     "Update verify, commit, and terminal continuation checks so they do not rely on sentinel transaction identifiers in normal flow.",
-    "Update materialized-state serialization and deserialization as needed so no-active-transaction state remains explicit without fake transaction identity.",
+    "Update materialized-state serialization and deserialization as needed so no-active-transaction state remains explicit as `active_tx: null`, with no fake transaction identity and no placeholder active-transaction object.",
     "Update rebuild logic so historical sentinel-bearing data is handled as bounded compatibility input rather than reintroduced as normal runtime semantics.",
     "Update comparison and validation logic to distinguish clearly between missing active work, active non-terminal work, and terminal historical work.",
     "Add or update regression tests covering sentinel-free no-active representation and continuation behavior.",
     "Document any bounded compatibility rules required for historical data that may still contain sentinel transaction identifiers."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02",
-    "p1-t03",
-    "p2-t01"
-  ],
+  "dependencies": ["p1-t01", "p1-t02", "p1-t03", "p2-t01"],
   "notes": [
     "This ticket is runtime implementation work, not only contract-definition work.",
     "The most important outcome is that no-active-work state becomes structurally explicit and no longer encoded as fake transaction identity.",
@@ -67,20 +62,31 @@
   ],
   "schema_notes": {
     "representation_rules": {
-      "normal_no_active_state": "Represent absence of active work structurally in canonical state rather than by sentinel transaction identifiers.",
+      "normal_no_active_state": "Represent absence of active work structurally in canonical state as `active_tx: null` rather than by sentinel transaction identifiers, fake active objects, or placeholder transaction identity.",
+      "top_level_no_active_fields": {
+        "active_tx": "null",
+        "status": "null",
+        "phase": "null",
+        "next_action": "tx.begin",
+        "terminal": "false",
+        "semantic_summary": "null",
+        "verify_state": "null",
+        "commit_state": "null"
+      },
       "forbidden_normal_flow_examples": [
         "`tx_id = none`",
-        "fake active transaction placeholders used as normal continuation inputs"
+        "fake active transaction placeholders used as normal continuation inputs",
+        "empty-string or placeholder `active_tx` objects used to stand in for no active work"
       ],
       "allowed_compatibility_scope": "Historical data may still be readable under bounded compatibility handling, but new runtime behavior must not depend on sentinel semantics."
     },
     "runtime_behavior_rules": {
-      "begin_rule": "New work may begin when there is structurally no active non-terminal transaction.",
+      "begin_rule": "New work may begin when there is structurally no active non-terminal transaction, represented canonically as `active_tx: null`.",
       "resume_rule": "Resume must act on an exact active non-terminal transaction when present, not on sentinel placeholders.",
       "continuation_rule": "Verify, commit, and end flows must use canonical transaction state and exact identity, not sentinel text."
     },
     "state_distinctions": {
-      "no_active_work": "No active non-terminal transaction exists.",
+      "no_active_work": "No active non-terminal transaction exists, represented canonically as `active_tx: null` with no placeholder active-transaction object and no stray active-transaction identity fields.",
       "active_work": "One exact non-terminal active transaction exists and must be resumed before new work begins.",
       "terminal_history": "Historical transaction data may exist, but no active resumable transaction remains."
     },
@@ -89,7 +95,7 @@
       "new_write_policy": "No new materialized state or event-writing path may emit sentinel transaction identifiers as normal canonical state."
     },
     "test_focus": [
-      "structural no-active representation",
+      "`active_tx: null` structural no-active representation",
       "begin from structurally empty active state",
       "resume from exact active transaction state",
       "bounded compatibility for legacy sentinel-bearing data"

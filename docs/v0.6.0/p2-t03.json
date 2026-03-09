@@ -26,7 +26,7 @@
   "outputs": [
     "Runtime resume logic that treats the exact active non-terminal transaction as the only canonical resumable work item",
     "Updated active-transaction lookup rules that prefer healthy materialized transaction state and exact rebuild behavior over heuristic selection",
-    "Updated continuation behavior that uses `next_action` as the primary machine-readable guide for interrupted work",
+    "Updated continuation behavior that uses the top-level continuation surface, with top-level `status`, `phase`, `next_action`, `terminal`, `semantic_summary`, `verify_state`, and `commit_state` as the primary machine-readable guide for interrupted work",
     "Updated runtime checks that distinguish clearly between no active transaction, active non-terminal transaction, and terminal historical transactions",
     "Updated bounded compatibility handling for historical legacy histories without reintroducing heuristic resume behavior into new runtime logic",
     "Regression coverage for exact active-transaction resume behavior and interruption-safe continuation"
@@ -37,7 +37,7 @@
     "Healthy materialized transaction state is treated as the primary resume entrypoint.",
     "Event-history rebuild is used as a fallback only when materialized transaction state is missing, incomplete, or inconsistent.",
     "Resume logic no longer depends on transaction-name prefixes, substring matching, ticket-name-derived inference, or similar identity heuristics in normal flow.",
-    "Resume logic uses canonical status, terminal state, exact active transaction identity, and `next_action` to decide continuation behavior.",
+    "Resume logic uses the top-level continuation surface — canonical top-level `status`, `phase`, `next_action`, `terminal`, `semantic_summary`, `verify_state`, and `commit_state` — together with exact active transaction identity when `active_tx` is present, to decide continuation behavior.",
     "If the active transaction is terminal, resume does not re-activate it as current work.",
     "If no active non-terminal transaction exists, runtime behavior distinguishes that state clearly from interrupted active work.",
     "If canonical persistence is malformed or ambiguous, resume fails clearly instead of silently guessing a continuation target.",
@@ -50,7 +50,7 @@
     "Update resume-entry behavior so it first loads canonical materialized transaction state and validates whether an exact active non-terminal transaction exists.",
     "Update fallback behavior so event-history rebuild is used only when materialized transaction state is missing, incomplete, or inconsistent.",
     "Ensure rebuild logic reconstructs the exact active transaction from canonical history instead of guessing a replacement candidate.",
-    "Update continuation logic so `next_action` is the primary machine-readable guide for how interrupted work should proceed after resume.",
+    "Update continuation logic so the top-level continuation surface is loaded first, with top-level `status`, `phase`, `next_action`, `terminal`, `semantic_summary`, `verify_state`, and `commit_state` treated as the canonical resume surface, and with top-level `next_action` as the primary machine-readable guide for how interrupted work should proceed after resume.",
     "Ensure resume behavior distinguishes clearly between active non-terminal work, terminal historical work, and no active work.",
     "Ensure interrupted verify, commit, and post-commit pre-terminal states resume the same active transaction without duplicating logical completion.",
     "Remove or refactor runtime logic that uses ticket-derived inference, transaction string-shape checks, timestamp-first selection, or other heuristic matching to decide which transaction to resume.",
@@ -58,13 +58,7 @@
     "Add or update regression tests covering exact active-transaction resume, rebuild fallback, and idempotent continuation across key interruption checkpoints.",
     "Document any bounded compatibility rules required so legacy histories remain replayable without reintroducing heuristic resume selection into new runtime behavior."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02",
-    "p1-t03",
-    "p2-t01",
-    "p2-t02"
-  ],
+  "dependencies": ["p1-t01", "p1-t02", "p1-t03", "p2-t01", "p2-t02"],
   "notes": [
     "This ticket is runtime implementation work, not only contract-definition work.",
     "The most important outcome is that resume behavior becomes exact and deterministic: continue the active transaction if it exists, otherwise do not invent one.",
@@ -75,6 +69,7 @@
   "schema_notes": {
     "resume_model": {
       "primary_resume_anchor": "Healthy canonical materialized transaction state.",
+      "primary_resume_surface": "The top-level continuation surface: top-level canonical `status`, `phase`, `next_action`, `terminal`, `semantic_summary`, `verify_state`, and `commit_state`, together with exact active transaction identity when `active_tx` is present.",
       "fallback_resume_anchor": "Canonical event-history rebuild when materialized state is missing, incomplete, or inconsistent.",
       "forbidden_normal_resume_behavior": [
         "heuristic replacement transaction selection",
@@ -84,9 +79,9 @@
       ]
     },
     "continuation_rules": {
-      "active_non_terminal": "Resume must continue the exact active transaction and follow canonical `next_action`.",
+      "active_non_terminal": "Resume must continue the exact active transaction and follow the top-level continuation surface, especially top-level `next_action`, while treating top-level `status`, `phase`, `terminal`, `semantic_summary`, `verify_state`, and `commit_state` as canonical resume inputs.",
       "terminal_transaction": "Resume must not re-activate a terminal transaction as active work.",
-      "no_active_transaction": "Runtime behavior must represent and handle the absence of active non-terminal work explicitly."
+      "no_active_transaction": "Runtime behavior must represent and handle the absence of active non-terminal work explicitly, including the no-active state where `active_tx` is null and top-level continuation fields represent begin-ready state."
     },
     "error_behavior": {
       "ambiguous_state": "Fail clearly when canonical persistence is ambiguous and no safe deterministic continuation target exists.",
@@ -99,7 +94,7 @@
       "no_forced_rewrite": "Forward migration does not require rewriting historical event logs in place."
     },
     "test_focus": [
-      "resume from healthy materialized active state",
+      "resume from healthy materialized active state using the top-level continuation surface plus exact active transaction identity",
       "resume from rebuild fallback when state is missing or incomplete",
       "interrupted verify continuation",
       "interrupted commit continuation",
@@ -108,7 +103,7 @@
       "malformed or ambiguous persistence fails clearly"
     ],
     "design_bias": {
-      "preferred_anchor": "Exact active transaction identity plus canonical status plus `next_action`.",
+      "preferred_anchor": "Exact active transaction identity plus the top-level continuation surface (`status`, `phase`, `next_action`, `terminal`, `semantic_summary`, `verify_state`, and `commit_state`).",
       "avoid": [
         "heuristic candidate selection",
         "guessing replacement active transactions",
