@@ -32,6 +32,7 @@
     "The contract explicitly states that `.agent/tx_event_log.jsonl` is the append-only authoritative history and rebuild source.",
     "The contract explicitly states that `.agent/tx_id_counter.json` is issuance metadata and not lifecycle history.",
     "The contract defines the minimum required canonical fields or responsibilities for `.agent/tx_state.json` needed to continue an interrupted active transaction safely.",
+    "The contract defines the minimum required JSON-facing field set for `.agent/tx_state.json`, `.agent/tx_event_log.jsonl`, and `.agent/tx_id_counter.json`.",
     "The contract defines the required fields and meanings for `.agent/tx_id_counter.json`, including `last_issued_id` and `updated_at`.",
     "The contract explicitly defines the canonical write-order rule: event append before materialized state update before any required cursor or snapshot persistence.",
     "The contract explicitly defines the resume and rebuild source-of-truth order: healthy `.agent/tx_state.json` first, then exact rebuild from `.agent/tx_event_log.jsonl` when materialized state is missing, incomplete, or inconsistent, then explicit failure when deterministic continuation cannot be established safely.",
@@ -45,6 +46,7 @@
   "tasks": [
     "Define the canonical responsibilities of `.agent/tx_state.json` in the redesigned resumable transaction protocol.",
     "Define the minimum transaction-state information that must be materialized to resume an interrupted active transaction safely.",
+    "Define the exact minimum JSON-facing field set for `.agent/tx_state.json` required for deterministic resume.",
     "Define the canonical responsibilities of `.agent/tx_event_log.jsonl` as append-only history, integrity trace, and rebuild source.",
     "Define the canonical responsibilities of `.agent/tx_id_counter.json` as issuance metadata rather than workflow history.",
     "Define the required fields and field meanings for `.agent/tx_id_counter.json`, including `last_issued_id` and `updated_at`.",
@@ -53,6 +55,7 @@
     "Define the canonical resume source-of-truth order, including when to trust materialized state and when exact rebuild from event history is required.",
     "Define the fallback behavior for missing `.agent/tx_state.json`, missing `.agent/tx_id_counter.json`, missing `.agent/tx_event_log.jsonl`, and missing-but-valid zero-event baselines where applicable.",
     "Define the failure behavior for malformed `.agent/tx_state.json`, malformed `.agent/tx_event_log.jsonl`, malformed `.agent/tx_id_counter.json`, and ambiguous integrity states that cannot safely continue.",
+    "Define a machine-implementable error classification surface for canonical persistence failures and integrity blocking states.",
     "Define the monotonic transaction ID issuance semantics, including initial counter value, first issued ID, increment rule, and issuance timing.",
     "Define the rule that only canonical transaction begin may mint a new `tx_id`, and explicitly forbid minting new IDs during resume, rebuild, verify, commit, or repair continuation.",
     "Leave implementation-ready notes for downstream tickets that will update state persistence, rebuild logic, transaction issuance helpers, validation behavior, and interruption-focused regression coverage."
@@ -84,12 +87,55 @@
         "Record current `next_action`",
         "Record terminal versus non-terminal state",
         "Record semantic summary or equivalent continuation context"
-      ]
+      ],
+      "required_json_fields": {
+        "schema_version": "Version marker for the materialized transaction-state format.",
+        "active_tx": "Object describing the exact active transaction or explicit no-active-transaction representation.",
+        "last_applied_seq": "Highest canonical event-log sequence already reflected in the materialized state.",
+        "updated_at": "RFC 3339 timestamp of the most recent successful materialized-state update.",
+        "integrity": "Object carrying rebuild and drift metadata for resume safety."
+      },
+      "active_tx_required_fields": {
+        "tx_id": "Exact server-issued transaction identifier for the active transaction.",
+        "ticket_id": "Client-facing ticket identity associated with the active transaction.",
+        "status": "Canonical lifecycle status for the active transaction.",
+        "phase": "Canonical phase value used for continuation and helper guidance.",
+        "current_step": "Current workflow step or checkpoint identifier.",
+        "next_action": "Machine-readable continuation action.",
+        "terminal": "Boolean indicating whether the active transaction is terminal.",
+        "semantic_summary": "Required non-terminal continuation summary.",
+        "session_id": "Session correlation value when session context is present.",
+        "verify_state": "Verification checkpoint object.",
+        "commit_state": "Commit checkpoint object."
+      },
+      "integrity_required_fields": {
+        "state_hash": "Hash of the materialized state payload excluding volatile fields when such hashing is enabled.",
+        "rebuilt_from_seq": "Sequence boundary used when the current state was rebuilt or confirmed from event history.",
+        "drift_detected": "Boolean indicating materialized-versus-rebuild inconsistency.",
+        "active_tx_source": "Marker describing whether active transaction context came from materialized state or rebuild."
+      }
     },
     "tx_event_log_contract": {
       "role": "Append-only authoritative history, integrity trace, and rebuild source.",
       "ordering_key": "seq",
-      "rebuild_role": "Used when materialized transaction state is missing, incomplete, or needs strict reconstruction."
+      "rebuild_role": "Used when materialized transaction state is missing, incomplete, or needs strict reconstruction.",
+      "required_event_fields": {
+        "seq": "Canonical global append-order integer.",
+        "tx_id": "Exact transaction identifier associated with the event.",
+        "ticket_id": "Ticket identity associated with the transaction event.",
+        "event_type": "Canonical event taxonomy value.",
+        "phase": "Lifecycle phase at the moment of the event.",
+        "step_id": "Workflow checkpoint identifier associated with the event.",
+        "actor": "Structured actor object describing the emitter.",
+        "session_id": "Session correlation value for the event.",
+        "payload": "Event-type-specific JSON object.",
+        "ts": "RFC 3339 event timestamp."
+      },
+      "representation_rules": {
+        "jsonl_record_shape": "Each non-empty line must be one valid JSON object representing exactly one canonical event.",
+        "ordering_rule": "Replay order is strict ascending `seq` order.",
+        "integrity_rule": "Malformed lines are integrity failures for canonical replay, not ignorable soft warnings."
+      }
     },
     "tx_id_counter_contract": {
       "path": ".agent/tx_id_counter.json",
@@ -97,6 +143,11 @@
       "field_semantics": {
         "last_issued_id": "The most recent issued monotonic transaction identifier.",
         "updated_at": "RFC 3339 timestamp of the most recent successful counter update."
+      },
+      "validation_rules": {
+        "last_issued_id": "Must be a non-negative integer in the counter artifact even though issued `tx_id` values are stringified in JSON-facing transaction artifacts.",
+        "updated_at": "Must be a valid RFC 3339 timestamp.",
+        "lifecycle_boundary": "This artifact is issuance metadata only and must not be used as a substitute for lifecycle history or active transaction state."
       }
     },
     "write_order": {
@@ -122,6 +173,15 @@
       "missing_vs_malformed": {
         "missing": "May trigger documented initialization or rebuild behavior when the artifact type allows it.",
         "malformed": "Must fail clearly and must not be silently treated as empty or valid baseline state."
+      },
+      "error_classification": {
+        "missing_tx_state": "Recoverable only through exact rebuild from a healthy canonical event log.",
+        "missing_tx_event_log": "Workspace initialization or damage failure; must block canonical replay.",
+        "missing_tx_id_counter": "Issuance-path failure; resume of an already known active transaction may still proceed if canonical transaction state is otherwise healthy.",
+        "malformed_tx_state": "Canonical materialized-state integrity failure.",
+        "malformed_tx_event_log": "Canonical replay integrity failure.",
+        "malformed_tx_id_counter": "Canonical issuance-metadata integrity failure.",
+        "ambiguous_integrity_state": "Explicit blocked failure because deterministic continuation cannot be established safely."
       }
     },
     "issuance_model": {
