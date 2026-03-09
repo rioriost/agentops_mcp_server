@@ -2,7 +2,7 @@
   "id": "p2-t01",
   "title": "Add regression coverage for commit/finalize workflow contract alignment",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Add regression coverage for the 0.5.2 workflow contract clarification so agents can reliably infer the correct next action after verify and commit operations. This ticket should protect the alignment between canonical `.rules`, bootstrap-generated rules, and tool responses by ensuring that successful commit helpers clearly expose non-terminal `committed` state, required follow-up terminal closure, and canonical next-action guidance.",
   "inputs": [
     "docs/draft_0.5.2.md",

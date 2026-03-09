@@ -2,7 +2,7 @@
   "id": "p2-t02",
   "title": "Align `repo_verify` responses with canonical next-step workflow guidance",
   "priority": "P2",
-  "status": "verified",
+  "status": "done",
   "summary": "Improve the `repo_verify` response contract so an agent following `.rules` can reliably determine what canonical workflow step comes next after verification. This ticket evaluates and, if appropriate, expands `repo_verify` so successful verification clearly exposes resulting transaction status, resulting phase, next action, and whether the workflow should proceed toward commit or return to fix-and-retry behavior.",
   "inputs": [
     "docs/draft_0.5.2.md",

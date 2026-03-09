@@ -2,7 +2,7 @@
   "id": "p1-t01",
   "title": "Clarify the commit-to-done workflow contract in canonical and generated `.rules`",
   "priority": "P0",
-  "status": "verified",
+  "status": "done",
   "summary": "Align the machine-facing workflow contract so agents can reliably distinguish between successful commit completion and terminal task completion. This ticket updates the canonical `.rules` contract and the generated rules surfaces so they explicitly state that commit helpers may leave a transaction in non-terminal `committed` with `next_action = tx.end.done`, and that terminal success still requires an explicit `ops_end_task(status=\"done\")` transition.",
   "inputs": [
     "docs/draft_0.5.2.md",

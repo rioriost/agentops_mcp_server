@@ -2,7 +2,7 @@
   "id": "p1-t02",
   "title": "Expand commit and verify tool responses to expose canonical workflow follow-up",
   "priority": "P0",
-  "status": "verified",
+  "status": "done",
   "summary": "Strengthen the response contracts of workflow-driving tools so an agent following `.rules` can reliably determine whether a transaction is terminal or still requires explicit follow-up. This ticket focuses on `commit_if_verified`, `repo_commit`, and, if appropriate for consistency, `repo_verify`, so their responses expose canonical workflow cues such as current status, current phase, next action, and whether `ops_end_task` is still required.",
   "inputs": [
     "docs/draft_0.5.2.md",

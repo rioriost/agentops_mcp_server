@@ -2,7 +2,7 @@
   "id": "p3-t01",
   "title": "Add regression coverage for rules and tool-response workflow contract alignment",
   "priority": "P1",
-  "status": "verified",
+  "status": "done",
   "summary": "Add regression coverage for the 0.5.2 workflow contract clarification so agents can reliably infer the correct next action from `.rules` plus workflow-driving tool responses. This ticket protects the alignment between canonical `.rules`, generated workspace rules, fallback rules, and the responses of `commit_if_verified`, `repo_commit`, and, if expanded, `repo_verify`, with particular focus on the non-terminal `committed` state and the still-required `ops_end_task(status=\"done\")` follow-up.",
   "inputs": [
     "docs/draft_0.5.2.md",
