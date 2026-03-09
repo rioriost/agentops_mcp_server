@@ -1,19 +1,20 @@
 # Zed AgentOps
 
-Zed AgentOps は、Zed 上で edit → verify → commit の流れを回しやすくするための MCP サーバーと、再開しやすい作業用スキャフォールドを提供します。
+Zed AgentOps は、Zed 上で edit → verify → commit のワークフローを回すためのローカル MCP サーバーと、作業再開しやすいプロジェクト用スキャフォールドを提供します。
 
 > 現在の対応環境は macOS のみです。
 
-## できること
+## What it does
 
-- Zed で AgentOps を使うためのプロジェクト雛形を作成
-- リポジトリ操作、検証、作業再開を支援するローカル MCP サーバーを提供
-- プロジェクトごとに拡張できる標準 `verify` エントリーポイントを追加
-- セッション中断後でも作業を再開しやすくするためのローカル状態を保持
+- Zed で AgentOps を使うためのプロジェクト雛形を作成します
+- リポジトリ操作、検証、作業再開を支援するローカル MCP サーバーを提供します
+- プロジェクトごとに拡張できる標準 `verify` / `verify-release` エントリーポイントを追加します
+- セッション中断後でも作業を再開しやすくするためのローカル状態を保持します
+- 生成されるスキャフォールド、runtime の workflow rules、helper behavior を、v0.5.0 でサポートする contract に揃えます
 
-この README は利用者向けです。内部実装の詳細は必要最小限に絞っています。
+この README は利用者向けです。AgentOps を実際に使い始めるための流れに絞って説明します。
 
-## インストール
+## Installation
 
 Homebrew でインストールします。
 
@@ -22,51 +23,24 @@ brew tap rioriost/agentops_mcp_server
 brew install agentops_mcp_server
 ```
 
-これにより、`agentops_mcp_server` と `zed-agentops-init.sh` がインストールされます。
+これにより、次がインストールされます。
 
-## クイックスタート
+- `agentops_mcp_server`
+- `zed-agentops-init`
 
-新しいプロジェクトディレクトリを初期化する場合:
+## Usage
 
-```bash
-zed-agentops-init.sh my_project
-```
+### Zedの設定
 
-既存の AgentOps 管理ディレクトリを更新する場合:
+AgentOps を使い始める前に、Zed 側で MCP サーバーを使えるように設定してください。
 
-```bash
-zed-agentops-init.sh --update my_project
-```
+v0.5.0 のワークフローでは、実質的にこれは必須です。想定されている運用は次を前提にしています。
 
-初期化後の流れ:
+- MCP サーバーが Zed に登録されていること
+- Agent Panel から AgentOps の tool を呼べること
+- よく使う AgentOps tool にあらかじめ permission が付与されていること
 
-1. ディレクトリを Zed で開く
-2. Zed の設定に MCP サーバーを登録する
-3. Agent Panel を開く
-4. リポジトリ上で作業を開始する
-
-## 初期化で作成されるもの
-
-`zed-agentops-init.sh` を実行すると、Zed で AgentOps を使い始めるために必要なファイルが作成されます。
-
-- `.rules`
-- `.zed/tasks.json`
-- `.zed/scripts/verify`
-- `.agent/tx_event_log.jsonl`
-- `.agent/tx_state.json`
-
-加えて、次も行います。
-
-- Git リポジトリが無ければ初期化
-- `.gitignore` に一般的な除外設定を追記
-- 既存ファイルは可能な限り保持
-- `--update` により既存セットアップを更新可能
-
-## 推奨される Zed 設定
-
-Zed の設定に MCP サーバーを追加してください。
-
-最小構成の MCP サーバー設定例:
+まず、Zed の設定に MCP サーバーを追加します。
 
 ```json
 {
@@ -80,7 +54,7 @@ Zed の設定に MCP サーバーを追加してください。
 }
 ```
 
-加えて、Agent Panel でよく使う AgentOps ツールをあらかじめ許可したい場合は、`settings.json` の権限設定に次のような項目を含められます。
+次に、workflow に必要な MCP tools を許可してください。実用上のベースラインは次のようになります。
 
 ```json
 {
@@ -141,6 +115,15 @@ Zed の設定に MCP サーバーを追加してください。
   "mcp:agentops-server:ops_end_task": {
     "default": "allow"
   },
+  "mcp:agentops-server:ops_add_file_intent": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_update_file_intent": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_complete_file_intent": {
+    "default": "allow"
+  },
   "mcp:agentops-server:ops_capture_state": {
     "default": "allow"
   },
@@ -153,88 +136,264 @@ Zed の設定に MCP サーバーを追加してください。
 }
 ```
 
-権限設定は、必要に応じてご自身のセキュリティ方針に合わせて調整してください。
+必要に応じて permission は調整してください。ただし、これらがブロックされていると、v0.5.0 の想定ワークフローは成立しません。
 
-## 基本的な使い方
+### zed-agentops-initによるプロジェクトの初期化
 
-プロジェクトを初期化したあとの基本的な流れは次のとおりです。
-
-1. エージェントに変更を依頼する
-2. プロジェクトの検証を実行させる
-3. 結果を確認する
-4. 変更をコミットする
-
-標準の検証入口は次です。
+AgentOps 管理対象のプロジェクトを新規作成または更新します。
 
 ```bash
-.zed/scripts/verify
+zed-agentops-init my_project
 ```
 
-必要に応じて、各リポジトリ向けに内容を拡張してください。  
-デフォルトでは、変更されたファイルに応じて、利用可能なツールが入っていれば Python、Swift、Rust、Shell、Bicep などの代表的なチェックを試みます。
+既存の AgentOps-managed directory を更新する場合は:
 
-## リリース向け検証 / カバレッジ
+```bash
+zed-agentops-init --update my_project
+```
 
-リリース向けの Python カバレッジ計測には、次を使ってください。
+古い AgentOps scaffold を現在の workflow contract に合わせたい場合は、`--update` を使ってください。
+
+#### 何が作成されるか
+
+`zed-agentops-init` を実行すると、Zed で AgentOps を使い始めるために必要なファイルが作成されます。
+
+- `.rules`
+- `.zed/tasks.json`
+- `.zed/scripts/verify`
+- `.agent/tx_event_log.jsonl`
+- `.agent/tx_state.json`
+
+加えて、次も行います。
+
+- Git リポジトリが無ければ初期化します
+- `.gitignore` に一般的な除外設定を追記します
+- 既存ファイルは可能な限り保持します
+- `--update` により既存セットアップを更新できます
+
+初期生成される `.agent/tx_state.json` は、正規化された empty-transaction state です。通常の runtime 解釈に必要な主な top-level field と metadata を含みます。
+
+- `schema_version`
+- `active_tx`
+- `last_applied_seq`
+- `integrity.state_hash`
+- `integrity.rebuilt_from_seq`
+- `integrity.drift_detected`
+- `integrity.active_tx_source`
+- `updated_at`
+
+この baseline は、canonical event replay をしないと分からない runtime-only facts を捏造せずに、runtime で再構築されるより豊かな state shape と整合するように設計されています。
+
+### プロジェクトをZedで開く
+
+初期化後は、次の順で進めるのが基本です。
+
+1. プロジェクトディレクトリを Zed で開く
+2. MCP サーバー設定が有効になっていることを確認する
+3. Agent Panel を開く
+4. Agent が必要な AgentOps tools にアクセスできることを確認する
+5. 初期化した repository root から作業を始める
+
+v0.5.0 でサポートされる workflow では、Agent は root-dependent な操作の前に workspace を初期化し、`.agent/tx_state.json` と `.agent/tx_event_log.jsonl` を canonical なローカル workflow state として扱うことが期待されます。
+
+### 必要に応じてverify / verify-releaseの設定
+
+scaffold には次が含まれます。
+
+- `.zed/scripts/verify`
+- `.zed/scripts/verify-release`
+
+デフォルトの `verify` は意図的に控えめです。各プロジェクトに合わせて拡張してください。
+
+Python プロジェクトでよくある考え方は次です。
+
+- `verify`: 日常作業向けの軽量チェック
+- `verify-release`: リリース向けのより完全な検証
+
+たとえば Python なら、次のような構成が考えられます。
+
+- `.zed/scripts/verify`
+  - `ruff check`
+  - `ruff format --check`
+  - `pytest -q`
+- `.zed/scripts/verify-release`
+  - `pytest --cov`
+
+デフォルトのリリース向けカバレッジ入口は次です。
 
 ```bash
 .zed/scripts/verify-release
 ```
 
-これには `pytest-cov` が必要です。
+Python の coverage に使う場合は `pytest-cov` が必要です。
 
-## 古いバージョンから更新する場合
+### プログラミング言語に応じたプロジェクトの初期化
+
+AgentOps は workflow を scaffold しますが、各言語や package manager の本来の project initialization を置き換えるものではありません。
+
+たとえば Python プロジェクトで `uv` を使う場合は、次のように初期化します。
+
+```bash
+uv init
+```
+
+その後、プロジェクトに必要なチェックを `.zed/scripts/verify` と `.zed/scripts/verify-release` に追加してください。
+
+他の ecosystem でも同様に、その言語に適したツールで project 自体を初期化してから Agent に実作業を依頼するのが自然です。
+
+### プロジェクトにdocsディレクトリを作成し、draftを書く
+
+v0.5.0 の workflow では、プロジェクトに `docs` ディレクトリを作って、たとえば次のような draft を書くのが有効です。
+
+```text
+docs/draft_0.1.0.md
+```
+
+この draft には、たとえば次を書きます。
+
+- 目的
+- スコープ
+- 制約
+- 優先順位
+- フェーズ
+- 想定チケット
+
+この draft は、ユーザーが全部自分で書いてもかまいませんし、AI エージェントと一緒に要件を洗い出しながら作ってもかまいません。どちらも正しい使い方です。
+
+実践的には、次の流れが扱いやすいです。
+
+1. `docs/` を作る
+2. まず自分が分かっている要件を書き出す
+3. エージェントに draft をもとに phase や ticket へ分解させる
+4. その plan を workflow guidance として使う
+
+v0.5.0 で重要な boundary は次です。
+
+- `docs/` 配下の planning files は有用な workflow artifact です
+- ただし server が管理する mandatory protocol state ではありません
+- server はそれら planning artifact の生成・同期・検証を保証しません
+
+つまり、これらは user-managed / client-managed な workflow document と理解するのが正確です。
+
+## Updating from older versions
 
 すでに Zed AgentOps を使っている場合は、次を実行してください。
 
 ```bash
-zed-agentops-init.sh --update <project>
+zed-agentops-init --update <project>
 ```
 
-これにより、主に次の利用者向けセットアップが更新されます。
+これにより、主に次の user-facing scaffold が更新されます。
 
 - `.rules`
 - `.agent` の状態ファイルの存在
-- 必要に応じた標準の verify / task スキャフォールド
+- 必要に応じた標準の verify / task scaffolding
 
-最近のバージョンでは、作業再開まわりと状態整合性も改善されているため、古いスキャフォールドを使っている場合は新しい作業を始める前に更新を推奨します。
+古い scaffold から移行する場合、更新を推奨します。最近の version では次が強化されています。
 
-## 最近の変更点
+- resumability behavior
+- transaction/state alignment
+- workflow rule clarity
+- scaffold/runtime consistency
 
-### 現在の動作の要点
+多くのケースでは `--update` で十分です。
 
-- スキャフォールド生成時の `.rules` が現在のワークフロー前提に揃うようになりました
-- 初期トランザクション状態が現在の基準値に揃いました
-- 作業再開はローカルの AgentOps 状態ファイルを中心に扱う前提です
-- セッション中断と再開をより安全に扱える初期構成になっています
+## What's new in v0.5.0
 
-### 古いスキャフォールドから更新した場合に変わること
+v0.5.0 の user-facing な変化は、主に **分かりやすさと予測可能性** にあります。
 
-次のような更新が入る場合があります。
+### 1. ドキュメントの workflow と、実際にサポートされる workflow が近づいた
 
-- `.rules` の更新
-- 初期状態デフォルト値の更新
-- スキャフォールドと現在の実行時挙動の整合性向上
+v0.5.0 の主目的は、次のズレを減らすことです。
 
-ほとんどのケースでは `--update` で十分です。
+- `.rules`
+- 生成される scaffold
+- runtime server behavior
+- helper tools
+- release-facing documentation
 
-## よく触るファイル
+ユーザー目線では、「書かれている workflow を以前より信頼しやすくなった」と考えてよいです。
 
-- `.rules` — エージェントのコンテキストに注入されるプロジェクト指示
-- `.zed/scripts/verify` — 主な検証エントリーポイント
-- `.zed/tasks.json` — 再利用可能な Zed タスク
-- `.agent/tx_event_log.jsonl` — ローカルの AgentOps イベントログ
-- `.agent/tx_state.json` — 作業再開に使われるローカル状態
+### 2. ticket files は server protocol ではなく convention
 
-利用者の観点では、重要なのはシンプルです。  
-最新のスキャフォールドを使うか `--update` を実行して、`.rules` を最新に保ってください。
+次のような planning files を管理していても:
 
-## 補足
+- `docs/__version__/plan.md`
+- `docs/__version__/tickets_list.json`
+- `docs/__version__/pX-tY.json`
+
+それらは便利な workflow document ですが、canonical な server-managed state ではありません。
+
+実務上は:
+
+- 手で管理してよい
+- Agent と一緒に管理してよい
+- ただし server が自動生成・同期・検証してくれる前提にはしない
+
+という理解が正しいです。
+
+### 3. canonical なローカル workflow state は `.agent/` 配下にある
+
+実用上、最も重要な canonical artifact は次です。
+
+- `.agent/tx_event_log.jsonl`
+- `.agent/tx_state.json`
+
+handoff や planning docs は便利ですが、canonical workflow record ではありません。
+
+### 4. commit workflow がより明示的になった
+
+サポートされる flow は以前より厳密です。
+
+- verify の後に commit
+- 変更がなければ commit しない
+
+これにより、空 commit や未検証 commit を減らしやすくなりました。
+
+### 5. file-intent workflow を安全に使いやすくなった
+
+サポートされる helper surface は次です。
+
+- `ops_add_file_intent`
+- `ops_update_file_intent`
+- `ops_complete_file_intent`
+
+これらにより、canonical transaction rules を緩めずに、一般的な file-intent workflow を扱いやすくしています。
+
+### 6. bootstrap state を理解しやすくなった
+
+初期の `.agent/tx_state.json` baseline がより正規化され、古い scaffold 由来の欠損と runtime 上まだ materialize されていない情報を混同しにくくなりました。
+
+### 7. version concepts は意図的に分かれている
+
+見える version は1種類ではありません。
+
+- package/server version
+- transaction/schema version
+- draft/release-plan version
+
+これは正常です。`docs` 上の version label と persisted transaction schema version が常に同じとは限りません。
+
+### v0.5.0 における、ユーザー向けの実践的な推奨
+
+日常運用では、次を意識すると扱いやすいです。
+
+1. 必要に応じて `zed-agentops-init --update` で scaffold を最新に保つ
+2. `.agent/tx_state.json` と `.agent/tx_event_log.jsonl` を canonical なローカル workflow state とみなす
+3. `docs/` 配下の planning files は便利な convention であり、server protocol ではないと理解する
+4. `verify` / `verify-release` は自分のプロジェクトに合わせて必ず調整する
+5. 大きな作業の前に、`docs/` に小さくてもよいので draft を書く
+6. Agent の workflow は以前より initialize → change → verify → commit を厳密に踏む前提で考える
+
+v0.5.0 の client/server contract をもう少し詳しく知りたい場合は、`docs/v0.5.0/interoperability.md` を参照してください。
+
+## Notes
 
 - 現時点では macOS のみ対応
-- 生成されるスキャフォールドは、各リポジトリに合わせて調整する前提です
-- 標準の verify スクリプトは控えめな初期設定なので、プロジェクトに応じた追加が必要になることがあります
+- 生成される scaffold は各リポジトリに合わせて調整する前提です
+- デフォルトの verify scripts は意図的に控えめなので、プロジェクトごとの追加設定が必要です
+- v0.5.0 では enforced protocol behavior と user-managed workflow convention を意図的に区別しています
 
-## ライセンス
+## License
 
 MIT

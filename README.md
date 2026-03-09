@@ -1,17 +1,18 @@
 # Zed AgentOps
 
-Zed AgentOps helps you run an edit → verify → commit loop inside Zed with an MCP server and a project scaffold designed for resumable agent work.
+Zed AgentOps helps you run an edit → verify → commit workflow inside Zed with a local MCP server and a project template designed for resumable agent work.
 
 > Currently supported on macOS.
 
 ## What it does
 
-- Scaffolds a project for AgentOps use in Zed
-- Provides a local MCP server for repo, verification, and resume-oriented workflow helpers
-- Adds a default `verify` entry point you can extend for your project
+- Creates a project template for using AgentOps in Zed
+- Provides a local MCP server for repository, verification, and resume-oriented workflow helpers
+- Adds default `verify` and `verify-release` entry points that you can extend for your project
 - Keeps enough local state for the agent to resume work more reliably across interrupted sessions
+- Aligns the generated project template, runtime workflow rules, and helper behavior around the supported v0.5.0 contract
 
-This README is written for users of the tool. Internal implementation details are intentionally kept to a minimum.
+This README is written for users of the tool. It focuses on how to set up and use AgentOps in practice.
 
 ## Installation
 
@@ -22,63 +23,24 @@ brew tap rioriost/agentops_mcp_server
 brew install agentops_mcp_server
 ```
 
-This installs the `agentops_mcp_server` binary and `zed-agentops-init.sh`.
+This installs:
 
-## Quick start
+- `agentops_mcp_server`
+- `zed-agentops-init`
 
-Initialize a new project directory:
+## Usage
 
-```bash
-zed-agentops-init.sh my_project
-```
+### Zed configuration
 
-Update an existing AgentOps-managed directory:
+Before you start using AgentOps in a project, configure Zed to use the MCP server.
 
-```bash
-zed-agentops-init.sh --update my_project
-```
+For v0.5.0, this is effectively required. The intended workflow assumes:
 
-After initialization:
+- the MCP server is registered in Zed
+- the Agent Panel can call the AgentOps tools it needs
+- the commonly used AgentOps tools are pre-allowed in tool permissions
 
-1. Open the directory in Zed
-2. Register the MCP server in your Zed settings
-3. Open the Agent Panel
-4. Start working in the repo
-
-## What initialization creates
-
-Running `zed-agentops-init.sh` sets up the files you need to start using AgentOps in Zed:
-
-- `.rules`
-- `.zed/tasks.json`
-- `.zed/scripts/verify`
-- `.agent/tx_event_log.jsonl`
-- `.agent/tx_state.json`
-
-The baseline `.agent/tx_state.json` is intentionally a normalized empty-transaction state. It includes the canonical top-level fields and metadata needed for normal runtime interpretation, including:
-
-- `schema_version` for the transaction state format
-- `active_tx` initialized to the safe `none` / `planned` baseline
-- `last_applied_seq`
-- `integrity.state_hash`
-- `integrity.rebuilt_from_seq`
-- `integrity.drift_detected`
-- `integrity.active_tx_source`
-- `updated_at`
-
-This baseline is meant to be compatible with the richer runtime-rebuilt state shape without inventing runtime-only facts that can only be known after canonical event replay.
-
-It also:
-- creates a Git repository if one does not already exist
-- appends common ignore entries to `.gitignore`
-- preserves existing files when possible
-- supports `--update` to refresh an existing setup
-
-## Recommended Zed configuration
-
-Add the MCP server to your Zed settings.
-
-Minimal MCP server example:
+Add the MCP server to your Zed settings:
 
 ```json
 {
@@ -92,7 +54,7 @@ Minimal MCP server example:
 }
 ```
 
-If you also want to pre-allow commonly used AgentOps tools in the Agent Panel, your `settings.json` can include entries like this under your tool permissions:
+Then allow the MCP tools the workflow depends on. A practical baseline is:
 
 ```json
 {
@@ -153,6 +115,15 @@ If you also want to pre-allow commonly used AgentOps tools in the Agent Panel, y
   "mcp:agentops-server:ops_end_task": {
     "default": "allow"
   },
+  "mcp:agentops-server:ops_add_file_intent": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_update_file_intent": {
+    "default": "allow"
+  },
+  "mcp:agentops-server:ops_complete_file_intent": {
+    "default": "allow"
+  },
   "mcp:agentops-server:ops_capture_state": {
     "default": "allow"
   },
@@ -165,97 +136,257 @@ If you also want to pre-allow commonly used AgentOps tools in the Agent Panel, y
 }
 ```
 
-Adjust permissions to match your own security preferences.
+Adjust permissions to match your own security preferences, but if these tools are blocked the intended workflow will be incomplete.
 
-## Typical usage flow
+### Initialize a project with `zed-agentops-init`
 
-Once the project is initialized, the normal flow is:
-
-1. Ask the agent to make a change
-2. Let it run project verification
-3. Review the result
-4. Commit the change
-
-The scaffolded verify script is the default entry point for checks:
+Create or update an AgentOps-managed project with:
 
 ```bash
-.zed/scripts/verify
+zed-agentops-init my_project
 ```
 
-Extend it to match your repository. By default, it tries common checks for changed files, such as Python, Swift, Rust, shell scripts, and Bicep where the corresponding tools are installed.
+or:
 
-## Release verification / coverage
+```bash
+zed-agentops-init --update my_project
+```
 
-For release-oriented Python coverage runs, use:
+Use `--update` when you already have an older AgentOps template and want to refresh it to the current workflow contract.
+
+#### What initialization creates
+
+Running `zed-agentops-init` sets up the files you need to start using AgentOps in Zed:
+
+- `.rules`
+- `.zed/tasks.json`
+- `.zed/scripts/verify`
+- `.agent/tx_event_log.jsonl`
+- `.agent/tx_state.json`
+
+It also:
+
+- creates a Git repository if one does not already exist
+- appends common ignore entries to `.gitignore`
+- preserves existing files when possible
+- supports `--update` to refresh an existing setup
+
+The baseline `.agent/tx_state.json` is intentionally a normalized empty-transaction state. It includes the major top-level fields and metadata needed for normal runtime interpretation, including:
+
+- `schema_version`
+- `active_tx`
+- `last_applied_seq`
+- `integrity.state_hash`
+- `integrity.rebuilt_from_seq`
+- `integrity.drift_detected`
+- `integrity.active_tx_source`
+- `updated_at`
+
+This baseline is designed to be compatible with the richer runtime-rebuilt state shape without inventing runtime-only facts that can only be known after canonical event replay.
+
+### Open the project in Zed
+
+After initialization:
+
+1. Open the project directory in Zed
+2. Make sure your MCP server configuration is active
+3. Open the Agent Panel
+4. Confirm the agent can access the required AgentOps tools
+5. Start work from the initialized repository root
+
+For the supported workflow, the agent should initialize the workspace root before root-dependent operations and should treat `.agent/tx_state.json` and `.agent/tx_event_log.jsonl` as the canonical local workflow state.
+
+### Configure `verify` / `verify-release` as needed
+
+The generated template includes:
+
+- `.zed/scripts/verify`
+- `.zed/scripts/verify-release`
+
+The default `verify` script is intentionally conservative. Extend it to match your project.
+
+A common Python-oriented setup is:
+
+- `verify`: fast local checks for day-to-day work
+- `verify-release`: more complete checks for release-oriented validation
+
+For example, in a Python project you may want:
+
+- `.zed/scripts/verify` to run `ruff check`, `ruff format --check`, and `pytest -q`
+- `.zed/scripts/verify-release` to run full coverage, such as `pytest --cov`
+
+The default release-oriented coverage entry point is:
 
 ```bash
 .zed/scripts/verify-release
 ```
 
-This requires `pytest-cov` to be available.
+This requires `pytest-cov` to be available if you use it for Python coverage.
+
+### Initialize the language-specific project itself
+
+AgentOps provides the workflow template, but it does not replace your language or package manager’s own project initialization.
+
+For example, for a Python project with `uv` you might run:
+
+```bash
+uv init
+```
+
+Then add the checks your project needs to `.zed/scripts/verify` and `.zed/scripts/verify-release`.
+
+Likewise, for other ecosystems you should initialize the actual project using the tools that ecosystem expects before asking the agent to make meaningful changes.
+
+### Create a `docs` directory and write a draft
+
+For the v0.5.0 workflow, it is useful to create a `docs` directory in the project and write a draft such as:
+
+```text
+docs/draft_0.1.0.md
+```
+
+This draft is where you describe:
+
+- goals
+- scope
+- constraints
+- priorities
+- phases
+- possible tickets
+
+You can write the draft entirely yourself, or you can work with the AI agent to refine it. Both approaches are valid.
+
+A practical pattern is:
+
+1. Create `docs/`
+2. Write an initial draft with the requirements you already know
+3. Ask the agent to help break the draft into phases and tickets
+4. Use the resulting plan as workflow guidance
+
+Important v0.5.0 boundary:
+
+- planning files under `docs/` are useful workflow artifacts
+- they are not mandatory server-managed protocol state
+- the server does not guarantee generation, synchronization, or validation of those planning artifacts for you
+
+They are best understood as user- or client-managed workflow documents.
 
 ## Updating from older versions
 
 If you already use Zed AgentOps, run:
 
 ```bash
-zed-agentops-init.sh --update <project>
+zed-agentops-init --update <project>
 ```
 
-This refreshes the user-facing scaffold, especially:
+This refreshes the user-facing template, especially:
 
 - `.rules`
 - `.agent` state file presence
-- default verify/task scaffolding where applicable
+- default verify/task templates where applicable
 
-Recent versions also tightened resumability and state alignment, so updating is recommended before starting new work in an older scaffold.
+Updating is recommended when moving from an older template, because recent versions tightened:
 
-## What changed in recent versions
-
-### Current behavior summary
-
-- The scaffold now aligns `.rules` with the current workflow expectations
-- Initial transaction state starts from a normalized baseline shape
-- Resume behavior is centered on the local AgentOps state files
-- The default setup is aimed at safer interruption/resume cycles
-
-### Version concepts
-
-AgentOps exposes a few different version concepts, and they do not mean the same thing:
-
-- package/server version: the released MCP server implementation version
-- transaction/schema version: the version of the persisted `tx_state` structure
-- draft/release-plan version: the workflow planning or documentation version used in `docs/`
-
-Keeping these distinct helps avoid confusion when the server implementation, the transaction state schema, and a draft release plan evolve on different timelines.
-
-### If you are upgrading from an older scaffold
-
-You may notice:
-
-- refreshed `.rules`
-- refreshed initial state defaults
-- improved consistency between the scaffold and the current runtime behavior
+- resumability behavior
+- transaction/state alignment
+- workflow rule clarity
+- template/runtime consistency
 
 In most cases, `--update` is enough.
 
-## Files you will commonly interact with
+## What's new in v0.5.0
 
-- `.rules` — project instructions injected into the agent context
-- `.zed/scripts/verify` — your main verification entry point
-- `.zed/tasks.json` — reusable Zed tasks
-- `.agent/tx_event_log.jsonl` — local AgentOps event log
-- `.agent/tx_state.json` — local AgentOps state used for resuming work
+The most important user-facing changes in v0.5.0 are about clarity and predictability.
 
-For most users, the important point is simple: keep `.rules` current by using the latest scaffold or running `--update`.
+### 1. The documented workflow is closer to the real supported workflow
 
-For a release-facing explanation of the supported v0.5.0 client/server contract, see `docs/v0.5.0/interoperability.md`. That guide summarizes what is enforced by the server, what is exposed as helper behavior, and what remains client-side operating convention.
+The main goal of v0.5.0 is to reduce mismatches between:
+
+- `.rules`
+- the generated template
+- runtime server behavior
+- helper tools
+- release-facing documentation
+
+As a user, that means the documented workflow is more trustworthy than before.
+
+### 2. Ticket files are convention, not server protocol
+
+If you keep planning files such as:
+
+- `docs/__version__/plan.md`
+- `docs/__version__/tickets_list.json`
+- `docs/__version__/pX-tY.json`
+
+they are useful workflow documents, but they are not canonical server-managed state.
+
+In practice:
+
+- you can maintain them manually
+- you can maintain them together with the agent
+- but you should not assume the server automatically creates, synchronizes, or validates them
+
+### 3. The canonical local workflow state is under `.agent/`
+
+For practical use, the most important canonical artifacts are:
+
+- `.agent/tx_event_log.jsonl`
+- `.agent/tx_state.json`
+
+Handoff and planning docs are helpful, but they are not the canonical workflow record.
+
+### 4. Commit workflow is more explicit
+
+The supported flow is stricter:
+
+- verify before commit
+- no commit when there are no changes
+
+This reduces accidental empty commits or unverified commits.
+
+### 5. File-intent workflow is easier to use safely
+
+The supported helper surface now includes:
+
+- `ops_add_file_intent`
+- `ops_update_file_intent`
+- `ops_complete_file_intent`
+
+These helpers make common file-intent workflows easier to follow without weakening the canonical transaction rules.
+
+### 6. Bootstrap state is easier to reason about
+
+The initial `.agent/tx_state.json` baseline is more normalized, so users and clients are less likely to misread missing fields as ambiguous old-template behavior.
+
+### 7. Version concepts are intentionally distinct
+
+You may see different version concepts, and they do not all mean the same thing:
+
+- package/server version
+- transaction/schema version
+- draft/release-plan version
+
+This is expected. Do not assume that a docs version label is automatically the same thing as the persisted transaction schema version.
+
+### Practical recommendations for users
+
+For day-to-day use in v0.5.0:
+
+1. Keep your template current with `zed-agentops-init --update` when needed
+2. Treat `.agent/tx_state.json` and `.agent/tx_event_log.jsonl` as the canonical local workflow state
+3. Treat planning files under `docs/` as useful convention, not guaranteed server protocol
+4. Extend `verify` and `verify-release` to match your project
+5. Prefer small, clearly scoped drafts in `docs/` before large agent-driven work
+6. Expect the agent workflow to follow initialize → change → verify → commit more strictly than before
+
+For a fuller release-facing explanation of the supported v0.5.0 client/server contract, see `docs/v0.5.0/interoperability.md`.
 
 ## Notes
 
 - macOS only at the moment
-- The generated scaffold is meant to be customized per repository
-- The default verify script is intentionally conservative and may need project-specific additions
+- The generated template is meant to be customized per repository
+- The default verify scripts are intentionally conservative and may need project-specific additions
+- The v0.5.0 workflow distinguishes between enforced protocol behavior and user-managed workflow convention; that distinction is intentional
 
 ## License
 
