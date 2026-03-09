@@ -93,9 +93,9 @@
     }
   ],
   "status_context": {
-    "active_ticket": "p2-t07",
+    "active_ticket": "p2-t05",
     "canonical_sync_state": "blocked",
     "reason": "Canonical history is currently blocked by duplicate tx.begin caused by global ticket ID collisions: p2-t01 was reused across multiple versions, so new 0.5.4 lifecycle events collided with prior canonical transactions. Until repair is complete, downstream implementation work such as p2-t06 must remain blocked even though p2-t01 is functionally complete.",
-    "recommended_action": "Start p2-t07 first to repair the ticket ID collision issue, document and enforce globally unique tx_id/ticket_id naming, and then resume blocked follow-up work such as p2-t06 only after canonical history is trustworthy again."
+    "recommended_action": "Work p2-t05 first to define canonical-aware helper bootstrap rules, then use that planning to guide follow-up implementation tickets while keeping the canonical collision issue visible."
   }
 }

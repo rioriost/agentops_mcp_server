@@ -2,7 +2,7 @@
   "id": "p2-t05",
   "title": "Make helper tx.begin bootstrap canonical-aware and resume-safe",
   "priority": "P1",
-  "status": "planned",
+  "status": "in-progress",
   "summary": "Prevent helper-driven duplicate `tx.begin` emission when materialized state is missing, stale, or temporarily inconsistent with canonical history. This ticket makes helper bootstrap logic canonical-aware so verify/commit helper flows consult replay-derived transaction state before emitting `tx.begin`, prefer resuming an existing non-terminal canonical transaction over re-beginning it, and fail safely when integrity drift blocks trustworthy progression.",
   "inputs": [
     "docs/draft_0.5.4.md",
@@ -54,6 +54,13 @@
     "A successful fix should prevent begin duplication from becoming the first failure in a cascade of secondary lifecycle errors.",
     "Implementation focus should start with `commit_manager._ensure_tx_begin()`, because that helper-side bootstrap path currently relies on event-log emptiness rather than a canonical replay-aware active-transaction check.",
     "The preferred guard order is: use healthy materialized active transaction state when present, otherwise consult replay-derived canonical state, then block with structured recovery guidance if integrity drift or an already-active matching non-terminal transaction makes helper-driven `tx.begin` unsafe.",
-    "Regression coverage should include cases where materialized state looks inactive but canonical replay still shows a matching non-terminal transaction, so helper entry cannot silently re-begin the same ticket."
+    "Regression coverage should include cases where materialized state looks inactive but canonical replay still shows a matching non-terminal transaction, so helper entry cannot silently re-begin the same ticket.",
+    "Planning progress: the current helper bootstrap path in `commit_manager._ensure_tx_begin()` first loads materialized active transaction context and then emits `tx.begin` whenever the event log appears empty. That means the helper currently treats event-log emptiness as sufficient evidence for bootstrap and does not consult replay-derived canonical state before beginning.",
+    "Planning progress: the canonical-aware bootstrap design should split helper entry into four cases: (1) healthy materialized active transaction available and consistent, (2) materialized state missing or incomplete but replay shows a resumable non-terminal transaction, (3) replay shows no active transaction and helper bootstrap may emit `tx.begin`, and (4) replay reports integrity drift or ambiguous history and helper bootstrap must fail with structured recovery guidance instead of writing new canonical events.",
+    "Planning progress: the current rebuild surface already exposes the key data needed for the guard, including `integrity.drift_detected`, `integrity.active_tx_source`, `active_tx`, `rebuild_warning`, `rebuild_invalid_event`, and `rebuild_observed_mismatch`. The helper bootstrap plan should consume those fields directly rather than infer health from event-log emptiness alone.",
+    "Planning progress: helper bootstrap should prefer a healthy materialized active transaction only when it is present and complete enough to supply `tx_id`, `ticket_id`, `session_id`, phase/status, and step context. If those fields are missing or suspicious, replay-derived canonical state should become the decision surface before any new begin is considered.",
+    "Planning progress: when replay finds a matching non-terminal canonical transaction, helper entry should resume that transaction context or surface structured resume-required guidance; it must not silently emit a duplicate `tx.begin` for the same task just because the materialized snapshot looks empty or stale.",
+    "Planning progress: when replay reports drift, helper bootstrap should return structured failure guidance aligned with the 0.5.4 response contract, with integrity metadata preserved, and should direct the caller toward repair/rebuild handling rather than implicit bootstrap.",
+    "Planning progress: regression coverage for the implementation follow-up should include at least (a) materialized state missing with replay-derived active transaction present, (b) materialized state stale while replay still shows the same non-terminal task, (c) truly empty healthy canonical history where helper bootstrap may begin, and (d) duplicate-begin or ordering-drift history where helper bootstrap must block instead of appending events."
   ]
 }
