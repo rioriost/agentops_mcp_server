@@ -25,7 +25,7 @@
       "id": "p1-t01",
       "priority": "P0",
       "title": "Define the canonical resumable work transaction model",
-      "status": "planned",
+      "status": "done",
       "file": "v0.6.0/p1-t01.json"
     },
     {

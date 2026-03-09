@@ -2,7 +2,7 @@
   "id": "p1-t01",
   "title": "Define the canonical resumable work transaction model",
   "priority": "P0",
-  "status": "planned",
+  "status": "done",
   "summary": "Create the authoritative 0.6.0 contract for treating the work loop as a resumable transaction protocol whose purpose is to complete one ticket durably despite MCP server interruption. This ticket defines what a transaction means in this project, separates planning identity from runtime execution identity, formalizes the single-active-transaction invariant, clarifies that repository commit is non-terminal, and establishes explicit terminal completion as the success condition for ticket-oriented transactional work.",
   "inputs": [
     "docs/draft_0.6.0.md",
@@ -22,6 +22,7 @@
     "A documented single-active-transaction invariant for workspace-level resumable execution",
     "A documented rule that begin creates a transaction and resume reuses the same active transaction identity",
     "A documented rule that repository commit is non-terminal and explicit end is required for terminal success",
+    "A documented bridge from resumable transaction semantics to machine-readable continuation guidance for active non-terminal work",
     "A documented no-sentinel policy for representing the absence of an active transaction",
     "Implementation-ready acceptance boundaries for downstream 0.6.0 tickets"
   ],
@@ -32,9 +33,11 @@
     "The contract defines the canonical roles of `ticket_id`, `tx_id`, `seq`, and `session_id` without relying on string-shape heuristics.",
     "The contract explicitly states that at most one non-terminal active transaction may exist in a workspace at a time.",
     "The contract explicitly states that a non-terminal active transaction must be resumed before any new ticket work begins.",
+    "The contract explicitly states that a fresh transaction identity must not be created while a non-terminal active transaction already exists.",
     "The contract explicitly states that begin may create a new `tx_id` but resume must reuse the existing active `tx_id` and must not mint a replacement.",
     "The contract explicitly states that repository commit is non-terminal and does not by itself mean successful transaction completion.",
     "The contract explicitly states that terminal success requires explicit end-of-transaction handling such as `tx.end.done`.",
+    "The contract explicitly states that successful repository commit may be necessary for a ticket-oriented transaction but is insufficient without explicit terminal closure.",
     "The contract explicitly states that normal canonical behavior must not use sentinel transaction identifiers such as `none` to represent missing active work.",
     "The contract explicitly states that planning artifacts under `docs/` are derived workflow artifacts and are not the canonical source of runtime resume truth.",
     "The contract is specific enough that downstream tickets can define state-machine rules, continuation rules, persistence rules, issuance rules, and recovery behavior without inventing per-module semantics ad hoc.",
@@ -48,9 +51,11 @@
     "Define the canonical role of `seq` as the append-only ordering identity for transaction events.",
     "Define the bounded role of `session_id` as optional or secondary runtime context that must not become the primary basis of resumable correctness.",
     "Define the single-active-transaction invariant for a workspace and the rule that non-terminal work must be resumed before starting a new ticket.",
+    "Define the rule that a fresh transaction identity must not be created while non-terminal active work already exists.",
     "Define the rule that begin creates a new transaction but resume continues the same active transaction identity.",
     "Define the rule that commit is a transaction checkpoint and not terminal success.",
     "Define the rule that successful completion requires explicit terminal end handling and that `done` and `blocked` are terminal states.",
+    "Define the contract-level bridge that active non-terminal transactions require machine-readable continuation guidance, with detailed `next_action` semantics deferred to downstream state-machine work.",
     "Define the normal structural representation for the absence of active work and reject sentinel transaction identifiers such as `none` from normal canonical behavior.",
     "Document that planning artifacts may be synchronized with runtime progress but are not authoritative for execution or resume decisions.",
     "Leave implementation-ready notes for downstream tickets that will define the state machine, continuation semantics, persistence model, issuance semantics, runtime simplification, and interruption-focused regression coverage."
@@ -60,7 +65,7 @@
     "This ticket is contract-definition work, not the full runtime implementation.",
     "The most important outcome is a simple and stable definition of transaction semantics that fits the project’s actual goal: reliably finishing tickets under interruption.",
     "The contract should prioritize resumability, deterministic continuation, and explicit completion over relational-model elegance.",
-    "The contract should explain why commit and terminal success are intentionally separate concepts in this system.",
+    "The contract should explain why commit and terminal success are intentionally separate concepts in this system, including that successful repository commit may be necessary but remains insufficient without explicit terminal closure.",
     "The contract should reduce future confusion by making the transaction the canonical runtime work unit and by demoting planning artifacts to derived workflow bookkeeping.",
     "The contract should assume that runtime correctness depends primarily on exact active transaction continuation, not on heuristic reconstruction or ticket-name-derived identity."
   ],
@@ -79,13 +84,15 @@
     "workspace_invariants": {
       "single_active_transaction": "At most one non-terminal active transaction may exist in a workspace at a time.",
       "resume_before_new_work": "If a non-terminal active transaction exists, it must be resumed before any new ticket work begins.",
+      "no_fresh_transaction_while_active": "A fresh transaction identity must not be created while a non-terminal active transaction already exists.",
       "terminal_statuses": ["done", "blocked"]
     },
     "lifecycle_rules": {
       "begin_rule": "Starting new work may create a new transaction identity.",
       "resume_rule": "Resuming work must continue the same active transaction identity and must not mint a replacement.",
       "commit_rule": "Repository commit is a non-terminal checkpoint in the transaction lifecycle.",
-      "success_rule": "Terminal success requires explicit end-of-transaction handling rather than commit alone."
+      "success_rule": "Terminal success requires explicit end-of-transaction handling rather than commit alone.",
+      "continuation_bridge_rule": "An active non-terminal transaction must remain machine-continuable, with detailed `next_action` semantics defined by downstream state-machine work."
     },
     "normal_state_rules": [
       "Normal canonical behavior must not use sentinel values such as `none` as fake transaction identifiers.",
