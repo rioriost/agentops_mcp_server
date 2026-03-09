@@ -1,0 +1,52 @@
+{
+  "id": "p3-t01",
+  "title": "Add regression coverage for duplicate tx.begin prevention, replay integrity, and state-facing behavior",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Add regression coverage for the 0.5.3 transaction-log integrity work so duplicate `tx.begin` conditions are prevented during normal lifecycle writes, detected deterministically during replay, and surfaced clearly in state-facing workflows. This ticket protects the integrity contract across lifecycle start helpers, replay/state rebuild logic, and observability or capture flows that depend on canonical transaction history.",
+  "inputs": [
+    "docs/draft_0.5.3.md",
+    "docs/v0.5.3/plan.md",
+    "docs/v0.5.3/tickets_list.json",
+    "docs/v0.5.3/p1-t01.json",
+    "docs/v0.5.3/p1-t02.json",
+    "docs/v0.5.3/p2-t01.json",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/main.py",
+    "tests/test_ops_tools.py",
+    "tests/test_state_rebuilder.py"
+  ],
+  "outputs": [
+    "Regression tests that fail if duplicate `tx.begin` can be emitted for an already-started non-terminal transaction",
+    "Replay/integrity tests that verify duplicate begin history is classified as invalid with clear metadata",
+    "State-facing tests that verify capture, resume, and observability paths surface actionable outcomes when duplicate begin history exists"
+  ],
+  "acceptance_criteria": [
+    "Tests verify that normal task-start flows do not emit duplicate `tx.begin` for an active non-terminal transaction.",
+    "Tests verify that same-transaction duplicate begin attempts are rejected with clear failure behavior instead of being appended as valid history.",
+    "Tests verify that replay continues to classify duplicate `tx.begin` as an integrity failure rather than silently accepting it.",
+    "Tests verify that rebuild metadata captures the invalid event and duplicate-begin failure reason in a stable, machine-usable form.",
+    "Tests verify that state-facing workflows such as capture, resume, summary, or observability helpers provide clear outcomes when duplicate-begin history blocks canonical replay.",
+    "Regression coverage fails if future changes weaken begin-event guards, hide duplicate begin during replay, or make invalid-history handling ambiguous."
+  ],
+  "tasks": [
+    "Add or update tests for transaction-start helpers so duplicate begin emission is rejected for active non-terminal transactions.",
+    "Add or update replay/state rebuild tests so duplicate `tx.begin` remains an explicit invalid-history condition with preserved diagnostic metadata.",
+    "Add or update state-facing tests for capture, resume, handoff, summary, or observability flows under duplicate-begin history.",
+    "Add assertions that prevention logic does not break legitimate start, update, verify, commit, and terminal lifecycle paths.",
+    "Keep the regression suite focused on machine-actionable integrity behavior rather than human-facing documentation wording."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p2-t01"
+  ],
+  "notes": [
+    "This ticket is about protecting transaction-log integrity behavior after the 0.5.3 fix, not about redesigning the transaction model.",
+    "The most important regression to prevent is a duplicate `tx.begin` entering canonical history in a way that later breaks replay or state capture.",
+    "Coverage should reinforce both sides of the contract: invalid begin writes must be prevented early, and historical invalidity must remain explicit during replay.",
+    "Tests should preserve strictness rather than masking invalid history through best-effort behavior."
+  ]
+}

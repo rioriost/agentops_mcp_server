@@ -1,0 +1,47 @@
+{
+  "id": "p1-t02",
+  "title": "Prevent duplicate `tx.begin` emission with stricter lifecycle start guards",
+  "priority": "P0",
+  "status": "planned",
+  "summary": "Tighten transaction-start behavior so invalid duplicate `tx.begin` events cannot be appended during normal operation. This ticket focuses on lifecycle guard enforcement around task start and resume paths, ensuring that callers cannot re-enter an already-started non-terminal transaction through a fresh begin event.",
+  "inputs": [
+    "docs/draft_0.5.3.md",
+    "docs/v0.5.3/plan.md",
+    "docs/v0.5.3/tickets_list.json",
+    ".rules",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/main.py",
+    "tests/test_ops_tools.py",
+    "tests/test_state_rebuilder.py"
+  ],
+  "outputs": [
+    "Stricter lifecycle guard logic that rejects duplicate `tx.begin` emission for already-started non-terminal transactions",
+    "Consistent begin-path behavior across task start, resume, and related lifecycle entrypoints",
+    "Regression tests proving duplicate begin attempts are blocked before invalid history is appended"
+  ],
+  "acceptance_criteria": [
+    "Normal task-start flows do not emit a second `tx.begin` when the target transaction is already active and non-terminal.",
+    "Attempts to re-begin the same transaction without terminal closure fail with a clear error or failure result.",
+    "Resume and progress-oriented paths no longer use a fresh begin event where lifecycle update semantics are required.",
+    "The prevention logic does not block valid starts for new transactions when no active non-terminal transaction exists.",
+    "The added begin guards remain consistent with canonical lifecycle ordering defined in `.rules`.",
+    "Tests fail if duplicate begin events can again be appended through normal lifecycle APIs."
+  ],
+  "tasks": [
+    "Review all lifecycle entrypoints that can emit `tx.begin` and identify where duplicate begin writes are currently permitted.",
+    "Define the canonical preconditions for a valid begin event, including how active, terminal, and same-transaction states must be handled.",
+    "Implement stricter begin guards so invalid duplicate lifecycle starts are rejected before event append.",
+    "Ensure callers that are resuming or updating existing work use the appropriate non-begin lifecycle path.",
+    "Add or update regression tests covering duplicate begin rejection, valid new begins, and legitimate resume/update behavior."
+  ],
+  "dependencies": [
+    "p1-t01"
+  ],
+  "notes": [
+    "This ticket is about preventing new invalid history from being written, not about repairing old logs that already contain duplicate begin events.",
+    "The desired behavior is explicit rejection of invalid lifecycle restarts, not silent deduplication.",
+    "Guard tightening should preserve valid resumability flows while making duplicate begin attempts impossible through supported entrypoints."
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "version": "0.5.3",
+  "source": "draft_0.5.3.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P0",
+      "title": "Reproduce duplicate tx.begin drift and identify the emitting path",
+      "status": "planned",
+      "file": "v0.5.3/p1-t01.json"
+    },
+    {
+      "id": "p1-t02",
+      "priority": "P0",
+      "title": "Prevent duplicate tx.begin emission through stricter lifecycle guards",
+      "status": "planned",
+      "file": "v0.5.3/p1-t02.json"
+    },
+    {
+      "id": "p2-t01",
+      "priority": "P1",
+      "title": "Clarify replay, capture, and operational behavior for invalid begin history",
+      "status": "planned",
+      "file": "v0.5.3/p2-t01.json"
+    },
+    {
+      "id": "p3-t01",
+      "priority": "P1",
+      "title": "Add regression coverage for duplicate tx.begin prevention and detection",
+      "status": "planned",
+      "file": "v0.5.3/p3-t01.json"
+    }
+  ]
+}

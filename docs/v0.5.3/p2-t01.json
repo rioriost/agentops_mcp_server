@@ -1,0 +1,50 @@
+{
+  "id": "p2-t01",
+  "title": "Clarify replay, capture, and operational behavior for duplicate `tx.begin` integrity failures",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Improve the machine-facing behavior of replay, state capture, and state-oriented operational tooling when historical transaction logs contain a duplicate `tx.begin`. This ticket does not weaken integrity rules or silently treat invalid history as healthy. Instead, it makes duplicate-begin replay outcomes explicit, preserves diagnostic metadata, and ensures downstream tools provide clear, actionable guidance about what is blocked, what remains safe, and what follow-up remediation is required.",
+  "inputs": [
+    "docs/draft_0.5.3.md",
+    "docs/v0.5.3/plan.md",
+    "docs/v0.5.3/tickets_list.json",
+    ".rules",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "tests/test_ops_tools.py",
+    "tests/test_state_rebuilder.py",
+    "tests/test_state_store.py"
+  ],
+  "outputs": [
+    "Explicit replay and rebuild handling for duplicate `tx.begin` integrity failures",
+    "State-facing tool behavior that reports actionable operational guidance when invalid begin history blocks canonical capture",
+    "Regression tests covering replay metadata, capture behavior, and downstream tool responses for duplicate-begin history"
+  ],
+  "acceptance_criteria": [
+    "Replay continues to classify duplicate `tx.begin` as an explicit integrity failure rather than silently accepting invalid history.",
+    "Rebuild output preserves clear diagnostic metadata for duplicate-begin failures, including the invalid event and failure reason.",
+    "State-capture and related state-facing workflows do not pretend that invalid replay is healthy when duplicate begin history exists.",
+    "When canonical capture is blocked by duplicate-begin integrity failure, the returned result includes clear, actionable guidance about the failure and likely next steps.",
+    "The behavior distinguishes between valid empty logs, uninitialized or missing logs, and malformed or invalid lifecycle history.",
+    "Tests fail if replay, capture, or state-facing tooling regress to ambiguous or misleading handling of duplicate `tx.begin` history."
+  ],
+  "tasks": [
+    "Review replay and rebuild logic for how duplicate `tx.begin` is currently classified and surfaced.",
+    "Confirm the expected canonical metadata shape for invalid replay outcomes, including invalid event details and failure reason.",
+    "Update state-capture and related state-facing helpers so they report blocked-by-integrity conditions clearly and consistently.",
+    "Ensure operational tooling distinguishes invalid history from healthy but empty or uninitialized transaction state.",
+    "Add or update regression tests for duplicate-begin replay metadata, capture behavior, and downstream state-oriented tool responses."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02"
+  ],
+  "notes": [
+    "This ticket is about strict and explicit handling of invalid historical state, not about silently recovering from duplicate begin events.",
+    "Operational clarity matters here because agents and operators need to know whether repository work can continue, whether capture is blocked, and whether remediation is required.",
+    "The fix should preserve the principle that canonical event-log integrity is more important than producing a misleading best-effort state.",
+    "If additional remediation tooling is proposed later, this ticket should still keep replay classification and state-facing reporting strict and machine-actionable."
+  ]
+}
