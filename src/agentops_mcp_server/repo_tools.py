@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 from .git_repo import GitRepo
 from .test_suggestions import CODE_SUFFIXES, is_test_path, parse_changed_files
 from .verify_runner import VerifyRunner
-from .workflow_response import build_guidance_from_active_tx
+from .workflow_response import build_guidance_from_active_tx, build_success_response
 
 
 class RepoTools:
@@ -202,6 +202,7 @@ class RepoTools:
                 "integrity_status": None,
                 "can_start_new_ticket": True,
                 "resume_required": False,
+                "active_tx": {},
             }
 
         tx_state = self.state_store.read_json_file(
@@ -225,33 +226,34 @@ class RepoTools:
                 "integrity_status": None,
                 "can_start_new_ticket": True,
                 "resume_required": False,
+                "active_tx": {},
             }
 
-        active_tx = tx_state.get("active_tx")
-        if not isinstance(active_tx, dict):
-            return {
-                "tx_status": "",
-                "tx_phase": "",
-                "next_action": "",
-                "terminal": False,
-                "requires_followup": False,
-                "followup_tool": None,
-                "canonical_status": "",
-                "canonical_phase": "",
-                "active_tx_id": None,
-                "active_ticket_id": None,
-                "current_step": None,
-                "verify_status": None,
-                "commit_status": None,
-                "integrity_status": None,
-                "can_start_new_ticket": True,
-                "resume_required": False,
-            }
-
-        guidance = build_guidance_from_active_tx(active_tx)
-        guidance["tx_status"] = guidance["canonical_status"]
-        guidance["tx_phase"] = guidance["canonical_phase"]
-        return guidance
+        response = build_success_response(tx_state=tx_state)
+        response["active_tx"] = (
+            tx_state.get("active_tx")
+            if isinstance(tx_state.get("active_tx"), dict)
+            else {}
+        )
+        return {
+            "tx_status": response["canonical_status"],
+            "tx_phase": response["canonical_phase"],
+            "next_action": response["next_action"],
+            "terminal": response["terminal"],
+            "requires_followup": response["requires_followup"],
+            "followup_tool": response["followup_tool"],
+            "canonical_status": response["canonical_status"],
+            "canonical_phase": response["canonical_phase"],
+            "active_tx_id": response["active_tx_id"],
+            "active_ticket_id": response["active_ticket_id"],
+            "current_step": response["current_step"],
+            "verify_status": response["verify_status"],
+            "commit_status": response["commit_status"],
+            "integrity_status": response["integrity_status"],
+            "can_start_new_ticket": response["can_start_new_ticket"],
+            "resume_required": response["resume_required"],
+            "active_tx": response["active_tx"],
+        }
 
     def repo_verify(self, timeout_sec: Optional[int] = None) -> Dict[str, Any]:
         context = self._load_tx_context()

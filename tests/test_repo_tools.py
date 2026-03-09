@@ -4,6 +4,7 @@ import pytest
 
 from agentops_mcp_server.ops_tools import OpsTools
 from agentops_mcp_server.repo_tools import RepoTools
+from agentops_mcp_server.workflow_response import build_success_response
 from agentops_mcp_server.workflow_rules import canonical_workflow_rules
 
 
@@ -85,6 +86,8 @@ def _active_tx(
     phase="in-progress",
     current_step="p1-t1",
     session_id="s1",
+    verify_status="not_started",
+    commit_status="not_started",
 ):
     return {
         "active_tx": {
@@ -94,8 +97,8 @@ def _active_tx(
             "phase": phase,
             "current_step": current_step,
             "session_id": session_id,
-            "verify_state": {"status": "not_started", "last_result": None},
-            "commit_state": {"status": "not_started", "last_result": None},
+            "verify_state": {"status": verify_status, "last_result": None},
+            "commit_state": {"status": commit_status, "last_result": None},
             "file_intents": [],
         }
     }
@@ -115,6 +118,26 @@ class DummyOpsRebuilder:
 
     def rebuild_tx_state(self):
         return {"ok": True, "state": self._state}
+
+
+def _assert_helper_guidance(result, *, expected_status, expected_phase):
+    assert result["canonical_status"] == expected_status
+    assert result["canonical_phase"] == expected_phase
+    assert result["tx_status"] == expected_status
+    assert result["tx_phase"] == expected_phase
+    assert "next_action" in result
+    assert "terminal" in result
+    assert "requires_followup" in result
+    assert "followup_tool" in result
+    assert "active_tx_id" in result
+    assert "active_ticket_id" in result
+    assert "current_step" in result
+    assert "verify_status" in result
+    assert "commit_status" in result
+    assert "integrity_status" in result
+    assert "can_start_new_ticket" in result
+    assert "resume_required" in result
+    assert "active_tx" in result
 
 
 def test_repo_status_summary_collects_fields():
@@ -176,6 +199,17 @@ def test_repo_verify_delegates():
     assert result["terminal"] is False
     assert result["requires_followup"] is False
     assert result["followup_tool"] is None
+    assert result["canonical_status"] == ""
+    assert result["canonical_phase"] == ""
+    assert result["active_tx_id"] is None
+    assert result["active_ticket_id"] is None
+    assert result["current_step"] is None
+    assert result["verify_status"] is None
+    assert result["commit_status"] is None
+    assert result["integrity_status"] is None
+    assert result["can_start_new_ticket"] is True
+    assert result["resume_required"] is False
+    assert result["active_tx"] == {}
     assert verify_runner.calls == [5]
 
 
@@ -368,6 +402,69 @@ def test_emit_tx_event_uses_rebuilder_state_when_materialized_state_missing():
     assert saved_state["active_tx"]["verify_state"]["status"] == "running"
 
 
+def test_workflow_guidance_uses_success_response_shape():
+    tx_state = _active_tx(
+        status="verified",
+        phase="verified",
+        current_step="verify-step",
+        verify_status="passed",
+        commit_status="not_started",
+    )
+    tx_state["integrity"] = {"drift_detected": False}
+    state_store = DummyStateStore(tx_state=tx_state)
+    tools = RepoTools(
+        DummyGitRepo(),
+        DummyVerifyRunner(),
+        state_store,
+        DummyStateRebuilder(),
+    )
+
+    guidance = tools._workflow_guidance()
+
+    expected = build_success_response(tx_state=tx_state)
+    assert guidance["canonical_status"] == expected["canonical_status"]
+    assert guidance["canonical_phase"] == expected["canonical_phase"]
+    assert guidance["next_action"] == expected["next_action"]
+    assert guidance["terminal"] == expected["terminal"]
+    assert guidance["requires_followup"] == expected["requires_followup"]
+    assert guidance["followup_tool"] == expected["followup_tool"]
+    assert guidance["active_tx_id"] == expected["active_tx_id"]
+    assert guidance["active_ticket_id"] == expected["active_ticket_id"]
+    assert guidance["current_step"] == expected["current_step"]
+    assert guidance["verify_status"] == expected["verify_status"]
+    assert guidance["commit_status"] == expected["commit_status"]
+    assert guidance["integrity_status"] == expected["integrity_status"]
+    assert guidance["can_start_new_ticket"] == expected["can_start_new_ticket"]
+    assert guidance["resume_required"] == expected["resume_required"]
+    assert guidance["active_tx"] == tx_state["active_tx"]
+
+
+def test_workflow_guidance_defaults_to_empty_shape_without_state_store():
+    tools = RepoTools(DummyGitRepo(), DummyVerifyRunner())
+
+    guidance = tools._workflow_guidance()
+
+    assert guidance == {
+        "tx_status": "",
+        "tx_phase": "",
+        "next_action": "",
+        "terminal": False,
+        "requires_followup": False,
+        "followup_tool": None,
+        "canonical_status": "",
+        "canonical_phase": "",
+        "active_tx_id": None,
+        "active_ticket_id": None,
+        "current_step": None,
+        "verify_status": None,
+        "commit_status": None,
+        "integrity_status": None,
+        "can_start_new_ticket": True,
+        "resume_required": False,
+        "active_tx": {},
+    }
+
+
 def test_emit_tx_event_uses_materialized_state_when_rebuilder_fails():
     state_store = DummyStateStore(tx_state=_active_tx())
     state_rebuilder = DummyStateRebuilder(result={"ok": False})
@@ -479,6 +576,90 @@ def test_emit_tx_event_returns_none_when_materialized_state_lacks_active_tx():
     assert result is None
     assert state_store.append_and_save_calls == []
     assert state_store.append_calls == []
+
+
+def test_repo_verify_with_active_tx_exposes_helper_guidance():
+    tx_state = _active_tx(
+        status="in-progress",
+        phase="in-progress",
+        current_step="verify-step",
+    )
+    tx_state["integrity"] = {"drift_detected": False}
+    state_store = DummyStateStore(tx_state=tx_state)
+    verify_runner = DummyVerifyRunner(
+        result={"ok": True, "returncode": 0, "stdout": "verify ok"}
+    )
+    tools = RepoTools(
+        DummyGitRepo(),
+        verify_runner,
+        state_store,
+        DummyStateRebuilder(),
+    )
+
+    result = tools.repo_verify(timeout_sec=7)
+
+    assert result["ok"] is True
+    _assert_helper_guidance(
+        result,
+        expected_status="verified",
+        expected_phase="verified",
+    )
+    assert result["next_action"] == "tx.commit.start"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
+    assert result["active_tx_id"] == "tx-1"
+    assert result["active_ticket_id"] == "p1-t1"
+    assert result["current_step"] == "verify-step"
+    assert result["verify_status"] == "passed"
+    assert result["commit_status"] == "not_started"
+    assert result["integrity_status"] == "ok"
+    assert result["can_start_new_ticket"] is False
+    assert result["resume_required"] is True
+    assert result["active_tx"]["verify_state"]["status"] == "passed"
+    assert verify_runner.calls == [7]
+
+
+def test_repo_verify_failed_result_preserves_helper_guidance():
+    tx_state = _active_tx(
+        status="in-progress",
+        phase="in-progress",
+        current_step="verify-step",
+    )
+    tx_state["integrity"] = {"drift_detected": False}
+    state_store = DummyStateStore(tx_state=tx_state)
+    verify_runner = DummyVerifyRunner(
+        result={"ok": False, "returncode": 2, "stderr": "verify failed"}
+    )
+    tools = RepoTools(
+        DummyGitRepo(),
+        verify_runner,
+        state_store,
+        DummyStateRebuilder(),
+    )
+
+    result = tools.repo_verify(timeout_sec=11)
+
+    assert result["ok"] is False
+    _assert_helper_guidance(
+        result,
+        expected_status="checking",
+        expected_phase="checking",
+    )
+    assert result["next_action"] == "fix and re-verify"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
+    assert result["active_tx_id"] == "tx-1"
+    assert result["active_ticket_id"] == "p1-t1"
+    assert result["current_step"] == "verify-step"
+    assert result["verify_status"] == "failed"
+    assert result["commit_status"] == "not_started"
+    assert result["integrity_status"] == "ok"
+    assert result["can_start_new_ticket"] is False
+    assert result["resume_required"] is True
+    assert result["active_tx"]["verify_state"]["status"] == "failed"
+    assert verify_runner.calls == [11]
 
 
 def test_emit_tx_event_uses_materialized_state_when_rebuilder_state_has_no_active_tx():
