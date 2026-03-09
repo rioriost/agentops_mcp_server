@@ -88,14 +88,14 @@
       "id": "p3-t02",
       "priority": "P2",
       "title": "Update docs and contract-facing guidance",
-      "status": "planned",
+      "status": "in-progress",
       "file": "v0.5.4/p3-t02.json"
     }
   ],
   "status_context": {
-    "active_ticket": "p3-t01",
+    "active_ticket": "p3-t02",
     "canonical_sync_state": "ready",
-    "reason": "The canonical tx_id collision and rebuild invalid-seq reporting issues addressed by p2-t07 are now complete, and the repository is back in a clean, resumable state for follow-on work.",
-    "recommended_action": "Start p3-t01 next to strengthen regression coverage for the machine-readable workflow-guidance contract."
+    "reason": "The regression coverage work in p3-t01 is complete, and the documentation-alignment follow-up ticket is now the active work item for the 0.5.4 workflow-guidance rollout.",
+    "recommended_action": "Continue p3-t02 to align contract-facing documentation with the final machine-readable workflow response semantics."
   }
 }

@@ -2,7 +2,7 @@
   "id": "p3-t02",
   "title": "Update docs and contract-facing guidance for machine-readable workflow responses",
   "priority": "P2",
-  "status": "planned",
+  "status": "in-progress",
   "summary": "Align the 0.5.4 documentation surface with the new machine-readable workflow-guidance contract so agents and clients can understand how lifecycle-aware MCP tool responses expose canonical status, next actions, terminality, follow-up requirements, and structured recovery guidance. This ticket ensures the implementation is reflected clearly in planning artifacts and contract-facing docs after the response schema, helper semantics, and structured failure behavior are finalized.",
   "inputs": [
     "docs/draft_0.5.4.md",
@@ -51,6 +51,8 @@
     "The ticket should follow the final implemented response schema rather than inventing a parallel wording-only contract.",
     "Public wording should remain compatible with strict canonical lifecycle semantics and should not imply that helper success automatically closes the transaction.",
     "If field names change during implementation, this ticket should update docs to the final canonical names rather than preserving outdated draft wording.",
-    "This ticket should keep user-facing guidance concise while still being specific enough for agent/client implementers to rely on."
+    "This ticket should keep user-facing guidance concise while still being specific enough for agent/client implementers to rely on.",
+    "Progress update: contract-facing README updates are being prepared to explain canonical status and phase, next_action, terminality, structured failure guidance, and helper follow-up semantics.",
+    "Progress update: documentation will explicitly distinguish helper completion from terminal lifecycle completion, including the non-terminal committed state."
   ]
 }

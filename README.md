@@ -10,7 +10,7 @@ Zed AgentOps helps you run an edit → verify → commit workflow inside Zed wit
 - Provides a local MCP server for repository, verification, and resume-oriented workflow helpers
 - Adds default `verify` and `verify-release` entry points that you can extend for your project
 - Keeps enough local state for the agent to resume work more reliably across interrupted sessions
-- Aligns the generated project template, runtime workflow rules, and helper behavior around the supported v0.5.0 contract
+- Aligns the generated project template, runtime workflow rules, and helper behavior around the supported v0.5.4 contract
 
 This README is written for users of the tool. It focuses on how to set up and use AgentOps in practice.
 
@@ -34,7 +34,7 @@ This installs:
 
 Before you start using AgentOps in a project, configure Zed to use the MCP server.
 
-For v0.5.0, this is effectively required. The intended workflow assumes:
+For v0.5.4, this is effectively required. The intended workflow assumes:
 
 - the MCP server is registered in Zed
 - the Agent Panel can call the AgentOps tools it needs
@@ -138,6 +138,54 @@ Then allow the MCP tools the workflow depends on. A practical baseline is:
 
 Adjust permissions to match your own security preferences, but if these tools are blocked the intended workflow will be incomplete.
 
+### Machine-readable workflow responses
+
+In v0.5.4, lifecycle-aware responses are intended to be machine-readable enough for an agent or client to decide what to do next without relying only on prose.
+
+For lifecycle-relevant success responses, the normalized guidance fields include:
+
+- `ok`
+- `canonical_status`
+- `canonical_phase`
+- `next_action`
+- `terminal`
+- `requires_followup`
+- `followup_tool`
+- `active_tx_id`
+- `active_ticket_id`
+
+When the information is available, responses may also include contextual fields such as:
+
+- `current_step`
+- `verify_status`
+- `commit_status`
+- `integrity_status`
+- `can_start_new_ticket`
+- `resume_required`
+
+These fields describe the resulting canonical state after the tool completes. In other words, they are meant to tell you whether you should begin, resume, verify, commit, explicitly end the task, or stop because the canonical state is blocked.
+
+Lifecycle- and state-related failures are also intended to expose structured recovery guidance. The normalized failure shape includes:
+
+- `ok: false`
+- `error_code`
+- `reason`
+- `recoverable`
+- `recommended_next_tool`
+- `recommended_action`
+
+When known, failure responses may also include canonical state or integrity context, such as the current status or phase, the active transaction identity, terminality, and integrity-related metadata.
+
+A practical way to interpret the main fields is:
+
+- `canonical_status` and `canonical_phase` describe the resulting canonical transaction state
+- `next_action` describes the next lifecycle step that should be taken
+- `terminal` tells you whether the transaction is already terminal
+- `requires_followup` tells you whether more lifecycle work is still required
+- `followup_tool` identifies the explicit follow-up tool when one is required
+
+Helper completion does not always mean the transaction is finished. In particular, successful commit helpers may leave the transaction in non-terminal `committed`, which still requires explicit terminal closure such as ending the task with `done` or `blocked`.
+
 ### Initialize a project with `zed-agentops-init`
 
 Create or update an AgentOps-managed project with:
@@ -196,6 +244,8 @@ After initialization:
 
 For the supported workflow, the agent should initialize the workspace root before root-dependent operations and should treat `.agent/tx_state.json` and `.agent/tx_event_log.jsonl` as the canonical local workflow state.
 
+The intended interpretation of lifecycle-aware responses is tied to that canonical state. Clients should rely on the structured response fields to understand whether there is an active transaction to resume, whether a new ticket can start safely, and whether helper success still leaves explicit follow-up work.
+
 ### Configure `verify` / `verify-release` as needed
 
 The generated template includes:
@@ -239,7 +289,7 @@ Likewise, for other ecosystems you should initialize the actual project using th
 
 ### Create a `docs` directory and write a draft
 
-For the v0.5.0 workflow, it is useful to create a `docs` directory in the project and write a draft such as:
+For the v0.5.4 workflow, it is useful to create a `docs` directory in the project and write a draft such as:
 
 ```text
 docs/draft_0.1.0.md
