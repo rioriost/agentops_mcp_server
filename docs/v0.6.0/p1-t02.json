@@ -2,7 +2,7 @@
   "id": "p1-t02",
   "title": "Define the canonical state machine and continuation rules",
   "priority": "P0",
-  "status": "planned",
+  "status": "done",
   "summary": "Create the authoritative 0.6.0 contract for the canonical transaction state machine and continuation model. This ticket defines the meaning of each canonical non-terminal and terminal status, the expected checkpoint events that mark resumable progress, the role of `next_action` as the machine-readable continuation contract, the transition constraints that keep the state machine explicit and compact, and the idempotent continuation invariants that later runtime tickets must preserve when implementing interrupted verify, commit, and end handling.",
   "inputs": [
     "docs/draft_0.6.0.md",
@@ -82,7 +82,7 @@
     },
     "status_meanings": {
       "in-progress": "Implementation work or repair work is actively ongoing and the transaction remains resumable.",
-      "checking": "The transaction is being evaluated against verification or acceptance expectations and remains resumable.",
+      "checking": "The transaction is in a non-terminal evaluation state between active implementation work and final verified-versus-repair branching, and remains resumable.",
       "verified": "Verification succeeded for the current transaction state, but the transaction is still non-terminal until commit and explicit end handling are complete.",
       "committed": "Repository commit succeeded, but the transaction remains non-terminal until explicit terminal completion occurs.",
       "done": "Terminal successful completion of the transaction.",
