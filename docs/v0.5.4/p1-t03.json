@@ -2,7 +2,7 @@
   "id": "p1-t03",
   "title": "Normalize lifecycle wrapper success responses to expose canonical workflow guidance",
   "priority": "P0",
-  "status": "planned",
+  "status": "done",
   "summary": "Update the lifecycle wrapper tools so successful operations return consistent machine-readable canonical workflow guidance instead of minimal payloads that force AI agents to infer the resulting state. This ticket focuses on success responses for wrapper-style tools, ensuring that after task start, task update, task end, file-intent operations, and state capture, the response clearly describes the resulting canonical status, phase, next action, terminality, follow-up requirements, and active transaction identity.",
   "inputs": [
     "docs/draft_0.5.4.md",
@@ -37,14 +37,13 @@
     "Ensure `ops_capture_state` exposes canonical workflow guidance in healthy-state cases while remaining compatible with strict integrity behavior.",
     "Add regression tests that assert wrapper success responses include the required guidance fields and consistent semantics."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02"
-  ],
+  "dependencies": ["p1-t01", "p1-t02"],
   "notes": [
     "This ticket is limited to success responses for lifecycle wrapper tools. Structured failure normalization is handled separately.",
     "The goal is to make wrapper tools as workflow-aware as helper tools, so agents can make next-step decisions from response data instead of implementation assumptions.",
     "The resulting response contract should preserve existing useful payload fields where practical, while adding canonical workflow metadata needed for machine-driven use.",
-    "Care should be taken to ensure that the response reflects canonical state after persistence/rebuild-sensitive operations, not stale local assumptions."
+    "Care should be taken to ensure that the response reflects canonical state after persistence/rebuild-sensitive operations, not stale local assumptions.",
+    "Completed implementation normalized wrapper success responses in ops_tools so lifecycle wrappers and file-intent wrappers expose canonical status, phase, next_action, terminality, follow-up guidance, active transaction identity, and integrity metadata from persisted canonical state.",
+    "Completed regression coverage in tests/test_ops_tools.py to assert that wrapper success responses expose the expected workflow-guidance fields and no longer require agent-side inference from minimal payloads."
   ]
 }

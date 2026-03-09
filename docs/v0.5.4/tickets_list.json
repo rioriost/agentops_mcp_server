@@ -25,7 +25,7 @@
       "id": "p1-t03",
       "priority": "P0",
       "title": "Normalize lifecycle wrapper success responses",
-      "status": "planned",
+      "status": "done",
       "file": "v0.5.4/p1-t03.json"
     },
     {
@@ -65,9 +65,9 @@
     }
   ],
   "status_context": {
-    "active_ticket": "p1-t02",
-    "canonical_sync_state": "in-progress",
-    "reason": "P1-T1 schema-definition work is complete, and p1-t02 is now the active canonical ticket for implementing shared response-building utilities.",
-    "recommended_action": "Continue p1-t02 by introducing shared helpers for standardized lifecycle success and failure responses, then apply that contract to downstream tool implementations."
+    "active_ticket": "p2-t01",
+    "canonical_sync_state": "planned",
+    "reason": "p1-t03 is complete, and p2-t01 is now the next executable ticket for normalizing helper success and follow-up semantics.",
+    "recommended_action": "Begin p2-t01 by aligning verify/commit helper success responses with the standardized workflow-guidance contract and making remaining follow-up obligations explicit."
   }
 }
