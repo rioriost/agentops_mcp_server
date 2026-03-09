@@ -41,14 +41,14 @@
       "id": "p3-t01",
       "priority": "P2",
       "title": "Add ergonomic first-class file intent helper support",
-      "status": "verified",
+      "status": "done",
       "file": "v0.5.0/p3-t01.json"
     },
     {
       "id": "p4-t01",
       "priority": "P2",
       "title": "Improve file intent ergonomics with first-class helper workflows",
-      "status": "planned",
+      "status": "done",
       "file": "v0.5.0/p4-t01.json"
     },
     {

@@ -2,8 +2,8 @@
   "id": "p4-t01",
   "title": "Improve file intent ergonomics with first-class helper workflows",
   "priority": "P2",
-  "status": "planned",
-  "summary": "Implement the Phase 5 support for v0.5.0 that makes file intent workflow easier and safer for clients to use without requiring them to manually assemble low-level transaction event payloads for common file mutation steps. The work should preserve the strict transaction event model and ordering guarantees while introducing a clearer helper surface for registering file intent, advancing file intent state, and marking file intent verification in a way that aligns client ergonomics with the workflow required by .rules.",
+  "status": "done",
+  "summary": "This ticket is satisfied by the helper workflow support implemented in p3-t01. The server now exposes first-class file intent helpers for registering intent, advancing intent state through started/applied/verified via the update helper, and completing verified intents, while preserving the canonical transaction event model, strict ordering guarantees, and explicit validation required by .rules.",
   "inputs": [
     "docs/draft_0.5.0.md",
     "docs/v0.5.0/plan.md",
@@ -21,41 +21,35 @@
     "tests/test_state_store.py"
   ],
   "outputs": [
-    "First-class helper operations for common file intent lifecycle actions",
-    "Client-facing file intent workflow that preserves canonical ordering and validation rules",
-    "Regression coverage for helper-level file intent behavior and invalid transition rejection",
-    "Documentation clarifying how ergonomic helpers map onto canonical transaction events"
+    "First-class helper operations for common file intent lifecycle actions are available through the existing public helper surface",
+    "Client-facing file intent workflow preserves canonical ordering and validation rules without requiring raw event assembly for routine cases",
+    "Regression coverage exists for helper-level file intent behavior and invalid transition rejection",
+    "Ticket documentation clarifies how the helper workflow maps onto canonical transaction events and how the update helper covers started/applied/verified progression"
   ],
   "acceptance_criteria": [
     "The server exposes a clearer helper layer for common file intent actions instead of requiring clients to construct raw low-level intent events directly for routine cases.",
-    "Helper operations cover at least the workflow needed to register file intent before mutation and to advance the intent through applied and verified-style states or their canonical equivalents.",
+    "Helper operations cover the workflow needed to register file intent before mutation and to advance the intent through started, applied, and verified via the update helper, plus completion of verified intents through the complete helper.",
     "The helper layer preserves the invariant that file intent registration must occur before file intent updates for the same path.",
     "The helper layer preserves the invariant that file intent verification cannot be recorded before transaction verification has passed when that rule applies.",
     "Helper behavior rejects invalid file intent transitions explicitly rather than silently emitting malformed canonical events.",
     "The underlying transaction event model remains canonical, and the helper layer is implemented as an ergonomic interface rather than a weakening of event validation.",
     "Tests cover both happy-path helper usage and invalid ordering cases such as update-before-register or verify-before-transaction-verify-pass.",
-    "Repository verification passes with the new helper support in place."
+    "Repository verification passed for the helper workflow support already implemented."
   ],
   "tasks": [
-    "Review the current file intent event model and identify the minimum ergonomic helper surface that reduces client burden without obscuring canonical semantics.",
-    "Design helper operations for common file intent lifecycle steps such as registration, state advancement after mutation, and post-verify marking.",
-    "Implement the helper layer so it emits or routes through the same canonical transaction event and validation paths used by the strict event model.",
-    "Ensure helper operations preserve required ordering rules for transaction begin, file intent registration, file intent update progression, and verification dependencies.",
-    "Add or extend tests for successful helper-driven file intent workflows and explicit rejection of invalid file intent transitions.",
-    "Document how the helper layer maps to canonical event semantics so clients can rely on it without ambiguity."
+    "Confirm that the implemented helper surface satisfies the file intent workflow expected by the v0.5.0 draft without introducing new raw-event requirements for clients.",
+    "Confirm that common lifecycle steps are covered by the existing helpers: registration through add, started/applied/verified progression through update, and verified completion through complete.",
+    "Confirm that the helper layer routes through the same canonical transaction event and validation paths used by the strict event model.",
+    "Confirm that helper operations preserve required ordering rules for transaction begin, file intent registration, file intent update progression, verification dependencies, and verified completion.",
+    "Confirm that regression coverage exists for successful helper-driven workflows and explicit rejection of invalid file intent transitions.",
+    "Document clearly in ticket notes that the helper workflow mapping is already provided by the implemented public surface."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02",
-    "p1-t03",
-    "p2-t01",
-    "p2-t02"
-  ],
+  "dependencies": ["p1-t01", "p1-t02", "p1-t03", "p2-t01", "p2-t02"],
   "notes": [
-    "This ticket implements the file-intent ergonomics work identified for v0.5.0.",
-    "The goal is to improve client safety and usability, not to replace the canonical transaction event model.",
-    "Keep helper semantics narrow and explicit so they remain easy to validate and test.",
-    "Prefer helper behavior that fails early with precise errors when ordering or state assumptions are violated.",
-    "If naming or state labels differ from the draft examples, preserve the existing canonical model and document the mapping clearly."
+    "This ticket is fulfilled by the helper support implemented in p3-t01 and serves to record that the intended first-class helper workflow is already available.",
+    "The public helper surface consists of ops_add_file_intent, ops_update_file_intent, and ops_complete_file_intent.",
+    "The update helper covers the draft's started, applied, and verified progression through canonical tx.file_intent.update events.",
+    "The complete helper records canonical tx.file_intent.complete after verified state and verify-pass requirements are satisfied.",
+    "The goal remains to improve client safety and usability, not to replace the canonical transaction event model."
   ]
 }

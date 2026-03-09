@@ -2,7 +2,7 @@
   "id": "p3-t01",
   "title": "Add ergonomic first-class file intent helper support",
   "priority": "P2",
-  "status": "verified",
+  "status": "done",
   "summary": "Implement Phase 5 support for v0.5.0 that makes file intent workflow easier and safer for clients to use without requiring them to manually assemble low-level transaction event payloads for common file mutation steps. The work should preserve the strict transaction event model and ordering guarantees while introducing a clearer helper surface for registering file intent, advancing file intent state, and marking file intent verification in a way that aligns client ergonomics with the workflow required by .rules.",
   "inputs": [
     "docs/draft_0.5.0.md",
