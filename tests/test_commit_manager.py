@@ -483,6 +483,101 @@ def test_build_structured_helper_failure_defaults_commit_required():
     )
 
 
+def test_build_structured_helper_failure_defaults_terminal_transaction():
+    result = build_structured_helper_failure(
+        error_code="terminal_transaction",
+        reason="cannot mutate a terminal transaction",
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "terminal_transaction"
+    assert result["recoverable"] is False
+    assert result["recommended_next_tool"] == "ops_start_task"
+    assert (
+        result["recommended_action"]
+        == "Do not emit more lifecycle events for a terminal transaction; start a new ticket only when canonical state allows it."
+    )
+    assert result["terminal"] is False
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] is None
+
+
+def test_build_structured_helper_failure_defaults_begin_required():
+    result = build_structured_helper_failure(
+        error_code="begin_required",
+        reason="tx.begin required before lifecycle updates",
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "begin_required"
+    assert result["recoverable"] is True
+    assert result["recommended_next_tool"] == "ops_start_task"
+    assert (
+        result["recommended_action"]
+        == "Start or resume the canonical transaction before emitting lifecycle events."
+    )
+    assert result["terminal"] is False
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] is None
+
+
+def test_build_structured_helper_failure_defaults_resume_required():
+    result = build_structured_helper_failure(
+        error_code="resume_required",
+        reason="resume the active transaction first",
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "resume_required"
+    assert result["recoverable"] is True
+    assert result["recommended_next_tool"] == "ops_update_task"
+    assert (
+        result["recommended_action"]
+        == "Resume or complete the active transaction before starting a different ticket."
+    )
+    assert result["terminal"] is False
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] is None
+
+
+def test_build_structured_helper_failure_defaults_historical_repair_required():
+    result = build_structured_helper_failure(
+        error_code="historical_repair_required",
+        reason="repair damaged canonical history before resuming",
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "historical_repair_required"
+    assert result["recoverable"] is False
+    assert result["recommended_next_tool"] == "tx_state_rebuild"
+    assert (
+        result["recommended_action"]
+        == "Historical repair is required before resume-safe automation can continue. Preserve the invalid event metadata, repair or replace the damaged canonical history, and avoid reusing human ticket labels as canonical tx_id values."
+    )
+    assert result["terminal"] is False
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] is None
+
+
+def test_build_structured_helper_failure_defaults_tx_id_collision():
+    result = build_structured_helper_failure(
+        error_code="tx_id_collision",
+        reason="canonical tx_id collision detected",
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "tx_id_collision"
+    assert result["recoverable"] is False
+    assert result["recommended_next_tool"] == "tx_state_rebuild"
+    assert (
+        result["recommended_action"]
+        == "Do not treat the collided history as healthy. Repair the historical log, assign future canonical tx_id values as opaque identifiers, and keep user-facing ticket labels separate from canonical transaction identity."
+    )
+    assert result["terminal"] is False
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] is None
+
+
 def test_commit_if_verified_backfills_tx_begin_when_log_empty(tmp_path, monkeypatch):
     repo_context = RepoContext(tmp_path)
     state_store = StateStore(repo_context)

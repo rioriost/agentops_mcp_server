@@ -140,6 +140,16 @@ def _assert_helper_guidance(result, *, expected_status, expected_phase):
     assert "active_tx" in result
 
 
+def _assert_nonterminal_guidance_consistency(result):
+    assert result["terminal"] is False
+    if result["followup_tool"] == "ops_end_task":
+        assert result["next_action"] in {"tx.end.done", "tx.end.blocked"}
+        assert result["requires_followup"] is True
+    if result["active_tx_id"] is not None or result["active_ticket_id"] is not None:
+        assert result["can_start_new_ticket"] is False
+        assert result["resume_required"] is True
+
+
 def test_repo_status_summary_collects_fields():
     mapping = {
         ("rev-parse", "--abbrev-ref", "HEAD"): "main",
@@ -208,6 +218,42 @@ def test_repo_verify_delegates():
     assert result["resume_required"] is False
     assert result["active_tx"] == {}
     assert verify_runner.calls == [5]
+
+
+def test_repo_verify_success_guidance_is_internally_consistent():
+    git_repo = DummyGitRepo()
+    verify_runner = DummyVerifyRunner(
+        result={"ok": True, "returncode": 0, "stdout": "ok", "stderr": ""}
+    )
+    tx_state = {
+        "active_tx": {
+            "tx_id": "tx-1",
+            "ticket_id": "p1-t1",
+            "status": "checking",
+            "phase": "checking",
+            "current_step": "p1-t1",
+            "session_id": "s1",
+            "verify_state": {"status": "not_started", "last_result": None},
+            "commit_state": {"status": "not_started", "last_result": None},
+            "file_intents": [],
+        }
+    }
+    state_store = DummyStateStore(tx_state=tx_state)
+    tools = RepoTools(git_repo, verify_runner, state_store, DummyStateRebuilder())
+
+    result = tools.repo_verify(timeout_sec=5)
+
+    assert result["ok"] is True
+    _assert_helper_guidance(
+        result, expected_status="verified", expected_phase="verified"
+    )
+    _assert_nonterminal_guidance_consistency(result)
+    assert result["next_action"] == "tx.commit.start"
+    assert result["followup_tool"] is None
+    assert result["verify_status"] == "passed"
+    assert result["commit_status"] == "not_started"
+    assert result["active_tx_id"] == "tx-1"
+    assert result["active_ticket_id"] == "p1-t1"
 
 
 def test_load_tx_context_returns_none_without_state_store():
@@ -1255,6 +1301,32 @@ def test_repo_verify_records_canonical_tx_events_when_active_tx_exists():
 
 
 def test_repo_verify_rejects_terminal_transaction():
+    git_repo = DummyGitRepo()
+    verify_runner = DummyVerifyRunner(result={"ok": True})
+    tx_state = {
+        "active_tx": {
+            "tx_id": "tx-1",
+            "ticket_id": "p1-t1",
+            "status": "done",
+            "phase": "done",
+            "current_step": "p1-t1",
+            "session_id": "s1",
+            "verify_state": {"status": "passed", "last_result": None},
+            "commit_state": {"status": "passed", "last_result": None},
+            "file_intents": [],
+        }
+    }
+    state_store = DummyStateStore(tx_state=tx_state)
+    tools = RepoTools(git_repo, verify_runner, state_store, DummyStateRebuilder())
+
+    with pytest.raises(ValueError, match="cannot verify a terminal transaction"):
+        tools.repo_verify(timeout_sec=5)
+
+    assert verify_runner.calls == []
+    assert state_store.append_and_save_calls == []
+
+
+def test_repo_verify_rejects_terminal_transaction_without_contradictory_guidance():
     git_repo = DummyGitRepo()
     verify_runner = DummyVerifyRunner(result={"ok": True})
     tx_state = {

@@ -1197,6 +1197,21 @@ def test_ops_end_task_emits_terminal_event_and_updates_state(
     last_seq = max(event["seq"] for event in events)
     assert tx_state["last_applied_seq"] == last_seq
     assert tx_state["integrity"]["rebuilt_from_seq"] == last_seq
+    assert result["canonical_status"] == "done"
+    assert result["canonical_phase"] == "done"
+    assert result["tx_status"] == "done"
+    assert result["tx_phase"] == "done"
+    assert result["next_action"] == "tx.begin"
+    assert result["terminal"] is True
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] is None
+    assert result["active_tx_id"] == "t-1"
+    assert result["active_ticket_id"] == "t-1"
+    assert result["current_step"] == "t-1"
+    assert result["verify_status"] == "passed"
+    assert result["commit_status"] == "passed"
+    assert result["can_start_new_ticket"] is True
+    assert result["resume_required"] is False
 
 
 def test_ops_end_task_uses_ticket_id_when_tx_id_is_none(
@@ -2836,7 +2851,78 @@ def test_ops_update_task_with_note_only_uses_active_task_and_default_phase(
     assert events[-1]["event_type"] == "tx.step.enter"
     assert events[-1]["phase"] == "in-progress"
     assert events[-1]["payload"]["description"] == "note only"
-    assert events[-1]["payload"]["step_id"] == "task"
+
+
+def test_ops_end_task_terminal_guidance_does_not_require_followup(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    tx_state["active_tx"]["status"] = "committed"
+    tx_state["active_tx"]["phase"] = "committed"
+    tx_state["active_tx"]["commit_state"] = {
+        "status": "passed",
+        "last_result": {"sha": "abc123"},
+    }
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    result = ops.ops_end_task(
+        summary="done",
+        next_action="next",
+        status="done",
+        task_id="t-1",
+        session_id="s1",
+    )
+
+    assert result["ok"] is True
+    assert result["canonical_status"] == "done"
+    assert result["canonical_phase"] == "done"
+    assert result["tx_status"] == "done"
+    assert result["tx_phase"] == "done"
+    assert result["terminal"] is True
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] == "ops_end_task"
+    assert result["next_action"] == "tx.begin"
+    assert result["active_tx_id"] == "t-1"
+    assert result["active_ticket_id"] == "t-1"
+    assert result["can_start_new_ticket"] is True
+    assert result["resume_required"] is False
+
+
+def test_ops_update_task_nonterminal_guidance_keeps_resume_state_consistent(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    result = ops.ops_update_task(
+        status="checking",
+        note="review guidance consistency",
+        session_id="s1",
+    )
+
+    assert result["ok"] is True
+    assert result["canonical_status"] == "checking"
+    assert result["canonical_phase"] == "checking"
+    assert result["tx_status"] == "checking"
+    assert result["tx_phase"] == "checking"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
+    assert result["next_action"] == "tx.verify.start"
+    assert result["active_tx_id"] == "t-1"
+    assert result["active_ticket_id"] == "t-1"
+    assert result["current_step"] == "checking"
+    assert result["can_start_new_ticket"] is False
+    assert result["resume_required"] is True
+    events = _read_tx_events(repo_context)
+    assert events[-1]["payload"]["step_id"] == "checking"
 
 
 def test_ops_update_task_with_done_status_keeps_non_terminal_phase_until_end(
@@ -2848,6 +2934,21 @@ def test_ops_update_task_with_done_status_keeps_non_terminal_phase_until_end(
     result = ops.ops_update_task(status="done", note="wrap up", session_id="s1")
 
     assert result["ok"] is True
+    assert result["canonical_status"] == "in-progress"
+    assert result["canonical_phase"] == "in-progress"
+    assert result["tx_status"] == "in-progress"
+    assert result["tx_phase"] == "in-progress"
+    assert result["next_action"] == "tx.verify.start"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
+    assert result["active_tx_id"] == "t-1"
+    assert result["active_ticket_id"] == "t-1"
+    assert result["current_step"] == "t-1"
+    assert result["verify_status"] == "not_started"
+    assert result["commit_status"] == "not_started"
+    assert result["can_start_new_ticket"] is False
+    assert result["resume_required"] is True
     events = _read_tx_events(repo_context)
     assert events[-1]["event_type"] == "tx.step.enter"
     assert events[-1]["phase"] == "in-progress"

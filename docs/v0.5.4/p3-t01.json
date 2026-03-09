@@ -2,7 +2,7 @@
   "id": "p3-t01",
   "title": "Add regression tests for the machine-readable workflow-guidance contract",
   "priority": "P1",
-  "status": "planned",
+  "status": "in-progress",
   "summary": "Protect the 0.5.4 workflow-guidance improvements with regression coverage so lifecycle-relevant MCP tools continue to expose structured canonical state and structured recovery guidance in a stable, agent-safe form. This ticket ensures that future changes do not regress success responses back to ambiguous minimal payloads or failure responses back to string-only lifecycle errors that force AI agents to guess canonical status, terminality, follow-up obligations, or resume behavior.",
   "inputs": [
     "docs/draft_0.5.4.md",
@@ -46,18 +46,14 @@
     "Add tests that distinguish begin-required, resume-required, terminal, and integrity-blocked outcomes without depending only on string matching.",
     "Add assertions that the guidance contract remains internally consistent across tools and does not expose contradictory status, phase, next action, or terminality."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02",
-    "p1-t03",
-    "p2-t01",
-    "p2-t02",
-    "p2-t03"
-  ],
+  "dependencies": ["p1-t01", "p1-t02", "p1-t03", "p2-t01", "p2-t02", "p2-t03"],
   "notes": [
     "This ticket protects the 0.5.4 response contract rather than introducing new lifecycle semantics by itself.",
     "The most important regression to prevent is a return to tool responses that require hidden implementation knowledge or natural-language inference for correct agent behavior.",
     "Coverage should focus on machine-actionable contract guarantees rather than documentation wording alone.",
-    "Tests should preserve strict canonical behavior; they should not encourage weakening lifecycle validation or hiding integrity-blocked states."
+    "Tests should preserve strict canonical behavior; they should not encourage weakening lifecycle validation or hiding integrity-blocked states.",
+    "Progress update: regression coverage now includes helper failure defaults for begin-required, resume-required, terminal-transaction, historical-repair-required, and tx_id-collision outcomes so machine-readable recovery guidance remains stable.",
+    "Progress update: repo verification guidance now has explicit consistency checks covering non-terminal helper responses, active transaction resume semantics, and terminal rejection without contradictory follow-up guidance.",
+    "Progress update: ops lifecycle response coverage now asserts that terminal end-task responses clear follow-up obligations while non-terminal task updates continue to require resume-safe follow-up."
   ]
 }
