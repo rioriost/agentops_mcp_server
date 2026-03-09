@@ -106,3 +106,36 @@ def test_init_script_contains_canonical_artifacts_and_rules():
     assert '"session_id": ""' in content
     assert '"drift_detected": false' in content
     assert '"active_tx_source": "none"' in content
+
+
+def test_init_script_documents_convention_boundary_and_helper_contract():
+    script_path = init_mod.resources.files("agentops_mcp_server").joinpath(
+        "zed-agentops-init.sh"
+    )
+    content = script_path.read_text(encoding="utf-8")
+
+    assert (
+        "- Ticket artifacts are client-managed workflow convention, not mandatory server protocol."
+        in content
+    )
+    assert (
+        "- MCP clients must not assume the server generates, persists, synchronizes, or validates:"
+        in content
+    )
+    assert (
+        "- If a client chooses to maintain ticket artifacts, keeping per-ticket JSON and docs/__version__/tickets_list.json synchronized is recommended operating practice."
+        in content
+    )
+    assert "- `tx.begin` before task lifecycle events" in content
+    assert (
+        "- `tx.verify.pass` before `tx.file_intent.update` with `state=verified`"
+        in content
+    )
+    assert (
+        "- file intent updates require a previously registered file intent for the same path"
+        in content
+    )
+    assert (
+        "- commit operations require a valid verify sequence and existing transaction context"
+        in content
+    )
