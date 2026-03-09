@@ -896,7 +896,16 @@ def test_repo_commit_with_verify_updates_verify_state(tmp_path, monkeypatch):
         state_store,
         state_rebuilder,
     )
-    monkeypatch.setattr(manager, "_run_git_commit", lambda msg: ("sha", "summary"))
+    original_run = subprocess.run
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: (
+            None
+            if args and args[0][:2] == ["git", "commit"]
+            else original_run(*args, **kwargs)
+        ),
+    )
 
     result = manager.repo_commit(message="message", run_verify=True)
 
@@ -913,12 +922,80 @@ def test_repo_commit_with_verify_updates_verify_state(tmp_path, monkeypatch):
         "tx.verify.start",
         "tx.verify.pass",
         "tx.commit.start",
+        "tx.commit.done",
     ]
 
     tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
     active_tx = tx_state["active_tx"]
     assert active_tx["verify_state"]["status"] == "passed"
+    assert active_tx["verify_state"]["last_result"]["returncode"] == 0
+    assert active_tx["commit_state"]["status"] == "passed"
+    assert active_tx["status"] == "committed"
+    assert active_tx["phase"] == "committed"
+
+
+def test_repo_commit_with_verify_then_commit_failure_keeps_verified_state(
+    tmp_path, monkeypatch
+):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    state_store.tx_event_append(
+        tx_id="tx-1",
+        ticket_id="p4-t3",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="commit",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "p4-t3", "ticket_title": "p4-t3"},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+    _write_tx_state(state_store, verify_state_status="not_started")
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"}),
+        state_store,
+        state_rebuilder,
+    )
+
+    def failing_run_git_commit(_message):
+        manager._emit_tx_event(
+            event_type="tx.commit.fail",
+            payload={"error": "git commit failed", "summary": "commit failed"},
+            phase_override="verified",
+        )
+        raise RuntimeError("git commit failed")
+
+    monkeypatch.setattr(manager, "_run_git_commit", failing_run_git_commit)
+
+    with pytest.raises(RuntimeError, match="git commit failed"):
+        manager.repo_commit(message="message", run_verify=True)
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    event_types = [event["event_type"] for event in events]
+    assert event_types == [
+        "tx.begin",
+        "tx.verify.start",
+        "tx.verify.pass",
+        "tx.commit.start",
+        "tx.commit.fail",
+    ]
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    active_tx = tx_state["active_tx"]
+    assert active_tx["verify_state"]["status"] == "passed"
+    assert active_tx["verify_state"]["last_result"]["returncode"] == 0
+    assert active_tx["commit_state"]["status"] == "failed"
+    assert active_tx["commit_state"]["last_result"]["error"] == "git commit failed"
     assert active_tx["status"] == "verified"
+    assert active_tx["phase"] == "verified"
 
 
 def test_repo_verify_success_records_canonical_verify_events(tmp_path):

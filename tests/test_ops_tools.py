@@ -1032,6 +1032,32 @@ def test_ops_add_file_intent_emits_add_event_and_updates_state(
     ]
 
 
+def test_ops_add_file_intent_requires_current_step(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="in-progress",
+        phase="in-progress",
+        current_step=" ",
+        session_id="s1",
+    )
+
+    with pytest.raises(
+        ValueError, match="current_step is required before adding file intent"
+    ):
+        ops.ops_add_file_intent(
+            path="src/file.py",
+            operation="update",
+            purpose="implement helper",
+            task_id="t-1",
+            session_id="s1",
+        )
+
+
 def test_ops_update_file_intent_emits_update_event_and_advances_state(
     repo_context, state_store, state_rebuilder
 ):
@@ -1207,6 +1233,30 @@ def test_ops_complete_file_intent_rejects_before_verify_pass(
     )
 
     with pytest.raises(ValueError, match="file intent verified requires verify.pass"):
+        ops.ops_complete_file_intent(
+            path="src/file.py",
+            task_id="t-1",
+            session_id="s1",
+        )
+
+
+def test_ops_complete_file_intent_requires_current_step(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="in-progress",
+        phase="in-progress",
+        current_step=" ",
+        session_id="s1",
+    )
+
+    with pytest.raises(
+        ValueError, match="current_step is required before completing file intent"
+    ):
         ops.ops_complete_file_intent(
             path="src/file.py",
             task_id="t-1",
@@ -1783,6 +1833,53 @@ def test_require_active_tx_allow_resume_returns_requested_id(
 
     assert active_tx["tx_id"] == "t-1"
     assert resolved_id == "t-1"
+
+
+def test_emit_tx_event_returns_none_when_no_identifier(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops._emit_tx_event(
+        event_type="tx.step.enter",
+        payload={"step_id": "task", "description": "noop"},
+        title="   ",
+        task_id="   ",
+        phase="in-progress",
+        step_id="task",
+        session_id="s1",
+        agent_id=None,
+    )
+
+    assert result is None
+
+
+def test_emit_tx_event_uses_append_and_rebuild_save_when_materialized_state_missing(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    repo_context.tx_state.unlink(missing_ok=True)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+
+    result = ops._emit_tx_event(
+        event_type="tx.step.enter",
+        payload={"step_id": "resume-step", "description": "from append"},
+        title="t-1",
+        task_id="t-1",
+        phase="checking",
+        step_id="resume-step",
+        session_id="s1",
+        agent_id="agent-1",
+    )
+
+    assert result is not None
+    events = _read_tx_events(repo_context)
+    assert events[-1]["event_type"] == "tx.step.enter"
+    assert events[-1]["actor"]["agent_id"] == "agent-1"
+
+    saved_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    assert saved_state["active_tx"]["tx_id"] == "t-1"
+    assert saved_state["active_tx"]["ticket_id"] == "t-1"
 
 
 def test_emit_tx_event_returns_none_when_no_identifier(

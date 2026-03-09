@@ -12,10 +12,33 @@ def test_main_wrapper_delegates(monkeypatch):
             }
 
     class DummyStore:
-        pass
+        def tx_event_append(self, **kwargs):
+            return {"tx_event_append": kwargs}
+
+        def tx_state_save(self, state):
+            return {"tx_state_save": state}
+
+        def log_tool_error(self, tool_name, tool_input, tool_output):
+            return {
+                "log_tool_error": {
+                    "tool_name": tool_name,
+                    "tool_input": tool_input,
+                    "tool_output": tool_output,
+                }
+            }
 
     class DummyRebuilder:
-        pass
+        def rebuild_tx_state(
+            self, start_seq=None, end_seq=None, tx_state_path=None, event_log_path=None
+        ):
+            return {
+                "tx_state_rebuild": {
+                    "start_seq": start_seq,
+                    "end_seq": end_seq,
+                    "tx_state_path": tx_state_path,
+                    "event_log_path": event_log_path,
+                }
+            }
 
     class DummyVerifyRunner:
         def run_verify(self, timeout_sec=None):
@@ -67,6 +90,15 @@ def test_main_wrapper_delegates(monkeypatch):
         def ops_end_task(self, **kwargs):
             return {"ops_end_task": kwargs}
 
+        def ops_add_file_intent(self, **kwargs):
+            return {"ops_add_file_intent": kwargs}
+
+        def ops_update_file_intent(self, **kwargs):
+            return {"ops_update_file_intent": kwargs}
+
+        def ops_complete_file_intent(self, **kwargs):
+            return {"ops_complete_file_intent": kwargs}
+
         def ops_capture_state(self, session_id=None):
             return {"ops_capture_state": session_id}
 
@@ -110,6 +142,35 @@ def test_main_wrapper_delegates(monkeypatch):
     assert init_result["ok"] is True
     assert init_result["repo_root"] == "/tmp/project"
 
+    tx_event = main.tx_event_append(
+        tx_id="tx-1",
+        ticket_id="t-1",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="step-1",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "t-1"},
+        event_id="evt-1",
+    )
+    assert tx_event["tx_event_append"]["tx_id"] == "tx-1"
+    assert tx_event["tx_event_append"]["event_id"] == "evt-1"
+
+    tx_state = main.tx_state_save({"state": "value"})
+    assert tx_state["tx_state_save"] == {"state": "value"}
+
+    rebuilt = main.tx_state_rebuild(
+        start_seq=1,
+        end_seq=2,
+        tx_state_path="tx_state.json",
+        event_log_path="tx_event_log.jsonl",
+    )
+    assert rebuilt["tx_state_rebuild"]["start_seq"] == 1
+    assert rebuilt["tx_state_rebuild"]["end_seq"] == 2
+
+    logged = main.log_tool_error("tool", {"a": 1}, {"b": 2})
+    assert logged["log_tool_error"]["tool_name"] == "tool"
+
     assert main.run_verify(timeout_sec=3)["verify"] == 3
     assert main.commit_if_verified("msg", timeout_sec=2)["commit_if_verified"] == "msg"
     assert main.repo_commit(message="m")["repo_commit"]["message"] == "m"
@@ -127,6 +188,22 @@ def test_main_wrapper_delegates(monkeypatch):
     assert main.ops_start_task(title="t")["ops_start_task"]["title"] == "t"
     assert main.ops_update_task(status="s")["ops_update_task"]["status"] == "s"
     assert main.ops_end_task(summary="done")["ops_end_task"]["summary"] == "done"
+    assert (
+        main.ops_add_file_intent("a.py", "update", "reason")["ops_add_file_intent"][
+            "path"
+        ]
+        == "a.py"
+    )
+    assert (
+        main.ops_update_file_intent("a.py", "applied")["ops_update_file_intent"][
+            "state"
+        ]
+        == "applied"
+    )
+    assert (
+        main.ops_complete_file_intent("a.py")["ops_complete_file_intent"]["path"]
+        == "a.py"
+    )
     assert main.ops_capture_state("s1")["ops_capture_state"] == "s1"
     assert main.ops_task_summary("s1", 5)["ops_task_summary"] == ("s1", 5)
     assert (

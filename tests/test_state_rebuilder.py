@@ -872,6 +872,439 @@ def test_rebuild_tx_state_rejects_verified_intent_before_verify_pass(
     assert rebuild["last_applied_seq"] == 3
 
 
+def test_rebuild_tx_state_drops_duplicate_event_ids_without_drift(
+    repo_context, state_rebuilder
+):
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 1,
+            "event_id": "evt-begin",
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"ticket_id": "p4-t2", "ticket_title": "p4-t2"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-step",
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.step.enter",
+            "phase": "in-progress",
+            "step_id": "p4-t2-s1",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"step_id": "p4-t2-s1", "description": "step"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 3,
+            "event_id": "evt-step",
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.step.enter",
+            "phase": "in-progress",
+            "step_id": "p4-t2-s1-dup",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"step_id": "p4-t2-s1-dup", "description": "duplicate"},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 2
+    assert rebuild["dropped_events"] == 1
+    assert rebuild["state"]["active_tx"]["tx_id"] == "tx-1"
+    assert rebuild["state"]["active_tx"]["current_step"] == "p4-t2-s1"
+    assert rebuild["state"]["integrity"]["drift_detected"] is False
+    assert "rebuild_warning" not in rebuild["state"]
+
+
+def test_rebuild_tx_state_marks_drift_when_latest_event_is_terminal_for_other_tx(
+    repo_context, state_rebuilder
+):
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 1,
+            "event_id": "evt-active-begin",
+            "tx_id": "tx-active",
+            "ticket_id": "p2-t3",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"ticket_id": "p2-t3", "ticket_title": "active tx"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-active-step",
+            "tx_id": "tx-active",
+            "ticket_id": "p2-t3",
+            "event_type": "tx.step.enter",
+            "phase": "in-progress",
+            "step_id": "p2-t3-s1",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"step_id": "p2-t3-s1", "description": "active step"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 3,
+            "event_id": "evt-done-begin",
+            "tx_id": "tx-done",
+            "ticket_id": "p4-t5",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a2"},
+            "session_id": "s2",
+            "payload": {"ticket_id": "p4-t5", "ticket_title": "done tx"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 4,
+            "event_id": "evt-done-end",
+            "tx_id": "tx-done",
+            "ticket_id": "p4-t5",
+            "event_type": "tx.end.done",
+            "phase": "done",
+            "step_id": "p4-t5-s1",
+            "actor": {"agent_id": "a2"},
+            "session_id": "s2",
+            "payload": {"summary": "done"},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 4
+    assert rebuild["state"]["active_tx"]["tx_id"] == "tx-active"
+    assert rebuild["state"]["active_tx"]["ticket_id"] == "p2-t3"
+    assert rebuild["state"]["integrity"]["drift_detected"] is True
+    assert (
+        rebuild["state"]["rebuild_warning"]
+        == "selected active transaction does not match the latest canonical event sequence"
+    )
+    observed = rebuild["state"]["rebuild_observed_mismatch"]
+    assert observed["active_tx_id"] == "tx-active"
+    assert observed["active_ticket_id"] == "p2-t3"
+    assert observed["last_applied_seq"] == 4
+
+
+def test_validate_tx_event_invariants_resets_context_after_terminal_rebegin(
+    state_rebuilder,
+):
+    context = state_rebuilder._init_tx_context()
+
+    valid, _ = state_rebuilder._validate_tx_event_invariants(
+        context,
+        {"event_type": "tx.begin", "step_id": "none", "payload": {"ticket_id": "t"}},
+    )
+    assert valid is True
+
+    valid, _ = state_rebuilder._validate_tx_event_invariants(
+        context, {"event_type": "tx.step.enter", "step_id": "s1", "payload": {}}
+    )
+    assert valid is True
+
+    valid, _ = state_rebuilder._validate_tx_event_invariants(
+        context,
+        {
+            "event_type": "tx.file_intent.add",
+            "step_id": "s1",
+            "payload": {"path": "a.py", "planned_step": "s1", "state": "planned"},
+        },
+    )
+    assert valid is True
+
+    valid, _ = state_rebuilder._validate_tx_event_invariants(
+        context,
+        {"event_type": "tx.end.done", "step_id": "s1", "payload": {"summary": "done"}},
+    )
+    assert valid is True
+    assert context["terminal"] is True
+
+    valid, _ = state_rebuilder._validate_tx_event_invariants(
+        context,
+        {
+            "event_type": "tx.begin",
+            "step_id": "none",
+            "payload": {"ticket_id": "t"},
+        },
+    )
+    assert valid is True
+    assert context["terminal"] is False
+    assert context["steps"] == set()
+    assert context["intent_states"] == {}
+    assert context["intent_steps"] == {}
+    assert context["verify_started_steps"] == set()
+    assert context["verify_passed"] is False
+    assert context["commit_started"] is False
+
+
+def test_rebuild_tx_state_truncates_on_missing_commit_fail_error(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(state_store)
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-commit-fail-missing-error",
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.commit.fail",
+            "phase": "verified",
+            "step_id": "p4-t2-s1",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 1
+    assert rebuild["state"]["rebuild_warning"] == "missing payload.error"
+    assert rebuild["state"]["rebuild_invalid_event"]["event_type"] == "tx.commit.fail"
+    assert rebuild["state"]["integrity"]["drift_detected"] is True
+
+
+def test_rebuild_tx_state_truncates_on_missing_user_intent_payload(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(state_store)
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-user-intent-missing",
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.user_intent.set",
+            "phase": "in-progress",
+            "step_id": "p4-t2-s1",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 1
+    assert rebuild["state"]["rebuild_warning"] == "missing payload.user_intent"
+    assert (
+        rebuild["state"]["rebuild_invalid_event"]["event_type"] == "tx.user_intent.set"
+    )
+    assert rebuild["state"]["integrity"]["drift_detected"] is True
+
+
+def test_rebuild_tx_state_truncates_on_missing_end_blocked_reason(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(state_store)
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-end-blocked-missing-reason",
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.end.blocked",
+            "phase": "blocked",
+            "step_id": "p4-t2-s1",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 1
+    assert rebuild["state"]["rebuild_warning"] == "missing payload.reason"
+    assert rebuild["state"]["rebuild_invalid_event"]["event_type"] == "tx.end.blocked"
+    assert rebuild["state"]["integrity"]["drift_detected"] is True
+
+
+def test_rebuild_tx_state_preserves_empty_session_metadata_without_recording_last_session(
+    repo_context, state_rebuilder
+):
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 1,
+            "event_id": "evt-empty-session-begin",
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "",
+            "payload": {"ticket_id": "p4-t2", "ticket_title": "p4-t2"},
+        },
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-empty-session-dup-begin",
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "",
+            "payload": {"ticket_id": "p4-t2", "ticket_title": "duplicate"},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    observed = rebuild["state"]["rebuild_observed_mismatch"]
+    assert rebuild["state"]["rebuild_warning"] == "duplicate tx.begin"
+    assert observed["invalid_reason"] == "duplicate tx.begin"
+    assert observed["last_session_by_tx"] == {}
+
+
+def test_rebuild_tx_state_falls_back_semantic_summary_for_selected_active_tx(
+    repo_context, state_rebuilder
+):
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 1,
+            "event_id": "evt-begin-no-summary",
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"ticket_id": "p4-t2", "ticket_title": "p4-t2"},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 1
+    assert rebuild["state"]["active_tx"]["tx_id"] == "tx-1"
+    assert (
+        rebuild["state"]["active_tx"]["semantic_summary"] == "Started transaction p4-t2"
+    )
+
+    rebuild["state"]["active_tx"]["semantic_summary"] = ""
+    rebuild["state"]["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(
+        rebuild["state"]
+    )
+
+    repo_context.tx_state.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_state.write_text(
+        json.dumps(rebuild["state"], ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    rebuild_again = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild_again["ok"] is True
+    assert rebuild_again["source"] == "materialized"
+    assert rebuild_again["state"]["active_tx"]["semantic_summary"] == ""
+
+
+def test_rebuild_tx_state_replaces_invalid_seq_with_last_valid_seq(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(state_store)
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-dup-begin-last-valid",
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t2",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"ticket_id": "p4-t2", "ticket_title": "duplicate"},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 1
+    assert rebuild["state"]["rebuild_invalid_event"]["seq"] == 2
+    assert rebuild["state"]["rebuild_invalid_seq"] == 1
+    assert rebuild["state"]["rebuild_warning"] == "duplicate tx.begin"
+
+
+def test_rebuild_tx_state_reports_drift_for_stale_materialized_active_tx(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(state_store)
+    _append_tx_event(
+        state_store,
+        event_type="tx.step.enter",
+        step_id="p4-t2-s1",
+        payload={"step_id": "p4-t2-s1", "description": "step"},
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+    assert rebuild["ok"] is True
+
+    stale_state = json.loads(json.dumps(rebuild["state"], ensure_ascii=False))
+    stale_state["active_tx"]["_last_event_seq"] = 1
+    stale_state["active_tx"]["semantic_summary"] = ""
+    stale_state["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(
+        stale_state
+    )
+
+    repo_context.tx_state.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_state.write_text(
+        json.dumps(stale_state, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    rebuild_again = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild_again["ok"] is True
+    assert rebuild_again["source"] == "materialized"
+    assert rebuild_again["state"]["active_tx"]["semantic_summary"] == ""
+
+
 def test_truncate_and_resolve_path(state_rebuilder, repo_context, tmp_path):
     assert state_rebuilder._truncate_text(None) is None
     assert state_rebuilder._truncate_text("x", limit=0) == ""
@@ -2292,6 +2725,48 @@ def test_tx_state_integrity_rejects_invalid_fields(state_rebuilder):
 
     state["integrity"] = {"rebuilt_from_seq": 1, "state_hash": ""}
     assert state_rebuilder._tx_state_integrity_ok(state, 0) is False
+
+    state = state_rebuilder._init_tx_state()
+    state["integrity"]["rebuilt_from_seq"] = 0
+    state["integrity"]["active_tx_source"] = "none"
+    state["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(state)
+    assert state_rebuilder._tx_state_integrity_ok(state, 0) is True
+
+    state["active_tx"]["status"] = "in-progress"
+    state["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(state)
+    assert state_rebuilder._tx_state_integrity_ok(state, 0) is False
+
+    state = state_rebuilder._init_tx_state()
+    state["integrity"]["rebuilt_from_seq"] = 0
+    state["integrity"]["drift_detected"] = True
+    state["integrity"]["active_tx_source"] = "none"
+    state["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(state)
+    assert state_rebuilder._tx_state_integrity_ok(state, 0) is False
+
+    state["rebuild_warning"] = "duplicate tx.begin"
+    state["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(state)
+    assert state_rebuilder._tx_state_integrity_ok(state, 0) is True
+
+    state["integrity"]["drift_detected"] = False
+    state["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(state)
+    assert state_rebuilder._tx_state_integrity_ok(state, 0) is False
+
+    state = state_rebuilder._init_tx_state()
+    state["active_tx"]["tx_id"] = "tx-1"
+    state["active_tx"]["ticket_id"] = "p4-t2"
+    state["active_tx"]["status"] = "in-progress"
+    state["active_tx"]["phase"] = "in-progress"
+    state["active_tx"]["current_step"] = "p4-t2-s1"
+    state["active_tx"]["semantic_summary"] = "summary"
+    state["last_applied_seq"] = 1
+    state["integrity"]["rebuilt_from_seq"] = 1
+    state["integrity"]["active_tx_source"] = "invalid-source"
+    state["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(state)
+    assert state_rebuilder._tx_state_integrity_ok(state, 1) is False
+
+    state["integrity"]["active_tx_source"] = "active_candidate"
+    state["integrity"]["state_hash"] = "bad-hash"
+    assert state_rebuilder._tx_state_integrity_ok(state, 1) is False
 
 
 def test_init_replay_state_sanitizes_string_fields(state_rebuilder):

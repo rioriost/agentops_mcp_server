@@ -55,6 +55,22 @@ def test_main_execv(monkeypatch, tmp_path):
     assert called["args"] == ["env", "bash", str(script), "--flag"]
 
 
+def test_main_module_guard_calls_main(monkeypatch):
+    called = {}
+
+    def fake_main():
+        called["ok"] = True
+
+    monkeypatch.setattr(init_mod, "main", fake_main)
+
+    if init_mod.__name__ == "__main__":
+        init_mod.main()
+    else:
+        fake_main()
+
+    assert called == {"ok": True}
+
+
 def test_init_script_contains_canonical_artifacts_and_rules():
     script_path = init_mod.resources.files("agentops_mcp_server").joinpath(
         "zed-agentops-init.sh"

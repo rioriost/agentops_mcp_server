@@ -1043,6 +1043,65 @@ def test_tx_event_append_and_state_save_persists_sync_failure_diagnostics_withou
     }
 
 
+def test_tx_event_append_and_state_save_raises_when_saved_state_cannot_be_reloaded(
+    state_store, repo_context, monkeypatch
+):
+    state = _valid_tx_state()
+    original_read_json_file = state_store.read_json_file
+
+    def unreadable_saved_state(path):
+        if path == repo_context.tx_state:
+            return []
+        return original_read_json_file(path)
+
+    monkeypatch.setattr(state_store, "read_json_file", unreadable_saved_state)
+
+    with pytest.raises(
+        RuntimeError,
+        match="canonical event appended but tx_state synchronization could not be verified",
+    ):
+        state_store.tx_event_append_and_state_save(
+            **_base_tx_event_args(),
+            state=state,
+        )
+
+    events = [
+        json.loads(line)
+        for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert [event["event_type"] for event in events] == ["tx.begin"]
+
+    error_lines = [
+        json.loads(line)
+        for line in repo_context.errors.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(error_lines) == 1
+    assert error_lines[0]["tool_name"] == "tx_event_append_and_state_save"
+    assert (
+        error_lines[0]["tool_output"]["error"]
+        == "event append succeeded but tx_state could not be reloaded"
+    )
+    assert error_lines[0]["tool_output"]["validation_point"] == (
+        "tx_event_append_and_state_save"
+    )
+    assert error_lines[0]["tool_output"]["event_sequence"] == {
+        "last_logged_seq": 1,
+        "seq": 1,
+    }
+    assert error_lines[0]["tool_output"]["expected_state"]["last_applied_seq"] == 1
+    assert error_lines[0]["tool_output"]["expected_state"]["rebuilt_from_seq"] == 1
+    assert error_lines[0]["tool_output"]["expected_state"]["tx_id"] == "tx-1"
+    assert error_lines[0]["tool_output"]["expected_state"]["ticket_id"] == "p4-t1"
+    assert error_lines[0]["tool_output"]["expected_state"]["status"] == "in-progress"
+    assert error_lines[0]["tool_output"]["expected_state"]["phase"] == "in-progress"
+    assert error_lines[0]["tool_output"]["expected_state"]["current_step"] == "p4-t1-s1"
+    assert error_lines[0]["tool_output"]["observed_state"] == {
+        "tx_state_path": str(repo_context.tx_state)
+    }
+
+
 def test_tx_state_save_sets_updated_at_when_missing(state_store, repo_context):
     state = _valid_tx_state()
 

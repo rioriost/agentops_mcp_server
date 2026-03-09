@@ -4,6 +4,7 @@ import sys
 
 import pytest
 
+from agentops_mcp_server import json_rpc_server as json_rpc_mod
 from agentops_mcp_server.json_rpc_server import JsonRpcServer
 from agentops_mcp_server.tool_router import ToolRouter
 
@@ -215,6 +216,136 @@ def test_handle_request_does_not_log_failed_tool_when_uninitialized(tmp_path):
         server.handle_request(req)
 
     assert repo_context.errors is None
+
+
+def test_write_json_writes_and_flushes(monkeypatch):
+    written = []
+
+    class DummyStdout:
+        def write(self, text):
+            written.append(("write", text))
+
+        def flush(self):
+            written.append(("flush", None))
+
+    monkeypatch.setattr(sys, "stdout", DummyStdout())
+
+    json_rpc_mod._write_json({"ok": True, "message": "hello"})
+
+    assert written == [("write", '{"ok": true, "message": "hello"}\n'), ("flush", None)]
+
+
+def test_handle_request_tools_call_defaults_missing_arguments(
+    repo_context, state_store
+):
+    server = _build_server(repo_context, state_store)
+
+    req = {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "tools/call",
+        "params": {"name": "echo"},
+    }
+    resp = server.handle_request(req)
+
+    payload = resp["result"]["content"][0]["text"]
+    result = json.loads(payload)
+    assert result == {"ok": True, "value": None}
+
+
+def test_handle_request_exit_calls_sys_exit(repo_context, state_store, monkeypatch):
+    server = _build_server(repo_context, state_store)
+    seen = {}
+
+    def fake_exit(code):
+        seen["code"] = code
+        raise SystemExit(code)
+
+    monkeypatch.setattr(sys, "exit", fake_exit)
+
+    req = {"jsonrpc": "2.0", "id": 12, "method": "exit"}
+
+    with pytest.raises(SystemExit) as excinfo:
+        server.handle_request(req)
+
+    assert excinfo.value.code == 0
+    assert seen["code"] == 0
+
+
+def test_run_ignores_blank_lines_and_writes_success_response(
+    repo_context, state_store, monkeypatch
+):
+    server = _build_server(repo_context, state_store)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO('\n  \n{"jsonrpc":"2.0","id":13,"method":"tools/list"}\n'),
+    )
+
+    written = []
+
+    def fake_write_json(obj):
+        written.append(obj)
+
+    monkeypatch.setattr(json_rpc_mod, "_write_json", fake_write_json)
+
+    server.run()
+
+    assert written == [
+        {
+            "jsonrpc": "2.0",
+            "id": 13,
+            "result": server.tool_router.tools_list(),
+        }
+    ]
+
+
+def test_run_writes_error_response_with_request_id(
+    repo_context, state_store, monkeypatch
+):
+    server = _build_server(repo_context, state_store)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO('{"jsonrpc":"2.0","id":14,"method":"nope"}\n'),
+    )
+
+    written = []
+
+    def fake_write_json(obj):
+        written.append(obj)
+
+    monkeypatch.setattr(json_rpc_mod, "_write_json", fake_write_json)
+
+    server.run()
+
+    assert written == [
+        {
+            "jsonrpc": "2.0",
+            "id": 14,
+            "error": {"code": -32000, "message": "Unknown method: nope"},
+        }
+    ]
+
+
+def test_run_skips_error_response_without_request_id(
+    repo_context, state_store, monkeypatch
+):
+    server = _build_server(repo_context, state_store)
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO('{"jsonrpc":"2.0","method":"nope"}\n')
+    )
+
+    written = []
+
+    def fake_write_json(obj):
+        written.append(obj)
+
+    monkeypatch.setattr(json_rpc_mod, "_write_json", fake_write_json)
+
+    server.run()
+
+    assert written == []
 
 
 def test_handle_request_preserves_original_tool_error_when_logging_fails(

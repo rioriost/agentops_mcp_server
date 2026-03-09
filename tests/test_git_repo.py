@@ -2,6 +2,7 @@ import subprocess
 
 import pytest
 
+from agentops_mcp_server import git_repo as git_repo_mod
 from agentops_mcp_server.git_repo import GitRepo
 
 
@@ -86,3 +87,41 @@ def test_diff_stat_cached_calls_git(monkeypatch, tmp_path):
 
     assert repo.diff_stat_cached() == "diff"
     assert calls[0] == ["git", "diff", "--stat", "--cached"]
+
+
+def test_git_handles_called_process_error_with_text_output(monkeypatch, tmp_path):
+    repo = GitRepo(DummyRepoContext(tmp_path))
+
+    def boom(*_args, **_kwargs):
+        raise subprocess.CalledProcessError(1, ["git"], output="bad text")
+
+    monkeypatch.setattr(subprocess, "check_output", boom)
+
+    with pytest.raises(RuntimeError, match="bad text"):
+        repo.git("status")
+
+
+def test_git_decodes_output_with_replacement(monkeypatch, tmp_path):
+    repo = GitRepo(DummyRepoContext(tmp_path))
+
+    def fake_check_output(args, cwd, stderr):
+        assert args == ["git", "status"]
+        return b"ok\xff\n"
+
+    monkeypatch.setattr(subprocess, "check_output", fake_check_output)
+
+    assert repo.git("status") == "ok�"
+
+
+def test_git_passes_stderr_to_stdout(monkeypatch, tmp_path):
+    repo = GitRepo(DummyRepoContext(tmp_path))
+    seen = {}
+
+    def fake_check_output(args, cwd, stderr):
+        seen["stderr"] = stderr
+        return b"ok\n"
+
+    monkeypatch.setattr(subprocess, "check_output", fake_check_output)
+
+    assert repo.git("status") == "ok"
+    assert seen["stderr"] is git_repo_mod.subprocess.STDOUT
