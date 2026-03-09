@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -64,21 +65,186 @@ class CommitManager:
         last = self.state_store.read_last_json_line(self.repo_context.tx_event_log)
         return last is None
 
-    def _ensure_tx_begin(self) -> None:
-        context = self._load_tx_context()
-        if not context:
-            return
-        if not self._event_log_empty():
-            return
-        self._emit_tx_event(
+    def _active_tx_from_state(self, tx_state: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(tx_state, dict):
+            return None
+        active_tx = tx_state.get("active_tx")
+        if not isinstance(active_tx, dict):
+            return None
+        tx_id = active_tx.get("tx_id")
+        ticket_id = active_tx.get("ticket_id")
+        if not isinstance(tx_id, str) or not tx_id.strip() or tx_id.strip() == "none":
+            return None
+        if (
+            not isinstance(ticket_id, str)
+            or not ticket_id.strip()
+            or ticket_id.strip() == "none"
+        ):
+            return None
+        phase = active_tx.get("phase")
+        if not isinstance(phase, str) or not phase.strip():
+            phase = active_tx.get("status")
+        if not isinstance(phase, str) or not phase.strip():
+            phase = "in-progress"
+        step_id = active_tx.get("current_step")
+        if not isinstance(step_id, str) or not step_id.strip():
+            step_id = "commit"
+        session_id = active_tx.get("session_id")
+        if not isinstance(session_id, str) or not session_id.strip():
+            return None
+        return {
+            "tx_id": tx_id.strip(),
+            "ticket_id": ticket_id.strip(),
+            "phase": phase.strip(),
+            "step_id": step_id.strip(),
+            "session_id": session_id.strip(),
+        }
+
+    def _matching_active_context_from_rebuild(
+        self, requested_context: Dict[str, str]
+    ) -> Tuple[
+        Optional[Dict[str, str]], Optional[Dict[str, Any]], Optional[Dict[str, Any]]
+    ]:
+        rebuild = self.state_rebuilder.rebuild_tx_state()
+        if not rebuild.get("ok") or not isinstance(rebuild.get("state"), dict):
+            return None, None, None
+
+        rebuilt_state = rebuild["state"]
+        integrity = (
+            rebuilt_state.get("integrity")
+            if isinstance(rebuilt_state.get("integrity"), dict)
+            else {}
+        )
+        if integrity.get("drift_detected") is True:
+            return None, rebuilt_state, integrity
+
+        rebuilt_context = self._active_tx_from_state(rebuilt_state)
+        if not rebuilt_context:
+            return None, rebuilt_state, integrity
+
+        requested_tx_id = requested_context["tx_id"].strip()
+        requested_ticket_id = requested_context["ticket_id"].strip()
+        if (
+            rebuilt_context["tx_id"] != requested_tx_id
+            and rebuilt_context["ticket_id"] != requested_ticket_id
+        ):
+            return None, rebuilt_state, integrity
+
+        terminal = rebuilt_context["phase"] in {"done", "blocked"}
+        if terminal:
+            return None, rebuilt_state, integrity
+
+        return rebuilt_context, rebuilt_state, integrity
+
+    def _emit_tx_begin_with_context(self, context: Dict[str, str]) -> None:
+        tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
+        if not isinstance(tx_state, dict):
+            rebuild = self.state_rebuilder.rebuild_tx_state()
+            if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
+                rebuilt_state = rebuild["state"]
+                integrity = (
+                    rebuilt_state.get("integrity")
+                    if isinstance(rebuilt_state.get("integrity"), dict)
+                    else {}
+                )
+                if integrity.get("drift_detected") is not True:
+                    tx_state = rebuilt_state
+        if isinstance(tx_state, dict):
+            active_tx = tx_state.get("active_tx")
+            if isinstance(active_tx, dict):
+                active_tx["tx_id"] = context["tx_id"]
+                active_tx["ticket_id"] = context["ticket_id"]
+                active_tx["status"] = context["phase"]
+                active_tx["phase"] = context["phase"]
+                active_tx["current_step"] = "none"
+                active_tx["session_id"] = context["session_id"]
+                self.state_store.tx_event_append_and_state_save(
+                    tx_id=context["tx_id"],
+                    ticket_id=context["ticket_id"],
+                    event_type="tx.begin",
+                    phase=context["phase"],
+                    step_id="none",
+                    actor={"tool": "commit_manager"},
+                    session_id=context["session_id"],
+                    payload={
+                        "ticket_id": context["ticket_id"],
+                        "ticket_title": context["ticket_id"],
+                    },
+                    state=tx_state,
+                )
+                return
+        self.state_store.tx_event_append(
+            tx_id=context["tx_id"],
+            ticket_id=context["ticket_id"],
             event_type="tx.begin",
+            phase=context["phase"],
+            step_id="none",
+            actor={"tool": "commit_manager"},
+            session_id=context["session_id"],
             payload={
                 "ticket_id": context["ticket_id"],
                 "ticket_title": context["ticket_id"],
             },
-            phase_override=context["phase"],
-            step_id_override="none",
         )
+
+    def _ensure_tx_begin(self) -> None:
+        context = self._load_tx_context()
+        if not context:
+            return
+
+        if not self._event_log_empty():
+            return
+
+        rebuild_context, rebuilt_state, integrity = (
+            self._matching_active_context_from_rebuild(context)
+        )
+        if rebuild_context:
+            tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
+            if not isinstance(tx_state, dict):
+                tx_state = rebuilt_state
+            if isinstance(tx_state, dict):
+                active_tx = tx_state.get("active_tx")
+                if isinstance(active_tx, dict):
+                    active_tx["tx_id"] = rebuild_context["tx_id"]
+                    active_tx["ticket_id"] = rebuild_context["ticket_id"]
+                    active_tx["status"] = rebuild_context["phase"]
+                    active_tx["phase"] = rebuild_context["phase"]
+                    active_tx["current_step"] = rebuild_context["step_id"]
+                    active_tx["session_id"] = rebuild_context["session_id"]
+                    self.state_store.tx_state_save(tx_state)
+            return
+
+        if isinstance(integrity, dict) and integrity.get("drift_detected") is True:
+            raise RuntimeError(
+                str(
+                    build_structured_helper_failure(
+                        error_code="integrity_blocked",
+                        reason="helper bootstrap blocked by canonical integrity drift",
+                        tx_state=rebuilt_state,
+                        recommended_next_tool="tx_state_rebuild",
+                        recommended_action="Repair the invalid canonical history before allowing helper bootstrap to emit tx.begin.",
+                        recoverable=False,
+                        blocked=True,
+                        rebuild_warning=(
+                            rebuilt_state.get("rebuild_warning")
+                            if isinstance(rebuilt_state, dict)
+                            else None
+                        ),
+                        rebuild_invalid_seq=(
+                            rebuilt_state.get("rebuild_invalid_seq")
+                            if isinstance(rebuilt_state, dict)
+                            else None
+                        ),
+                        rebuild_observed_mismatch=(
+                            rebuilt_state.get("rebuild_observed_mismatch")
+                            if isinstance(rebuilt_state, dict)
+                            else None
+                        ),
+                    )
+                )
+            )
+
+        self._emit_tx_begin_with_context(context)
 
     def _ensure_verify_started(self) -> None:
         tx_state = self.state_store.read_json_file(self.repo_context.tx_state)

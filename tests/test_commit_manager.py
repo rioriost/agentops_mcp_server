@@ -1396,6 +1396,140 @@ def test_ensure_tx_begin_skips_when_event_log_not_empty():
     assert state_store.appended == []
 
 
+def test_ensure_tx_begin_uses_rebuild_active_transaction_when_materialized_missing():
+    class MissingStateStore(DummyStateStore):
+        def __init__(self):
+            super().__init__()
+            self.saved_states = []
+            self.appended = []
+
+        def read_json_file(self, _path):
+            return None
+
+        def read_last_json_line(self, _path):
+            return None
+
+        def tx_state_save(self, state):
+            self.saved_states.append(state)
+            return {"ok": True}
+
+        def tx_event_append(self, **kwargs):
+            self.appended.append(kwargs)
+            return {"ok": True}
+
+    rebuild_state = {
+        "active_tx": {
+            "tx_id": "tx-1",
+            "ticket_id": "p4-t3",
+            "status": "checking",
+            "phase": "checking",
+            "current_step": "resume-step",
+            "next_action": "tx.verify.start",
+            "session_id": "s1",
+            "verify_state": {"status": "not_started", "last_result": None},
+            "commit_state": {"status": "not_started", "last_result": None},
+            "file_intents": [],
+        },
+        "integrity": {
+            "drift_detected": False,
+            "active_tx_source": "active_candidate",
+        },
+    }
+    state_store = MissingStateStore()
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        state_store,
+        DummyStateRebuilder({"ok": True, "state": rebuild_state}),
+    )
+
+    manager._ensure_tx_begin()
+
+    assert state_store.appended == []
+    assert len(state_store.saved_states) == 1
+    saved_active_tx = state_store.saved_states[0]["active_tx"]
+    assert saved_active_tx["tx_id"] == "tx-1"
+    assert saved_active_tx["ticket_id"] == "p4-t3"
+    assert saved_active_tx["phase"] == "checking"
+    assert saved_active_tx["current_step"] == "resume-step"
+    assert saved_active_tx["session_id"] == "s1"
+
+
+def test_ensure_tx_begin_raises_structured_failure_when_rebuild_drift_detected():
+    class DriftStateStore(DummyStateStore):
+        def read_json_file(self, _path):
+            return {
+                "active_tx": {
+                    "tx_id": "tx-1",
+                    "ticket_id": "p4-t3",
+                    "phase": "in-progress",
+                    "current_step": "commit",
+                    "session_id": "s1",
+                }
+            }
+
+        def read_last_json_line(self, _path):
+            return None
+
+    rebuild_state = {
+        "active_tx": {
+            "tx_id": "none",
+            "ticket_id": "none",
+            "status": "planned",
+            "phase": "planned",
+            "current_step": "none",
+            "next_action": "",
+            "session_id": "",
+            "verify_state": {"status": "not_started", "last_result": None},
+            "commit_state": {"status": "not_started", "last_result": None},
+            "file_intents": [],
+        },
+        "integrity": {
+            "drift_detected": True,
+            "active_tx_source": "none",
+        },
+        "rebuild_warning": "duplicate tx.begin",
+        "rebuild_invalid_seq": 1,
+        "rebuild_observed_mismatch": {
+            "drift_reason": "duplicate tx.begin",
+            "last_applied_seq": 1,
+            "invalid_reason": "duplicate tx.begin",
+            "invalid_event": {
+                "seq": 2,
+                "event_type": "tx.begin",
+                "tx_id": "tx-1",
+                "ticket_id": "p4-t3",
+            },
+        },
+    }
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        DriftStateStore(),
+        DummyStateRebuilder({"ok": True, "state": rebuild_state}),
+    )
+
+    with pytest.raises(RuntimeError) as excinfo:
+        manager._ensure_tx_begin()
+
+    failure = eval(
+        str(excinfo.value),
+        {"__builtins__": {}},
+        {"False": False, "True": True, "None": None},
+    )
+    assert failure["ok"] is False
+    assert failure["error_code"] == "integrity_blocked"
+    assert failure["recoverable"] is False
+    assert failure["blocked"] is True
+    assert failure["recommended_next_tool"] == "tx_state_rebuild"
+    assert failure["rebuild_warning"] == "duplicate tx.begin"
+    assert failure["rebuild_invalid_seq"] == 1
+    assert (
+        failure["rebuild_observed_mismatch"]["invalid_event"]["event_type"]
+        == "tx.begin"
+    )
+
+
 def test_ensure_verify_started_returns_when_already_running():
     class RunningStateStore(DummyStateStore):
         def read_json_file(self, _path):
