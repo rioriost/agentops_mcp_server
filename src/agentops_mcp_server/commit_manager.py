@@ -313,6 +313,17 @@ class CommitManager:
                 "terminal": False,
                 "requires_followup": False,
                 "followup_tool": None,
+                "canonical_status": "",
+                "canonical_phase": "",
+                "active_tx_id": None,
+                "active_ticket_id": None,
+                "current_step": None,
+                "verify_status": None,
+                "commit_status": None,
+                "integrity_status": None,
+                "can_start_new_ticket": True,
+                "resume_required": False,
+                "active_tx": {},
             }
 
         active_tx = tx_state.get("active_tx")
@@ -324,6 +335,17 @@ class CommitManager:
                 "terminal": False,
                 "requires_followup": False,
                 "followup_tool": None,
+                "canonical_status": "",
+                "canonical_phase": "",
+                "active_tx_id": None,
+                "active_ticket_id": None,
+                "current_step": None,
+                "verify_status": None,
+                "commit_status": None,
+                "integrity_status": None,
+                "can_start_new_ticket": True,
+                "resume_required": False,
+                "active_tx": {},
             }
 
         guidance = build_guidance_from_active_tx(active_tx)
@@ -334,6 +356,17 @@ class CommitManager:
             "terminal": guidance["terminal"],
             "requires_followup": guidance["requires_followup"],
             "followup_tool": guidance["followup_tool"],
+            "canonical_status": guidance["canonical_status"],
+            "canonical_phase": guidance["canonical_phase"],
+            "active_tx_id": guidance["active_tx_id"],
+            "active_ticket_id": guidance["active_ticket_id"],
+            "current_step": guidance["current_step"],
+            "verify_status": guidance["verify_status"],
+            "commit_status": guidance["commit_status"],
+            "integrity_status": guidance["integrity_status"],
+            "can_start_new_ticket": guidance["can_start_new_ticket"],
+            "resume_required": guidance["resume_required"],
+            "active_tx": dict(active_tx),
         }
 
     def commit_if_verified(

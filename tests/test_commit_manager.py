@@ -268,10 +268,22 @@ def test_commit_if_verified_runs_verify(tmp_path, monkeypatch):
     assert result["message"] == "message"
     assert result["tx_status"] == "committed"
     assert result["tx_phase"] == "committed"
+    assert result["canonical_status"] == "committed"
+    assert result["canonical_phase"] == "committed"
     assert result["next_action"] == "tx.end.done"
     assert result["terminal"] is False
     assert result["requires_followup"] is True
     assert result["followup_tool"] == "ops_end_task"
+    assert result["active_tx_id"] == "tx-1"
+    assert result["active_ticket_id"] == "p4-t3"
+    assert result["current_step"] == "commit"
+    assert result["verify_status"] == "passed"
+    assert result["commit_status"] == "passed"
+    assert result["integrity_status"] in {"ok", None}
+    assert result["can_start_new_ticket"] is False
+    assert result["resume_required"] is True
+    assert result["active_tx"]["tx_id"] == "tx-1"
+    assert result["active_tx"]["ticket_id"] == "p4-t3"
     assert manager.verify_runner.calls == [5]
     assert ("add", "-A") in manager.git_repo.calls
 

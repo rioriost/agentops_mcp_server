@@ -193,14 +193,11 @@ def test_repo_verify_delegates():
     result = tools.repo_verify(timeout_sec=5)
 
     assert result["ok"] is True
-    assert result["tx_status"] == ""
-    assert result["tx_phase"] == ""
+    _assert_helper_guidance(result, expected_status="", expected_phase="")
     assert result["next_action"] == ""
     assert result["terminal"] is False
     assert result["requires_followup"] is False
     assert result["followup_tool"] is None
-    assert result["canonical_status"] == ""
-    assert result["canonical_phase"] == ""
     assert result["active_tx_id"] is None
     assert result["active_ticket_id"] is None
     assert result["current_step"] is None
@@ -1084,8 +1081,9 @@ def test_repo_verify_records_failure_event_when_verify_fails():
     result = tools.repo_verify(timeout_sec=9)
 
     assert result["ok"] is False
-    assert result["tx_status"] == "checking"
-    assert result["tx_phase"] == "checking"
+    _assert_helper_guidance(
+        result, expected_status="checking", expected_phase="checking"
+    )
     assert result["next_action"] == "fix and re-verify"
     assert result["terminal"] is False
     assert result["requires_followup"] is True
@@ -1123,8 +1121,9 @@ def test_repo_verify_allows_blocked_phase_when_status_is_non_terminal():
     result = tools.repo_verify(timeout_sec=5)
 
     assert result["ok"] is True
-    assert result["tx_status"] == "verified"
-    assert result["tx_phase"] == "verified"
+    _assert_helper_guidance(
+        result, expected_status="verified", expected_phase="verified"
+    )
     assert result["next_action"] == "tx.commit.start"
     assert result["terminal"] is False
     assert result["requires_followup"] is True
@@ -1138,15 +1137,16 @@ def test_repo_verify_allows_blocked_phase_when_status_is_non_terminal():
 
 def test_repo_verify_ignores_non_dict_active_tx_when_checking_terminal_state():
     git_repo = DummyGitRepo()
-    verify_runner = DummyVerifyRunner(result={"ok": True, "returncode": 0})
-    state_store = DummyStateStore(tx_state={"active_tx": "bad"})
+    verify_runner = DummyVerifyRunner(
+        result={"ok": True, "returncode": 0, "stdout": "verify ok", "stderr": ""}
+    )
+    state_store = DummyStateStore(tx_state={"active_tx": []})
     tools = RepoTools(git_repo, verify_runner, state_store, DummyStateRebuilder())
 
     result = tools.repo_verify(timeout_sec=8)
 
     assert result["ok"] is True
-    assert result["tx_status"] == ""
-    assert result["tx_phase"] == ""
+    _assert_helper_guidance(result, expected_status="", expected_phase="")
     assert result["next_action"] == ""
     assert result["terminal"] is False
     assert result["requires_followup"] is False
