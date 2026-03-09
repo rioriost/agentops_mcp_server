@@ -1,0 +1,100 @@
+{
+  "id": "p1-t01",
+  "title": "Define the 0.5.5 monotonic transaction ID contract and migration policy",
+  "priority": "P0",
+  "status": "planned",
+  "summary": "Create the authoritative 0.5.5 contract for transaction identity so the system can replace ticket-derived transaction IDs with a monotonic issued identifier model without weakening canonical lifecycle behavior. This ticket defines the issuance semantics, the `.agent/tx_id_counter.json` metadata contract, the separation of `tx_id` from `ticket_id`, the elimination of sentinel transaction IDs such as `none` from normal operation, and the compatibility policy for historical logs that still contain legacy transaction ID formats.",
+  "inputs": [
+    "docs/draft_0.5.5.md",
+    "docs/v0.5.5/plan.md",
+    "docs/v0.5.5/tickets_list.json",
+    ".rules",
+    ".agent/tx_state.json",
+    ".agent/tx_event_log.jsonl",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py"
+  ],
+  "outputs": [
+    "A documented monotonic transaction ID issuance contract",
+    "A documented schema for `.agent/tx_id_counter.json`",
+    "A documented rule that only `tx.begin` may mint a new transaction ID",
+    "A documented separation between `ticket_id` and `tx_id` responsibilities",
+    "A documented compatibility policy for historical logs that contain legacy transaction IDs",
+    "Implementation-ready acceptance boundaries for downstream 0.5.5 tickets"
+  ],
+  "acceptance_criteria": [
+    "The ticket defines a single authoritative contract for issuing new transaction IDs from a monotonic counter.",
+    "The contract defines the `.agent/tx_id_counter.json` file shape, including the required fields and their meanings.",
+    "The contract explicitly states that only new transaction-begin flow may mint a new `tx_id`.",
+    "The contract explicitly separates `ticket_id` from `tx_id` and states that `tx_id` is no longer derived from `ticket_id`.",
+    "The contract explicitly defines the normal no-active-transaction representation and removes `tx_id=\"none\"` from normal canonical behavior.",
+    "The contract defines the expected representation for newly issued transaction IDs in persisted JSON artifacts.",
+    "The contract defines the initialization policy for missing issuance metadata and the failure policy for malformed issuance metadata.",
+    "The contract defines a compatibility policy for replaying historical logs that use legacy transaction ID formats.",
+    "The contract is specific enough that downstream implementation tickets can update issuance, lifecycle comparison logic, rebuild logic, and tests without inventing per-module semantics ad hoc.",
+    "The ticket does not weaken canonical lifecycle ordering, replay integrity, or explicit terminal-state handling."
+  ],
+  "tasks": [
+    "Define the monotonic transaction ID issuance semantics, including starting value, increment rule, and issuance timing.",
+    "Define the `.agent/tx_id_counter.json` schema and the meaning of `last_issued_id` and `updated_at`.",
+    "Clarify whether issued transaction IDs are stored as strings or numbers in JSON-facing artifacts and document the rule explicitly.",
+    "Define the rule that only new transaction-begin flow may allocate a new transaction ID.",
+    "Document the separation of concerns between `ticket_id` and `tx_id` so future lifecycle logic does not compare them heuristically.",
+    "Define the normal representation for the absence of an active canonical transaction ID and remove sentinel-based normal-flow semantics.",
+    "Define the compatibility policy for historical legacy transaction IDs during replay and rebuild.",
+    "Leave implementation-ready notes for downstream tickets that will update state storage, lifecycle logic, recovery logic, and regression coverage."
+  ],
+  "dependencies": [],
+  "notes": [
+    "This ticket is contract-definition work, not the full runtime implementation.",
+    "The most important outcome is a stable, implementation-ready transaction ID policy that downstream tickets can apply consistently.",
+    "This ticket should preserve strict canonical lifecycle behavior while simplifying transaction identity semantics.",
+    "The contract should assume that transaction identity is opaque and exact once issued, rather than semantically meaningful by string shape.",
+    "Historical logs may continue to contain legacy transaction IDs, so the contract must distinguish replay compatibility from new-write policy.",
+    "The contract should make it easy for later tickets to simplify begin/resume validation, session recovery, and rebuild conflict handling."
+  ],
+  "schema_notes": {
+    "issuance_model": {
+      "initial_counter_value": 0,
+      "first_issued_tx_id": 1,
+      "increment_rule": "Each new transaction begin increments the last issued counter by exactly 1.",
+      "issuance_scope": "Repository-local canonical transaction issuance under `.agent/`."
+    },
+    "counter_file": {
+      "path": ".agent/tx_id_counter.json",
+      "required_fields": [
+        "last_issued_id",
+        "updated_at"
+      ],
+      "field_semantics": {
+        "last_issued_id": "The most recent issued monotonic transaction identifier.",
+        "updated_at": "RFC 3339 timestamp for the most recent successful counter update."
+      }
+    },
+    "identity_roles": {
+      "ticket_id": "Identifies the work item, plan task, or user-visible workflow label.",
+      "tx_id": "Identifies one concrete transaction instance only."
+    },
+    "normal_state_rules": [
+      "Before `tx.begin`, canonical state should not represent an active transaction using sentinel values like `none`.",
+      "After `tx.begin`, canonical state should contain a valid issued monotonic `tx_id`.",
+      "Resume, update, verify, commit, and terminal lifecycle steps must reuse the existing canonical transaction ID rather than minting a new one."
+    ],
+    "compatibility_policy": {
+      "historical_logs": "Historical logs with legacy transaction ID formats remain replayable as opaque identifiers.",
+      "new_writes": "All newly issued transaction IDs must use the monotonic issuance contract defined by 0.5.5.",
+      "migration_rule": "Forward migration does not require rewriting existing historical event logs."
+    },
+    "counter_initialization_policy": {
+      "missing_file": "A missing issuance metadata file may be treated as a zero baseline for issuance metadata only.",
+      "malformed_file": "A malformed issuance metadata file must fail clearly and must not be silently treated as zero."
+    }
+  },
+  "canonical_alignment": {
+    "intended_canonical_task_id": "p1-t01",
+    "synchronization_intent": "Use this ticket as the contract foundation for all later 0.5.5 implementation tickets.",
+    "current_canonical_constraint": "Downstream implementation work should not start changing runtime transaction issuance semantics until this contract is treated as the authoritative boundary."
+  }
+}

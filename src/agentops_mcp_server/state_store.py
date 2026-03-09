@@ -256,9 +256,7 @@ class StateStore:
             self._require_payload_str(payload, "ticket_id")
             return
         if event_type == "tx.step.enter":
-            step_value = self._require_payload_str(payload, "step_id")
-            if step_value != step_id:
-                raise ValueError("payload.step_id must match step_id")
+            self._require_payload_str(payload, "step_id")
             return
         if event_type == "tx.file_intent.add":
             self._require_payload_str(payload, "path")

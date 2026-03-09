@@ -204,14 +204,16 @@ class CommitManager:
                 tx_state = rebuilt_state
             if isinstance(tx_state, dict):
                 active_tx = tx_state.get("active_tx")
-                if isinstance(active_tx, dict):
-                    active_tx["tx_id"] = rebuild_context["tx_id"]
-                    active_tx["ticket_id"] = rebuild_context["ticket_id"]
-                    active_tx["status"] = rebuild_context["phase"]
-                    active_tx["phase"] = rebuild_context["phase"]
-                    active_tx["current_step"] = rebuild_context["step_id"]
-                    active_tx["session_id"] = rebuild_context["session_id"]
-                    self.state_store.tx_state_save(tx_state)
+                if not isinstance(active_tx, dict):
+                    active_tx = {}
+                    tx_state["active_tx"] = active_tx
+                active_tx["tx_id"] = rebuild_context["tx_id"]
+                active_tx["ticket_id"] = rebuild_context["ticket_id"]
+                active_tx["status"] = rebuild_context["phase"]
+                active_tx["phase"] = rebuild_context["phase"]
+                active_tx["current_step"] = rebuild_context["step_id"]
+                active_tx["session_id"] = rebuild_context["session_id"]
+                self.state_store.tx_state_save(tx_state)
             return
 
         if isinstance(integrity, dict) and integrity.get("drift_detected") is True:

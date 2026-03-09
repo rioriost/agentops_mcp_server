@@ -211,8 +211,6 @@ class StateRebuilder:
         if event_type == "tx.step.enter":
             if not _require_str("step_id"):
                 return False, "missing payload.step_id"
-            if payload.get("step_id") != step_id:
-                return False, "payload.step_id must match step_id"
             return True, ""
         if event_type == "tx.file_intent.add":
             if not _require_str("path"):

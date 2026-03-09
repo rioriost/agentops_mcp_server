@@ -1,0 +1,80 @@
+{
+  "version": "0.5.5",
+  "source": "draft_0.5.5.md",
+  "sync_policy": {
+    "canonical_state_is_authoritative": true,
+    "ticket_status_is_derived": true,
+    "synchronization_rule": "Keep ticket status aligned with canonical lifecycle progress whenever safe and possible. Ticket artifacts describe planned implementation work, but runtime transaction state and canonical event history remain authoritative for execution and resume decisions."
+  },
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P0",
+      "title": "Define the monotonic transaction ID contract and migration policy",
+      "status": "planned",
+      "file": "v0.5.5/p1-t01.json"
+    },
+    {
+      "id": "p1-t02",
+      "priority": "P0",
+      "title": "Implement tx_id counter storage and issuance under .agent",
+      "status": "planned",
+      "file": "v0.5.5/p1-t02.json"
+    },
+    {
+      "id": "p1-t03",
+      "priority": "P0",
+      "title": "Replace ticket-derived tx_id generation with issued monotonic IDs",
+      "status": "planned",
+      "file": "v0.5.5/p1-t03.json"
+    },
+    {
+      "id": "p2-t01",
+      "priority": "P1",
+      "title": "Simplify lifecycle comparison logic to use exact transaction identity",
+      "status": "planned",
+      "file": "v0.5.5/p2-t01.json"
+    },
+    {
+      "id": "p2-t02",
+      "priority": "P1",
+      "title": "Normalize active transaction representation and remove sentinel tx_id values",
+      "status": "planned",
+      "file": "v0.5.5/p2-t02.json"
+    },
+    {
+      "id": "p2-t03",
+      "priority": "P1",
+      "title": "Update session recovery to prefer exact tx_id matching",
+      "status": "planned",
+      "file": "v0.5.5/p2-t03.json"
+    },
+    {
+      "id": "p2-t04",
+      "priority": "P1",
+      "title": "Define compatibility handling for legacy historical transaction IDs",
+      "status": "planned",
+      "file": "v0.5.5/p2-t04.json"
+    },
+    {
+      "id": "p3-t01",
+      "priority": "P1",
+      "title": "Add regression coverage for monotonic transaction ID issuance and lifecycle behavior",
+      "status": "planned",
+      "file": "v0.5.5/p3-t01.json"
+    },
+    {
+      "id": "p3-t02",
+      "priority": "P2",
+      "title": "Update documentation and contract-facing guidance for the new transaction ID model",
+      "status": "planned",
+      "file": "v0.5.5/p3-t02.json"
+    }
+  ],
+  "status_context": {
+    "active_ticket": "p1-t01",
+    "canonical_sync_state": "ready",
+    "reason": "The 0.5.5 draft is written and the next step is to turn the transaction ID redesign into an implementation-ready ticket sequence.",
+    "recommended_action": "Start with p1-t01 to lock the monotonic tx_id contract, issuance semantics, compatibility policy, and acceptance boundaries before changing runtime code."
+  }
+}

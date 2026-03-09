@@ -1,0 +1,118 @@
+{
+  "version": "0.6.0",
+  "source": "draft_0.6.0.md",
+  "sync_policy": {
+    "canonical_state_is_authoritative": true,
+    "ticket_status_is_derived": true,
+    "synchronization_rule": "Keep ticket status aligned with canonical lifecycle progress whenever safe and possible. Ticket artifacts describe planned implementation work, but runtime transaction state and canonical event history remain authoritative for execution and resume decisions."
+  },
+  "planning_focus": {
+    "theme": "Redesign the work loop as a resumable transactional protocol for ticket completion.",
+    "problem_statement": "The core 0.6.0 problem is not only identifier ambiguity. The deeper issue is that the work loop itself must be specified as a durable, resumable transaction protocol so an interrupted MCP server session can still deterministically finish the active ticket.",
+    "transaction_definition": "A transaction is one durable execution attempt for one ticket. It is the canonical unit of resumable work, distinct from planning identity and distinct from repository commit.",
+    "design_priorities": [
+      "single active non-terminal transaction per workspace",
+      "explicit state-machine-driven continuation",
+      "materialized state as resume entrypoint",
+      "append-only event history as rebuild source",
+      "next_action as machine-readable continuation guide",
+      "commit remains non-terminal until explicit end",
+      "exact transaction continuation without heuristic replacement"
+    ]
+  },
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P0",
+      "title": "Define the canonical resumable work transaction model",
+      "status": "planned",
+      "file": "v0.6.0/p1-t01.json"
+    },
+    {
+      "id": "p1-t02",
+      "priority": "P0",
+      "title": "Define the canonical state machine and continuation rules",
+      "status": "planned",
+      "file": "v0.6.0/p1-t02.json"
+    },
+    {
+      "id": "p1-t03",
+      "priority": "P0",
+      "title": "Define persistence, rebuild, and issuance responsibilities",
+      "status": "planned",
+      "file": "v0.6.0/p1-t03.json"
+    },
+    {
+      "id": "p2-t01",
+      "priority": "P0",
+      "title": "Replace ticket-derived tx_id generation with issued transaction IDs",
+      "status": "planned",
+      "file": "v0.6.0/p2-t01.json"
+    },
+    {
+      "id": "p2-t02",
+      "priority": "P1",
+      "title": "Remove sentinel active-transaction semantics from normal flow",
+      "status": "planned",
+      "file": "v0.6.0/p2-t02.json"
+    },
+    {
+      "id": "p2-t03",
+      "priority": "P1",
+      "title": "Simplify resume logic to continue the exact active transaction",
+      "status": "planned",
+      "file": "v0.6.0/p2-t03.json"
+    },
+    {
+      "id": "p2-t04",
+      "priority": "P1",
+      "title": "Bound session context and define historical compatibility behavior",
+      "status": "planned",
+      "file": "v0.6.0/p2-t04.json"
+    },
+    {
+      "id": "p3-t01",
+      "priority": "P1",
+      "title": "Add interruption and resume regression coverage for transaction checkpoints",
+      "status": "planned",
+      "file": "v0.6.0/p3-t01.json"
+    },
+    {
+      "id": "p3-t02",
+      "priority": "P1",
+      "title": "Add idempotent continuation coverage for verify, commit, and terminal flows",
+      "status": "planned",
+      "file": "v0.6.0/p3-t02.json"
+    },
+    {
+      "id": "p3-t03",
+      "priority": "P2",
+      "title": "Update documentation and operator guidance for the redesigned protocol",
+      "status": "planned",
+      "file": "v0.6.0/p3-t03.json"
+    }
+  ],
+  "phase_summary": [
+    {
+      "phase": "Phase 1",
+      "goal": "Define the resumable transaction protocol, state machine, and persistence contract before runtime code changes.",
+      "ticket_ids": ["p1-t01", "p1-t02", "p1-t03"]
+    },
+    {
+      "phase": "Phase 2",
+      "goal": "Simplify runtime identity and recovery behavior so the active transaction can be resumed deterministically.",
+      "ticket_ids": ["p2-t01", "p2-t02", "p2-t03", "p2-t04"]
+    },
+    {
+      "phase": "Phase 3",
+      "goal": "Harden the redesigned protocol with interruption-focused regression coverage and updated guidance.",
+      "ticket_ids": ["p3-t01", "p3-t02", "p3-t03"]
+    }
+  ],
+  "status_context": {
+    "active_ticket": "p1-t01",
+    "canonical_sync_state": "ready",
+    "reason": "The 0.6.0 effort has been reframed around redesigning the work loop itself as a resumable transaction protocol. The next step is to lock the canonical transaction model before implementation tickets change runtime behavior.",
+    "recommended_action": "Start with p1-t01 to define the canonical meaning of a transaction, its relationship to tickets, the single-active-transaction invariant, explicit terminal completion, and the non-terminal role of repository commit."
+  }
+}

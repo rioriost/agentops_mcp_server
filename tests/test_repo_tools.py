@@ -1,3 +1,4 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -5,7 +6,6 @@ import pytest
 from agentops_mcp_server.ops_tools import OpsTools
 from agentops_mcp_server.repo_tools import RepoTools
 from agentops_mcp_server.workflow_response import build_success_response
-from agentops_mcp_server.workflow_rules import canonical_workflow_rules
 
 
 class FailingStateStore:
@@ -1449,8 +1449,16 @@ def test_repo_commit_message_suggest_uses_unstaged_diff_when_cached_diff_missing
     assert result["suggestions"][0].startswith("docs:")
 
 
-def test_canonical_workflow_rules_export_contains_key_contract_sections():
-    rules = canonical_workflow_rules()
+def test_rules_template_contains_key_contract_sections():
+    rules = Path("src/agentops_mcp_server/rules_template.txt").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_rules_template_contains_key_contract_sections():
+    rules = Path("src/agentops_mcp_server/rules_template.txt").read_text(
+        encoding="utf-8"
+    )
 
     assert rules.endswith("\n")
     assert "# AgentOps (strict rules)" in rules

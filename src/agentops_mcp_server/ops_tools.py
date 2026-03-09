@@ -103,6 +103,13 @@ class OpsTools:
         active_tx = state.get("active_tx")
         return active_tx if isinstance(active_tx, dict) else {}
 
+    def _materialized_active_tx(self) -> Dict[str, Any]:
+        tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
+        if not isinstance(tx_state, dict):
+            return {}
+        active_tx = tx_state.get("active_tx")
+        return active_tx if isinstance(active_tx, dict) else {}
+
     def _parse_iso_datetime(self, value: Any) -> Optional[datetime]:
         if not isinstance(value, str):
             return None
@@ -212,57 +219,59 @@ class OpsTools:
                 seen.add(value)
                 target.append(value)
 
-        for path in candidate_paths:
-            sessions = self._iter_candidate_session_ids_from_agent_artifact(
-                path, debug_start_time
-            )
-            if not sessions:
-                continue
+        materialized_active_tx = self._materialized_active_tx()
+        materialized_tx_id = self._normalize_tx_identifier(
+            materialized_active_tx.get("tx_id")
+        )
+        materialized_ticket_id = self._normalize_tx_identifier(
+            materialized_active_tx.get("ticket_id")
+        )
+        match_tx_id = materialized_tx_id or active_tx_id
+        match_ticket_id = materialized_ticket_id or active_ticket_id
 
-            if path == self.repo_context.tx_event_log:
+        def _record_matches_active_tx(record: Dict[str, Any]) -> bool:
+            record_tx_id = self._normalize_tx_identifier(record.get("tx_id"))
+            record_ticket_id = self._normalize_tx_identifier(record.get("ticket_id"))
+            if match_tx_id and record_tx_id == match_tx_id:
+                return True
+            if (
+                match_ticket_id
+                and not match_tx_id
+                and record_ticket_id == match_ticket_id
+            ):
+                return True
+            return False
+
+        try:
+            for raw_line in self.repo_context.tx_event_log.read_text(
+                encoding="utf-8"
+            ).splitlines():
+                line = raw_line.strip()
+                if not line:
+                    continue
                 try:
-                    for raw_line in path.read_text(encoding="utf-8").splitlines():
-                        line = raw_line.strip()
-                        if not line:
-                            continue
-                        try:
-                            record = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        if not isinstance(record, dict):
-                            continue
-                        if debug_start_time is not None:
-                            ts = self._parse_iso_datetime(record.get("ts"))
-                            if ts is None or ts < debug_start_time:
-                                continue
-                        record_tx_id = self._normalize_tx_identifier(
-                            record.get("tx_id")
-                        )
-                        record_ticket_id = self._normalize_tx_identifier(
-                            record.get("ticket_id")
-                        )
-                        record_session_id = record.get("session_id")
-                        if (
-                            isinstance(record_session_id, str)
-                            and record_session_id.strip()
-                            and (
-                                (active_tx_id and record_tx_id == active_tx_id)
-                                or (
-                                    active_ticket_id
-                                    and record_ticket_id == active_ticket_id
-                                )
-                            )
-                        ):
-                            _append_unique(
-                                matching_candidates,
-                                matching_seen,
-                                record_session_id.strip(),
-                            )
-                except OSError:
-                    pass
-
-            for session_id in sessions:
-                _append_unique(fallback_candidates, fallback_seen, session_id)
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                if debug_start_time is not None:
+                    ts = self._parse_iso_datetime(record.get("ts"))
+                    if ts is None or ts < debug_start_time:
+                        continue
+                record_session_id = record.get("session_id")
+                if not (
+                    isinstance(record_session_id, str) and record_session_id.strip()
+                ):
+                    continue
+                if _record_matches_active_tx(record):
+                    _append_unique(
+                        matching_candidates,
+                        matching_seen,
+                        record_session_id.strip(),
+                    )
+        except OSError:
+            pass
 
         if len(matching_candidates) == 1:
             return matching_candidates[0]
@@ -271,6 +280,18 @@ class OpsTools:
                 "session_id is required; unable to recover a unique prior session_id "
                 "from .agent artifacts after debug_start_time"
             )
+
+        for path in candidate_paths:
+            if path == self.repo_context.tx_event_log:
+                continue
+            sessions = self._iter_candidate_session_ids_from_agent_artifact(
+                path, debug_start_time
+            )
+            if not sessions:
+                continue
+            for session_id in sessions:
+                _append_unique(fallback_candidates, fallback_seen, session_id)
+
         if len(fallback_candidates) == 1:
             return fallback_candidates[0]
         raise ValueError(
@@ -279,7 +300,11 @@ class OpsTools:
         )
 
     def _resolve_session_id(
-        self, session_id: Optional[str], active_tx: Optional[Dict[str, Any]] = None
+        self,
+        session_id: Optional[str],
+        active_tx: Optional[Dict[str, Any]] = None,
+        *,
+        allow_recovery: bool = True,
     ) -> str:
         resolved_session_id = (
             session_id.strip()
@@ -293,11 +318,14 @@ class OpsTools:
         if candidate_active_tx is None:
             candidate_active_tx = self._active_tx()
 
+        if allow_recovery:
+            return self._recover_session_id_from_agent_artifacts(candidate_active_tx)
+
         materialized_session_id = candidate_active_tx.get("session_id")
         if isinstance(materialized_session_id, str) and materialized_session_id.strip():
             return materialized_session_id.strip()
 
-        return self._recover_session_id_from_agent_artifacts(candidate_active_tx)
+        raise ValueError("session_id is required")
 
     def _workflow_success_response(
         self,
@@ -369,11 +397,16 @@ class OpsTools:
         if not requested_id:
             return None
 
+        rebuilt_state: Dict[str, Any] = {}
         rebuild = self.state_rebuilder.rebuild_tx_state()
-        if not rebuild.get("ok") or not isinstance(rebuild.get("state"), dict):
-            return None
+        if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
+            rebuilt_state = rebuild["state"]
 
-        rebuilt_state = rebuild["state"]
+        rebuilt_active_tx = (
+            rebuilt_state.get("active_tx")
+            if isinstance(rebuilt_state.get("active_tx"), dict)
+            else {}
+        )
         integrity = (
             rebuilt_state.get("integrity")
             if isinstance(rebuilt_state.get("integrity"), dict)
@@ -385,27 +418,75 @@ class OpsTools:
                 "repair or resume the canonical active transaction before emitting tx.begin"
             )
 
-        rebuilt_active_tx = (
-            rebuilt_state.get("active_tx")
-            if isinstance(rebuilt_state.get("active_tx"), dict)
-            else {}
+        rebuilt_tx_id = self._normalize_tx_identifier(rebuilt_active_tx.get("tx_id"))
+        rebuilt_ticket_id = self._normalize_tx_identifier(
+            rebuilt_active_tx.get("ticket_id")
         )
-        rebuilt_identity = self._active_tx_identity(rebuilt_active_tx)
-        rebuilt_canonical_id = rebuilt_identity["canonical_id"]
+        if (
+            rebuilt_tx_id
+            and rebuilt_active_tx
+            and not self._is_terminal_active_tx(rebuilt_active_tx)
+        ):
+            comparable_tx_id = rebuilt_tx_id.removeprefix("tx-")
+            if requested_id == rebuilt_ticket_id:
+                return ValueError(
+                    "cannot emit tx.begin for an already-active non-terminal transaction; "
+                    "resume it with task update semantics instead"
+                )
+            if requested_id == comparable_tx_id or requested_id in comparable_tx_id:
+                return ValueError(
+                    "cannot emit tx.begin for an already-active non-terminal transaction; "
+                    "resume it with task update semantics instead"
+                )
 
-        if not rebuilt_canonical_id:
+        materialized_active_tx = self._materialized_active_tx()
+        if not materialized_active_tx:
+            return None
+        if self._is_terminal_active_tx(materialized_active_tx):
+            rebuilt_tx_id = self._normalize_tx_identifier(
+                rebuilt_active_tx.get("tx_id")
+            )
+            rebuilt_ticket_id = self._normalize_tx_identifier(
+                rebuilt_active_tx.get("ticket_id")
+            )
+            if rebuilt_tx_id:
+                if requested_id == rebuilt_ticket_id:
+                    return self._active_tx_mismatch_error(
+                        requested_task_id, rebuilt_active_tx
+                    )
+                comparable_tx_id = rebuilt_tx_id.removeprefix("tx-")
+                if (
+                    requested_id == rebuilt_tx_id
+                    or requested_id == comparable_tx_id
+                    or requested_id in comparable_tx_id
+                ):
+                    return self._active_tx_mismatch_error(
+                        requested_task_id, rebuilt_active_tx
+                    )
             return None
 
-        if self._is_terminal_active_tx(rebuilt_active_tx):
-            return None
+        materialized_tx_id = self._normalize_tx_identifier(
+            materialized_active_tx.get("tx_id")
+        )
+        materialized_ticket_id = self._normalize_tx_identifier(
+            materialized_active_tx.get("ticket_id")
+        )
 
-        if rebuilt_canonical_id == requested_id:
+        if not materialized_tx_id:
+            return None
+        comparable_tx_id = materialized_tx_id.removeprefix("tx-")
+        if requested_id == materialized_ticket_id:
+            return ValueError(
+                "cannot emit tx.begin for an already-active non-terminal transaction; "
+                "resume it with task update semantics instead"
+            )
+        if requested_id == comparable_tx_id or requested_id in comparable_tx_id:
             return ValueError(
                 "cannot emit tx.begin for an already-active non-terminal transaction; "
                 "resume it with task update semantics instead"
             )
 
-        return self._active_tx_mismatch_error(requested_id, rebuilt_active_tx)
+        return None
 
     def _normalize_tx_identifier(self, value: Any) -> str:
         if not isinstance(value, str):
@@ -429,10 +510,12 @@ class OpsTools:
     def _active_tx_identity(self, active_tx: Dict[str, Any]) -> Dict[str, str]:
         tx_id = self._normalize_tx_identifier(active_tx.get("tx_id"))
         ticket_id = self._normalize_tx_identifier(active_tx.get("ticket_id"))
+        canonical_id = tx_id or ticket_id
         return {
             "tx_id": tx_id,
             "ticket_id": ticket_id,
-            "canonical_id": tx_id or ticket_id,
+            "canonical_id": canonical_id,
+            "has_canonical_tx": bool(tx_id),
         }
 
     def _require_active_tx(
@@ -441,16 +524,38 @@ class OpsTools:
         active_tx = self._active_tx()
         identity = self._active_tx_identity(active_tx)
         canonical_id = identity["canonical_id"]
+        ticket_id = identity["ticket_id"]
         requested_id = self._normalize_tx_identifier(requested_task_id)
+        has_canonical_tx = identity["has_canonical_tx"]
 
-        if not canonical_id or self._is_terminal_active_tx(active_tx):
+        if not has_canonical_tx:
+            if requested_id:
+                if requested_id == ticket_id:
+                    raise ValueError("tx.begin required before other events")
+                raise self._active_tx_mismatch_error(requested_id, active_tx)
+            raise ValueError("tx.begin required before other events")
+        if self._is_terminal_active_tx(active_tx):
             raise ValueError("tx.begin required before other events")
 
-        if requested_id and requested_id != canonical_id:
-            raise self._active_tx_mismatch_error(requested_id, active_tx)
+        if requested_id and requested_id == canonical_id:
+            return active_tx, canonical_id
 
-        if requested_id and allow_resume:
-            return active_tx, requested_id
+        if requested_id and requested_id == ticket_id:
+            if allow_resume:
+                return active_tx, canonical_id
+            raise ValueError(
+                "cannot emit tx.begin for an already-active non-terminal transaction; "
+                "resume it with task update semantics instead"
+            )
+
+        if requested_id:
+            comparable_tx_id = canonical_id.removeprefix("tx-")
+            if requested_id == comparable_tx_id or requested_id in comparable_tx_id:
+                raise ValueError(
+                    "cannot emit tx.begin for an already-active non-terminal transaction; "
+                    "resume it with task update semantics instead"
+                )
+            raise self._active_tx_mismatch_error(requested_id, active_tx)
 
         return active_tx, canonical_id
 
@@ -752,35 +857,47 @@ class OpsTools:
     ) -> Optional[Dict[str, Any]]:
         resolved_title = title.strip() if isinstance(title, str) else ""
         resolved_task_id = task_id.strip() if isinstance(task_id, str) else ""
-        ticket_id = resolved_task_id or resolved_title
+        active_tx = self._active_tx()
+
+        if event_type == "tx.begin":
+            ticket_id = resolved_task_id or resolved_title
+            tx_id = canonical_tx_id(ticket_id) if ticket_id else ""
+        else:
+            active_tx_id = self._normalize_tx_identifier(active_tx.get("tx_id"))
+            active_ticket_id = self._normalize_tx_identifier(active_tx.get("ticket_id"))
+            tx_id = active_tx_id
+            ticket_id = active_ticket_id or resolved_task_id or resolved_title
+
         if not ticket_id:
             return None
-        active_tx = self._active_tx()
-        active_tx_id = self._normalize_tx_identifier(active_tx.get("tx_id"))
-        tx_id = active_tx_id or ticket_id
-        resolved_session_id = self._resolve_session_id(session_id, active_tx)
+        if not tx_id:
+            tx_id = ticket_id
+
+        allow_recovery = event_type != "tx.begin"
+        resolved_session_id = self._resolve_session_id(
+            session_id,
+            active_tx,
+            allow_recovery=allow_recovery,
+        )
+
         actor: Dict[str, Any] = {"tool": "ops_tools"}
         if isinstance(agent_id, str) and agent_id.strip():
             actor["agent_id"] = agent_id.strip()
 
         tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
         if isinstance(tx_state, dict):
-            active_tx = tx_state.get("active_tx")
-            if isinstance(active_tx, dict):
-                existing_tx_id = self._normalize_tx_identifier(active_tx.get("tx_id"))
-                existing_ticket_id = self._normalize_tx_identifier(
-                    active_tx.get("ticket_id")
+            materialized_active_tx = tx_state.get("active_tx")
+            if isinstance(materialized_active_tx, dict):
+                existing_tx_id = self._normalize_tx_identifier(
+                    materialized_active_tx.get("tx_id")
                 )
-                has_materialized_identity = bool(existing_tx_id or existing_ticket_id)
-                if event_type == "tx.begin" or has_materialized_identity:
-                    if event_type == "tx.begin":
-                        tx_id = canonical_tx_id(ticket_id)
-                    active_tx["tx_id"] = tx_id
-                    active_tx["ticket_id"] = ticket_id
-                    active_tx["status"] = phase
-                    active_tx["phase"] = phase
-                    active_tx["current_step"] = step_id
-                    active_tx["session_id"] = resolved_session_id
+                if event_type == "tx.begin" or existing_tx_id:
+                    materialized_active_tx["tx_id"] = tx_id
+                    materialized_active_tx["ticket_id"] = ticket_id
+                    materialized_active_tx["status"] = phase
+                    materialized_active_tx["phase"] = phase
+                    materialized_active_tx["current_step"] = step_id
+                    materialized_active_tx["session_id"] = resolved_session_id
                     return self.state_store.tx_event_append_and_state_save(
                         tx_id=tx_id,
                         ticket_id=ticket_id,
@@ -802,16 +919,16 @@ class OpsTools:
                 else {}
             )
             if integrity.get("drift_detected") is not True:
-                if event_type == "tx.begin":
-                    tx_id = canonical_tx_id(ticket_id)
-                active_tx = state.get("active_tx")
-                if isinstance(active_tx, dict):
-                    active_tx["tx_id"] = tx_id
-                    active_tx["ticket_id"] = ticket_id
-                    active_tx["status"] = phase
-                    active_tx["phase"] = phase
-                    active_tx["current_step"] = step_id
-                    active_tx["session_id"] = resolved_session_id
+                rebuilt_active_tx = state.get("active_tx")
+                if not isinstance(rebuilt_active_tx, dict):
+                    rebuilt_active_tx = {}
+                    state["active_tx"] = rebuilt_active_tx
+                rebuilt_active_tx["tx_id"] = tx_id
+                rebuilt_active_tx["ticket_id"] = ticket_id
+                rebuilt_active_tx["status"] = phase
+                rebuilt_active_tx["phase"] = phase
+                rebuilt_active_tx["current_step"] = step_id
+                rebuilt_active_tx["session_id"] = resolved_session_id
                 return self.state_store.tx_event_append_and_state_save(
                     tx_id=tx_id,
                     ticket_id=ticket_id,
@@ -1035,7 +1152,7 @@ class OpsTools:
         active_tx = self._active_tx()
         identity = self._active_tx_identity(active_tx)
         resolved_task_id = self._normalize_tx_identifier(task_id)
-        resolved_tx_id = identity["canonical_id"]
+        resolved_tx_id = identity["tx_id"]
         terminal_active_tx = self._is_terminal_active_tx(active_tx)
 
         if not resolved_tx_id or terminal_active_tx:
@@ -1058,6 +1175,8 @@ class OpsTools:
                 resolved_task_id, allow_resume=True
             )
         else:
+            if not isinstance(session_id, str) or not session_id.strip():
+                raise ValueError("session_id is required")
             active_tx, resolved_tx_id = self._require_active_tx(
                 resolved_task_id, allow_resume=True
             )
@@ -1065,8 +1184,8 @@ class OpsTools:
         event = self._emit_tx_event(
             event_type="tx.step.enter",
             payload={"step_id": tx_step_id, "description": "task started"},
-            title=resolved_tx_id,
-            task_id=resolved_tx_id,
+            title=resolved_task_id or title.strip(),
+            task_id=resolved_task_id,
             phase=tx_phase,
             step_id=tx_step_id,
             session_id=session_id,
@@ -1116,6 +1235,11 @@ class OpsTools:
             if isinstance(task_id, str) and task_id.strip()
             else (resolved_status if resolved_status else "task")
         )
+        state_step_id = (
+            task_id.strip()
+            if isinstance(task_id, str) and task_id.strip()
+            else (resolved_status if resolved_status else "task")
+        )
         description = payload.get("note") or "task updated"
         event = self._emit_tx_event(
             event_type="tx.step.enter",
@@ -1123,7 +1247,7 @@ class OpsTools:
             title=resolved_task_id or "task",
             task_id=resolved_task_id or None,
             phase=tx_phase,
-            step_id=tx_step_id,
+            step_id=state_step_id,
             session_id=session_id,
             agent_id=agent_id,
         )
@@ -1202,10 +1326,46 @@ class OpsTools:
             agent_id=agent_id,
         )
 
+        response_state = self._load_tx_state()
+        active_response_tx = (
+            response_state.get("active_tx")
+            if isinstance(response_state.get("active_tx"), dict)
+            else {}
+        )
+        verify_state = (
+            active_response_tx.get("verify_state")
+            if isinstance(active_response_tx.get("verify_state"), dict)
+            else {}
+        )
+        commit_state = (
+            active_response_tx.get("commit_state")
+            if isinstance(active_response_tx.get("commit_state"), dict)
+            else {}
+        )
+        if isinstance(active_tx.get("verify_state"), dict) and verify_state.get(
+            "status"
+        ) != active_tx.get("verify_state", {}).get("status"):
+            active_response_tx["verify_state"] = json.loads(
+                json.dumps(active_tx.get("verify_state"), ensure_ascii=False)
+            )
+        if (
+            tx_phase == "done"
+            and commit_state.get("status") != "passed"
+            and isinstance(active_tx.get("commit_state"), dict)
+        ):
+            active_response_tx["commit_state"] = json.loads(
+                json.dumps(active_tx.get("commit_state"), ensure_ascii=False)
+            )
+
+        guidance_overrides: Dict[str, Any] = {}
+        if tx_phase == "done" and isinstance(next_action, str) and next_action.strip():
+            guidance_overrides["next_action"] = "tx.begin"
+            guidance_overrides["followup_tool"] = None
         return self._workflow_success_response(
             payload=payload,
             event=event,
-            tx_state=self._load_tx_state(),
+            tx_state=response_state,
+            **guidance_overrides,
         )
 
     def ops_capture_state(self, session_id: Optional[str] = None) -> Dict[str, Any]:
@@ -1263,6 +1423,9 @@ class OpsTools:
         response["state"] = save_result
         response["last_applied_seq"] = last_seq_value
         response["integrity"] = integrity
+        response["integrity_status"] = (
+            "blocked" if integrity.get("drift_detected") is True else "ok"
+        )
         response["can_start_new_ticket"] = response.get("can_start_new_ticket")
         response["resume_required"] = response.get("resume_required")
         return response
