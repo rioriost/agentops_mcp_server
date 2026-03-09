@@ -271,9 +271,65 @@ class CommitManager:
         )
         return sha, summary
 
+    def _workflow_guidance(self) -> Dict[str, Any]:
+        tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
+        if not isinstance(tx_state, dict):
+            return {
+                "tx_status": "",
+                "tx_phase": "",
+                "next_action": "",
+                "terminal": False,
+                "requires_followup": False,
+                "followup_tool": None,
+            }
+
+        active_tx = tx_state.get("active_tx")
+        if not isinstance(active_tx, dict):
+            return {
+                "tx_status": "",
+                "tx_phase": "",
+                "next_action": "",
+                "terminal": False,
+                "requires_followup": False,
+                "followup_tool": None,
+            }
+
+        tx_status = (
+            active_tx.get("status").strip()
+            if isinstance(active_tx.get("status"), str)
+            and active_tx.get("status").strip()
+            else ""
+        )
+        tx_phase = (
+            active_tx.get("phase").strip()
+            if isinstance(active_tx.get("phase"), str)
+            and active_tx.get("phase").strip()
+            else tx_status
+        )
+        next_action = (
+            active_tx.get("next_action").strip()
+            if isinstance(active_tx.get("next_action"), str)
+            and active_tx.get("next_action").strip()
+            else ""
+        )
+        terminal = tx_status in {"done", "blocked"} or tx_phase in {"done", "blocked"}
+        requires_followup = bool(next_action) and not terminal
+        followup_tool = (
+            "ops_end_task" if next_action in {"tx.end.done", "tx.end.blocked"} else None
+        )
+
+        return {
+            "tx_status": tx_status,
+            "tx_phase": tx_phase,
+            "next_action": next_action,
+            "terminal": terminal,
+            "requires_followup": requires_followup,
+            "followup_tool": followup_tool,
+        }
+
     def commit_if_verified(
         self, message: str, timeout_sec: Optional[int] = None
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         self._verify_started_in_call = False
         self._ensure_tx_begin()
         self._emit_tx_event(
@@ -325,7 +381,9 @@ class CommitManager:
 
         msg = commit_start_message
         sha, _summary = self._run_git_commit(msg)
-        return {"sha": sha, "message": msg}
+        result: Dict[str, Any] = {"ok": True, "sha": sha, "message": msg}
+        result.update(self._workflow_guidance())
+        return result
 
     def repo_commit(
         self,
@@ -396,7 +454,9 @@ class CommitManager:
                 },
                 phase_override="verified",
             )
-            return {"ok": False, "reason": "no changes to commit"}
+            result: Dict[str, Any] = {"ok": False, "reason": "no changes to commit"}
+            result.update(self._workflow_guidance())
+            return result
 
         resolved_files: Any = files if files is not None else "auto"
         if isinstance(resolved_files, str):
@@ -422,10 +482,19 @@ class CommitManager:
                     },
                     phase_override="verified",
                 )
-                return {"ok": False, "reason": "no files specified"}
+                result: Dict[str, Any] = {"ok": False, "reason": "no files specified"}
+                result.update(self._workflow_guidance())
+                return result
             self.git_repo.git("add", *paths)
 
         msg = commit_start_message
 
         sha, summary = self._run_git_commit(msg)
-        return {"ok": True, "sha": sha, "message": msg, "summary": summary}
+        result: Dict[str, Any] = {
+            "ok": True,
+            "sha": sha,
+            "message": msg,
+            "summary": summary,
+        }
+        result.update(self._workflow_guidance())
+        return result

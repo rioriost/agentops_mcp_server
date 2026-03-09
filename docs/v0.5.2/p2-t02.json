@@ -1,0 +1,44 @@
+{
+  "id": "p2-t02",
+  "title": "Align `repo_verify` responses with canonical next-step workflow guidance",
+  "priority": "P2",
+  "status": "verified",
+  "summary": "Improve the `repo_verify` response contract so an agent following `.rules` can reliably determine what canonical workflow step comes next after verification. This ticket evaluates and, if appropriate, expands `repo_verify` so successful verification clearly exposes resulting transaction status, resulting phase, next action, and whether the workflow should proceed toward commit or return to fix-and-retry behavior.",
+  "inputs": [
+    "docs/draft_0.5.2.md",
+    "docs/v0.5.2/plan.md",
+    "docs/v0.5.2/tickets_list.json",
+    ".rules",
+    "src/agentops_mcp_server/repo_tools.py",
+    "src/agentops_mcp_server/main.py",
+    "src/agentops_mcp_server/state_store.py",
+    "tests/test_repo_tools.py"
+  ],
+  "outputs": [
+    "A clarified `repo_verify` response contract that exposes canonical workflow next-step guidance where applicable",
+    "Consistent verify response fields that help agents interpret verified versus failed states without guessing",
+    "Regression tests validating that `repo_verify` response guidance matches canonical transaction state"
+  ],
+  "acceptance_criteria": [
+    "A successful `repo_verify` response clearly indicates the resulting canonical verification state and the next workflow action expected by the transaction model.",
+    "A failed `repo_verify` response clearly indicates that verification did not advance the workflow to commit-ready state and exposes the appropriate next-step guidance for retry or repair.",
+    "If `repo_verify` is invoked in an active transaction context, any new workflow-oriented response fields match the persisted canonical `tx_state` after verification completes.",
+    "The response remains backward-compatible by preserving existing verification result information such as success indicator, return code, stdout, and stderr while adding workflow guidance fields.",
+    "The response does not imply terminal completion or commit readiness when canonical state does not support that conclusion.",
+    "Tests fail if `repo_verify` again returns success without enough information for an agent to determine the next canonical workflow step."
+  ],
+  "tasks": [
+    "Review the current `repo_verify` return shape and identify which workflow-relevant fields are missing for agent decision-making.",
+    "Define a minimal additive response contract that can expose canonical verification outcome, resulting transaction status/phase, next action, and any follow-up requirement.",
+    "Implement the new response fields in a way that reflects canonical persisted state rather than local assumptions where practical.",
+    "Ensure failure responses continue to include existing diagnostic information while also clarifying that the workflow has not advanced to commit-ready state.",
+    "Add or update tests so `repo_verify` response guidance is validated against the canonical transaction state and expected post-verify workflow behavior."
+  ],
+  "dependencies": ["p1-t01", "p1-t02"],
+  "notes": [
+    "This ticket is lower priority than the commit helper response work because the main ambiguity reported in 0.5.2 is post-commit non-terminal state, but verify response clarity should still be improved for consistency.",
+    "The goal is not to redesign verification semantics; it is to make the existing staged workflow more explicit and machine-actionable.",
+    "Any added response fields should remain consistent with the current lifecycle distinction between `checking`, `verified`, `committed`, and terminal states.",
+    "The agent-facing purpose of this ticket is to reduce guesswork after verification so the next action toward commit or repair can be determined from `.rules` plus tool responses."
+  ]
+}

@@ -182,10 +182,80 @@ class RepoTools:
             payload=payload,
         )
 
+    def _workflow_guidance(self) -> Dict[str, Any]:
+        if self.state_store is None:
+            return {
+                "tx_status": "",
+                "tx_phase": "",
+                "next_action": "",
+                "terminal": False,
+                "requires_followup": False,
+                "followup_tool": None,
+            }
+
+        tx_state = self.state_store.read_json_file(
+            self.state_store.repo_context.tx_state
+        )
+        if not isinstance(tx_state, dict):
+            return {
+                "tx_status": "",
+                "tx_phase": "",
+                "next_action": "",
+                "terminal": False,
+                "requires_followup": False,
+                "followup_tool": None,
+            }
+
+        active_tx = tx_state.get("active_tx")
+        if not isinstance(active_tx, dict):
+            return {
+                "tx_status": "",
+                "tx_phase": "",
+                "next_action": "",
+                "terminal": False,
+                "requires_followup": False,
+                "followup_tool": None,
+            }
+
+        tx_status = (
+            active_tx.get("status").strip()
+            if isinstance(active_tx.get("status"), str)
+            and active_tx.get("status").strip()
+            else ""
+        )
+        tx_phase = (
+            active_tx.get("phase").strip()
+            if isinstance(active_tx.get("phase"), str)
+            and active_tx.get("phase").strip()
+            else tx_status
+        )
+        next_action = (
+            active_tx.get("next_action").strip()
+            if isinstance(active_tx.get("next_action"), str)
+            and active_tx.get("next_action").strip()
+            else ""
+        )
+        terminal = tx_status in {"done", "blocked"} or tx_phase in {"done", "blocked"}
+        requires_followup = bool(next_action) and not terminal
+        followup_tool = (
+            "ops_end_task" if next_action in {"tx.end.done", "tx.end.blocked"} else None
+        )
+
+        return {
+            "tx_status": tx_status,
+            "tx_phase": tx_phase,
+            "next_action": next_action,
+            "terminal": terminal,
+            "requires_followup": requires_followup,
+            "followup_tool": followup_tool,
+        }
+
     def repo_verify(self, timeout_sec: Optional[int] = None) -> Dict[str, Any]:
         context = self._load_tx_context()
         if context is None or self.state_store is None:
-            return self.verify_runner.run_verify(timeout_sec=timeout_sec)
+            result = self.verify_runner.run_verify(timeout_sec=timeout_sec)
+            result.update(self._workflow_guidance())
+            return result
 
         active_tx = self.state_store.read_json_file(
             self.state_store.repo_context.tx_state
@@ -233,6 +303,7 @@ class RepoTools:
                 step_id_override=context["step_id"],
             )
 
+        result.update(self._workflow_guidance())
         return result
 
     def repo_status_summary(self) -> Dict[str, Any]:

@@ -170,6 +170,12 @@ def test_repo_verify_delegates():
     result = tools.repo_verify(timeout_sec=5)
 
     assert result["ok"] is True
+    assert result["tx_status"] == ""
+    assert result["tx_phase"] == ""
+    assert result["next_action"] == ""
+    assert result["terminal"] is False
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] is None
     assert verify_runner.calls == [5]
 
 
@@ -897,6 +903,12 @@ def test_repo_verify_records_failure_event_when_verify_fails():
     result = tools.repo_verify(timeout_sec=9)
 
     assert result["ok"] is False
+    assert result["tx_status"] == "checking"
+    assert result["tx_phase"] == "checking"
+    assert result["next_action"] == "fix and re-verify"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
     assert verify_runner.calls == [9]
     assert [call["event_type"] for call in state_store.append_and_save_calls] == [
         "tx.verify.start",
@@ -930,6 +942,12 @@ def test_repo_verify_allows_blocked_phase_when_status_is_non_terminal():
     result = tools.repo_verify(timeout_sec=5)
 
     assert result["ok"] is True
+    assert result["tx_status"] == "verified"
+    assert result["tx_phase"] == "verified"
+    assert result["next_action"] == "tx.commit.start"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
     assert verify_runner.calls == [5]
     assert [call["event_type"] for call in state_store.append_and_save_calls] == [
         "tx.verify.start",
@@ -946,6 +964,12 @@ def test_repo_verify_ignores_non_dict_active_tx_when_checking_terminal_state():
     result = tools.repo_verify(timeout_sec=8)
 
     assert result["ok"] is True
+    assert result["tx_status"] == ""
+    assert result["tx_phase"] == ""
+    assert result["next_action"] == ""
+    assert result["terminal"] is False
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] is None
     assert verify_runner.calls == [8]
 
 
@@ -972,6 +996,12 @@ def test_repo_verify_without_state_store_delegates_directly_even_when_rebuilder_
     result = tools.repo_verify(timeout_sec=6)
 
     assert result["ok"] is True
+    assert result["tx_status"] == ""
+    assert result["tx_phase"] == ""
+    assert result["next_action"] == ""
+    assert result["terminal"] is False
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] is None
     assert verify_runner.calls == [6]
 
 
@@ -1028,6 +1058,12 @@ def test_repo_verify_records_canonical_tx_events_when_active_tx_exists():
     result = tools.repo_verify(timeout_sec=7)
 
     assert result["ok"] is True
+    assert result["tx_status"] == "verified"
+    assert result["tx_phase"] == "verified"
+    assert result["next_action"] == "tx.commit.start"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
     assert verify_runner.calls == [7]
     assert [call["event_type"] for call in state_store.append_and_save_calls] == [
         "tx.verify.start",

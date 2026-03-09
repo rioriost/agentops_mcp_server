@@ -62,9 +62,15 @@
   7) Set runtime work status -> verified
      - If a client maintains ticket artifacts, it may also update them.
   8) Commit changes (emit tx.commit.start/done|fail)
+     - Successful commit helpers may advance the active transaction only to `committed`.
+     - Commit success does not by itself imply terminal `done`.
   9) Set runtime work status -> committed
+     - `committed` is a non-terminal active transaction state.
+     - If canonical `next_action` is `tx.end.done`, the agent must treat that as required follow-up work rather than completed work.
      - If a client maintains ticket artifacts, it may also update them.
   10) Set runtime work status -> done (emit tx.end.done|blocked)
+     - Terminal success still requires explicit lifecycle closure, typically with `ops_end_task(status="done")`.
+     - A transaction remains active until runtime status is `done` or `blocked`.
      - If a client maintains ticket artifacts, it may also persist terminal status there.
 - Runtime transaction status/phase is canonical for server behavior.
 - Client ticket-document status, when maintained, is derived workflow bookkeeping and may be synchronized by the client as a convention.
@@ -109,11 +115,18 @@
 - Use:
   - workspace_initialize
   - commit_if_verified
+    - may leave the transaction in non-terminal `committed`
+    - does not by itself guarantee terminal completion
+    - agents must use returned canonical workflow fields and/or current tx state to determine whether `ops_end_task` is still required
   - tx_event_append
   - tx_state_save
   - tx_state_rebuild
   - repo_verify
+    - should be interpreted together with returned canonical next-step guidance when available
   - repo_commit
+    - may leave the transaction in non-terminal `committed`
+    - does not by itself guarantee terminal completion
+    - agents must use returned canonical workflow fields and/or current tx state to determine whether `ops_end_task` is still required
   - repo_status_summary
   - repo_commit_message_suggest
   - session_capture_context
@@ -132,6 +145,8 @@
 ## Commit rules (mandatory)
 - After verify: check repo status; commit only if changes exist.
 - Commit message: ~80 chars, add scope if useful.
+- After successful commit, agents must inspect canonical transaction status and `next_action` before assuming work is complete.
+- If commit succeeds and canonical `next_action` is `tx.end.done`, agents must explicitly complete the lifecycle before treating the ticket as done.
 
 ## Token discipline (mandatory)
 - Keep outputs short; avoid large logs.

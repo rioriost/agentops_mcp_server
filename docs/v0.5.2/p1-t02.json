@@ -1,0 +1,44 @@
+{
+  "id": "p1-t02",
+  "title": "Expand commit and verify tool responses to expose canonical workflow follow-up",
+  "priority": "P0",
+  "status": "verified",
+  "summary": "Strengthen the response contracts of workflow-driving tools so an agent following `.rules` can reliably determine whether a transaction is terminal or still requires explicit follow-up. This ticket focuses on `commit_if_verified`, `repo_commit`, and, if appropriate for consistency, `repo_verify`, so their responses expose canonical workflow cues such as current status, current phase, next action, and whether `ops_end_task` is still required.",
+  "inputs": [
+    "docs/draft_0.5.2.md",
+    "docs/v0.5.2/plan.md",
+    "docs/v0.5.2/tickets_list.json",
+    ".rules",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "src/agentops_mcp_server/main.py",
+    "tests/test_commit_manager.py",
+    "tests/test_repo_tools.py"
+  ],
+  "outputs": [
+    "Expanded response payloads for `commit_if_verified` and `repo_commit` that expose canonical workflow follow-up requirements",
+    "Consistent workflow-oriented response fields for commit/verify helpers where applicable",
+    "Regression tests proving that successful commit responses make non-terminal `committed` state and required next action explicit"
+  ],
+  "acceptance_criteria": [
+    "A successful `commit_if_verified` response makes it explicit that the transaction may remain non-terminal after commit and exposes the canonical next action.",
+    "A successful `repo_commit` response includes enough workflow-state information for an agent to determine whether explicit terminal closure is still required.",
+    "If `repo_verify` is updated for consistency, its response clearly signals the verified state and the next canonical workflow action.",
+    "Response payloads preserve existing success information such as commit SHA and commit message while adding machine-usable workflow guidance.",
+    "The added response fields do not contradict the canonical transaction state persisted in `tx_state`.",
+    "Tests fail if commit helpers again return success without exposing the remaining required terminal action when the transaction is still only `committed`."
+  ],
+  "tasks": [
+    "Review the current return shapes of `commit_if_verified`, `repo_commit`, and `repo_verify` and identify which fields are insufficient for agent decision-making.",
+    "Define a minimal backward-compatible response contract that includes canonical workflow cues such as status, phase, next action, terminal flag, and follow-up requirement.",
+    "Implement the new response fields in commit-related helpers without changing the underlying two-stage `committed` -> `done` lifecycle model.",
+    "Ensure any response-level workflow cues are derived from canonical transaction state rather than local assumptions where practical.",
+    "Add or update regression tests so tool responses are validated against persisted transaction state and expected follow-up behavior."
+  ],
+  "dependencies": ["p1-t01"],
+  "notes": [
+    "This ticket is about contract clarity for agents, not about changing the lifecycle so that commit automatically implies terminal success.",
+    "Backward compatibility matters: existing fields such as `sha`, `message`, and top-level success indicators should be preserved while richer workflow guidance is added.",
+    "The main workflow goal is to make it obvious to an agent that `committed` is still non-terminal when `next_action` remains `tx.end.done`."
+  ]
+}

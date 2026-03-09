@@ -1,0 +1,49 @@
+{
+  "id": "p2-t01",
+  "title": "Add regression coverage for commit/finalize workflow contract alignment",
+  "priority": "P1",
+  "status": "verified",
+  "summary": "Add regression coverage for the 0.5.2 workflow contract clarification so agents can reliably infer the correct next action after verify and commit operations. This ticket should protect the alignment between canonical `.rules`, bootstrap-generated rules, and tool responses by ensuring that successful commit helpers clearly expose non-terminal `committed` state, required follow-up terminal closure, and canonical next-action guidance.",
+  "inputs": [
+    "docs/draft_0.5.2.md",
+    "docs/v0.5.2/plan.md",
+    "docs/v0.5.2/tickets_list.json",
+    ".rules",
+    "src/agentops_mcp_server/workflow_rules.py",
+    "src/agentops_mcp_server/workflow_rules_fallback.txt",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "tests/test_commit_manager.py",
+    "tests/test_init.py",
+    "tests/test_repo_tools.py"
+  ],
+  "outputs": [
+    "Regression tests that verify commit-oriented tool responses expose canonical workflow guidance after successful commit",
+    "Coverage that confirms rules text and generated rules remain synchronized on committed-versus-done semantics",
+    "Tests that fail if commit helpers return success without surfacing the remaining required terminal follow-up action"
+  ],
+  "acceptance_criteria": [
+    "Tests verify that `commit_if_verified` returns machine-usable workflow cues indicating that a successful commit may still leave the transaction in non-terminal `committed` state.",
+    "Tests verify that `repo_commit` exposes the same post-commit workflow cues, including the canonical next action when the transaction is not yet terminal.",
+    "If `repo_verify` response fields are expanded, tests verify that verify success clearly signals the next workflow step toward commit.",
+    "Tests confirm that canonical `.rules`, generated rules from `workflow_rules.py`, and fallback rules remain aligned on the requirement that terminal success still requires `tx.end.done`.",
+    "Tests confirm that generated workspace rules written through the bootstrap path preserve the clarified commit/finalize workflow contract.",
+    "Regression coverage fails if tool responses contradict canonical transaction state in `tx_state`, especially around `status`, `phase`, and `next_action` after commit."
+  ],
+  "tasks": [
+    "Add or update tests for `commit_if_verified` so successful results expose canonical workflow state such as transaction status, phase, next action, terminality, and follow-up requirement.",
+    "Add or update tests for `repo_commit` so its response contract matches the clarified post-commit workflow semantics.",
+    "Add or update tests for `repo_verify` if its response shape is expanded to include canonical next-step guidance.",
+    "Add tests that compare canonical rules text, generated rules text, and fallback rules text for the clarified committed-versus-done workflow wording.",
+    "Add bootstrap-path coverage to ensure initialized workspaces receive rules consistent with the revised canonical workflow contract.",
+    "Preserve existing transaction-state expectations that successful commit helpers leave transactions in `committed` with `next_action = tx.end.done` unless and until an explicit terminal event is emitted."
+  ],
+  "dependencies": ["p1-t01", "p1-t02"],
+  "notes": [
+    "This ticket is about regression protection for the clarified workflow contract, not about redesigning the transaction model.",
+    "The two-stage lifecycle distinction between `committed` and `done` should remain intact; tests should reinforce that distinction rather than collapse it.",
+    "The most important failure mode to guard against is a commit helper returning success in a way that causes an agent to miss the still-required `ops_end_task(status=\"done\")` step.",
+    "Coverage should focus on machine-actionable behavior across rules and tool responses, not human-facing README wording."
+  ]
+}

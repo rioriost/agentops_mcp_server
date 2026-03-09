@@ -69,9 +69,15 @@ CANONICAL_WORKFLOW_RULES = (
       7) Set runtime work status -> verified
          - If a client maintains ticket artifacts, it may also update them.
       8) Commit changes (emit tx.commit.start/done|fail)
+         - Successful commit helpers may advance the transaction only to `committed`.
+         - A successful commit helper does not by itself imply terminal success.
       9) Set runtime work status -> committed
+         - `committed` is a non-terminal state.
+         - If canonical `next_action` is `tx.end.done`, the transaction is still active and must be closed explicitly.
          - If a client maintains ticket artifacts, it may also update them.
       10) Set runtime work status -> done (emit tx.end.done|blocked)
+         - Terminal success still requires an explicit `tx.end.done`, typically via `ops_end_task(status="done")`.
+         - A transaction remains active until runtime status is `done` or `blocked`.
          - If a client maintains ticket artifacts, it may also persist terminal status there.
     - Runtime transaction status/phase is canonical for server behavior.
     - Client ticket-document status, when maintained, is derived workflow bookkeeping and may be synchronized by the client as a convention.
@@ -116,11 +122,15 @@ CANONICAL_WORKFLOW_RULES = (
     - Use:
       - workspace_initialize
       - commit_if_verified
+        - commit helpers may return success while leaving canonical transaction state at non-terminal `committed`
+        - agents must inspect canonical transaction status and `next_action` to determine whether explicit terminal follow-up is still required
       - tx_event_append
       - tx_state_save
       - tx_state_rebuild
       - repo_verify
       - repo_commit
+        - `repo_commit` does not by itself guarantee terminal completion
+        - if canonical `next_action` remains `tx.end.done`, the agent must still complete the lifecycle explicitly
       - repo_status_summary
       - repo_commit_message_suggest
       - session_capture_context
@@ -138,6 +148,9 @@ CANONICAL_WORKFLOW_RULES = (
 
     ## Commit rules (mandatory)
     - After verify: check repo status; commit only if changes exist.
+    - Successful commit helpers may leave canonical transaction state in non-terminal `committed`.
+    - After commit success, agents must use canonical transaction status and `next_action` to decide whether explicit terminal completion is still required.
+    - If canonical `next_action` is `tx.end.done`, complete the lifecycle explicitly, typically with `ops_end_task(status="done")`.
     - Commit message: ~80 chars, add scope if useful.
 
     ## Token discipline (mandatory)

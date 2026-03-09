@@ -132,6 +132,9 @@ def test_repo_commit_no_changes():
     result = manager.repo_commit(message="msg", files="auto", run_verify=False)
     assert result["ok"] is False
     assert result["reason"] == "no changes to commit"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] is None
 
 
 def test_repo_commit_no_changes_emits_commit_fail_event(tmp_path):
@@ -236,7 +239,15 @@ def test_commit_if_verified_runs_verify(tmp_path, monkeypatch):
 
     result = manager.commit_if_verified("message", timeout_sec=5)
 
+    assert result["ok"] is True
     assert result["sha"] == "abc123"
+    assert result["message"] == "message"
+    assert result["tx_status"] == "committed"
+    assert result["tx_phase"] == "committed"
+    assert result["next_action"] == "tx.end.done"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] == "ops_end_task"
     assert manager.verify_runner.calls == [5]
     assert ("add", "-A") in manager.git_repo.calls
 
@@ -277,7 +288,14 @@ def test_commit_if_verified_emits_tx_commit_events(tmp_path, monkeypatch):
     )
 
     result = manager.commit_if_verified("message", timeout_sec=5)
+    assert result["ok"] is True
     assert result["sha"] == "abc123"
+    assert result["tx_status"] == "committed"
+    assert result["tx_phase"] == "committed"
+    assert result["next_action"] == "tx.end.done"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] == "ops_end_task"
 
     events = [
         json.loads(line)
@@ -514,6 +532,12 @@ def test_repo_commit_run_verify_synchronizes_verify_state_before_commit(
 
     assert result["ok"] is True
     assert result["sha"] == "abc123"
+    assert result["tx_status"] == "committed"
+    assert result["tx_phase"] == "committed"
+    assert result["next_action"] == "tx.end.done"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] == "ops_end_task"
 
     events = [
         json.loads(line)
@@ -1468,12 +1492,16 @@ def test_repo_commit_returns_summary_from_run_git_commit(monkeypatch):
 
     result = manager.repo_commit(message="msg", files="auto", run_verify=False)
 
-    assert result == {
-        "ok": True,
-        "sha": "sha-123",
-        "message": "msg",
-        "summary": "cached diff summary",
-    }
+    assert result["ok"] is True
+    assert result["sha"] == "sha-123"
+    assert result["message"] == "msg"
+    assert result["summary"] == "cached diff summary"
+    assert result["tx_status"] == ""
+    assert result["tx_phase"] == ""
+    assert result["next_action"] == ""
+    assert result["terminal"] is False
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] is None
 
 
 def test_run_git_commit_failure_emits_event(tmp_path, monkeypatch):

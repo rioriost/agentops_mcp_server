@@ -1,0 +1,44 @@
+{
+  "id": "p1-t01",
+  "title": "Clarify the commit-to-done workflow contract in canonical and generated `.rules`",
+  "priority": "P0",
+  "status": "verified",
+  "summary": "Align the machine-facing workflow contract so agents can reliably distinguish between successful commit completion and terminal task completion. This ticket updates the canonical `.rules` contract and the generated rules surfaces so they explicitly state that commit helpers may leave a transaction in non-terminal `committed` with `next_action = tx.end.done`, and that terminal success still requires an explicit `ops_end_task(status=\"done\")` transition.",
+  "inputs": [
+    "docs/draft_0.5.2.md",
+    "docs/v0.5.2/plan.md",
+    "docs/v0.5.2/tickets_list.json",
+    ".rules",
+    "src/agentops_mcp_server/workflow_rules.py",
+    "src/agentops_mcp_server/workflow_rules_fallback.txt",
+    "src/agentops_mcp_server/zed-agentops-init.sh"
+  ],
+  "outputs": [
+    "Updated canonical `.rules` text that explicitly describes `committed` as non-terminal and requires explicit terminal closure",
+    "Synchronized generated rules content in `workflow_rules.py` and `workflow_rules_fallback.txt`",
+    "Bootstrap-generated workspace `.rules` content that matches the clarified commit/finalize contract"
+  ],
+  "acceptance_criteria": [
+    "The canonical `.rules` explicitly states that successful commit helpers may leave the active transaction in `committed` and that this state is non-terminal.",
+    "The canonical `.rules` explicitly states that terminal success still requires `tx.end.done`, typically through `ops_end_task(status=\"done\")`.",
+    "The canonical `.rules` explicitly instructs agents to use canonical transaction status and `next_action` to determine whether follow-up lifecycle completion is still required.",
+    "The generated rules content derived from `workflow_rules.py` and `workflow_rules_fallback.txt` matches the clarified canonical contract for commit, committed, and done transitions.",
+    "The rules written into initialized workspaces by `zed-agentops-init.sh` remain contract-identical to the canonical rules in this area.",
+    "The clarified rules preserve the current two-stage lifecycle model rather than collapsing `committed` and `done` into a single state."
+  ],
+  "tasks": [
+    "Revise the work loop section of the canonical `.rules` so it explicitly distinguishes commit success from terminal task completion.",
+    "Add explicit wording that `commit_if_verified` and `repo_commit` may advance the transaction only to `committed`, not necessarily to terminal `done`.",
+    "Add explicit wording that if canonical `next_action` is `tx.end.done`, the agent must complete the lifecycle with `ops_end_task(status=\"done\")`.",
+    "Update `workflow_rules.py` so the generated canonical rules reflect the clarified commit/finalize contract.",
+    "Update `workflow_rules_fallback.txt` so fallback-generated workspace rules remain synchronized with the canonical rules.",
+    "Confirm that the rules distribution path used by `zed-agentops-init.sh` continues to produce workspace `.rules` content matching the clarified contract."
+  ],
+  "dependencies": [],
+  "notes": [
+    "This ticket is about machine-facing workflow contract clarity, not README wording.",
+    "The primary consumer of this change is an AI agent that follows `.rules` and adjusts behavior based on tool responses and canonical transaction state.",
+    "The ticket should preserve the existing transaction model in which `committed` is a meaningful non-terminal state and `done` remains a distinct terminal state.",
+    "Because initialized workspaces consume generated rules rather than repository prose directly, synchronization across `.rules`, `workflow_rules.py`, and `workflow_rules_fallback.txt` is mandatory."
+  ]
+}

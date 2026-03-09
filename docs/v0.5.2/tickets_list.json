@@ -1,0 +1,41 @@
+{
+  "version": "0.5.2",
+  "source": "draft_0.5.2.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P0",
+      "title": "Clarify canonical rules for committed versus done workflow semantics",
+      "status": "verified",
+      "file": "v0.5.2/p1-t01.json"
+    },
+    {
+      "id": "p1-t02",
+      "priority": "P0",
+      "title": "Keep bootstrap-generated rules synchronized with the clarified commit/finalize contract",
+      "status": "verified",
+      "file": "v0.5.2/p1-t02.json"
+    },
+    {
+      "id": "p2-t01",
+      "priority": "P1",
+      "title": "Expand commit helper responses with canonical workflow guidance",
+      "status": "verified",
+      "file": "v0.5.2/p2-t01.json"
+    },
+    {
+      "id": "p2-t02",
+      "priority": "P1",
+      "title": "Align verify helper responses with canonical next-step guidance",
+      "status": "verified",
+      "file": "v0.5.2/p2-t02.json"
+    },
+    {
+      "id": "p3-t01",
+      "priority": "P1",
+      "title": "Add regression coverage for rules and tool-response workflow contract alignment",
+      "status": "verified",
+      "file": "v0.5.2/p3-t01.json"
+    }
+  ]
+}

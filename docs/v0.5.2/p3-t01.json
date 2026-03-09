@@ -1,0 +1,56 @@
+{
+  "id": "p3-t01",
+  "title": "Add regression coverage for rules and tool-response workflow contract alignment",
+  "priority": "P1",
+  "status": "verified",
+  "summary": "Add regression coverage for the 0.5.2 workflow contract clarification so agents can reliably infer the correct next action from `.rules` plus workflow-driving tool responses. This ticket protects the alignment between canonical `.rules`, generated workspace rules, fallback rules, and the responses of `commit_if_verified`, `repo_commit`, and, if expanded, `repo_verify`, with particular focus on the non-terminal `committed` state and the still-required `ops_end_task(status=\"done\")` follow-up.",
+  "inputs": [
+    "docs/draft_0.5.2.md",
+    "docs/v0.5.2/plan.md",
+    "docs/v0.5.2/tickets_list.json",
+    "docs/v0.5.2/p1-t01.json",
+    "docs/v0.5.2/p1-t02.json",
+    "docs/v0.5.2/p2-t01.json",
+    "docs/v0.5.2/p2-t02.json",
+    ".rules",
+    "src/agentops_mcp_server/workflow_rules.py",
+    "src/agentops_mcp_server/workflow_rules_fallback.txt",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "tests/test_commit_manager.py",
+    "tests/test_repo_tools.py",
+    "tests/test_init.py"
+  ],
+  "outputs": [
+    "Regression tests that verify successful commit helpers expose canonical workflow guidance after commit",
+    "Coverage that confirms canonical `.rules`, generated rules, and fallback rules remain synchronized on committed-versus-done semantics",
+    "Tests that fail if workflow-driving tool responses become ambiguous about required post-commit terminal follow-up"
+  ],
+  "acceptance_criteria": [
+    "Tests verify that canonical `.rules` explicitly distinguishes non-terminal `committed` from terminal `done` and requires explicit terminal closure through `tx.end.done` or `ops_end_task(status=\"done\")`.",
+    "Tests verify that `workflow_rules.py` and `workflow_rules_fallback.txt` remain aligned with canonical `.rules` for the clarified commit/finalize workflow wording.",
+    "Tests verify that generated workspace rules delivered through the bootstrap path preserve the same clarified commit-to-done contract.",
+    "Tests verify that a successful `commit_if_verified` response exposes enough canonical workflow guidance to show that the transaction may still be non-terminal after commit.",
+    "Tests verify that a successful `repo_commit` response exposes the same post-commit workflow cues, including canonical next action when terminal closure is still required.",
+    "If `repo_verify` response fields are expanded, tests verify that verify success and failure both expose enough workflow guidance for an agent to determine the next canonical step.",
+    "Regression coverage fails if tool responses contradict persisted canonical transaction state in `tx_state`, especially for `status`, `phase`, `next_action`, and terminality after verify or commit.",
+    "Regression coverage preserves the existing transaction-model expectation that successful commit helpers leave the transaction in `committed` with `next_action = tx.end.done` until an explicit terminal event is emitted."
+  ],
+  "tasks": [
+    "Add or update tests that compare canonical `.rules`, generated rules text, and fallback rules text for the clarified committed-versus-done workflow contract.",
+    "Add or update bootstrap-path tests so initialized workspaces are verified to receive `.rules` content matching the revised canonical workflow contract.",
+    "Add or update `commit_if_verified` tests so successful responses expose machine-usable workflow guidance such as canonical transaction status, phase, next action, terminality, and follow-up requirement.",
+    "Add or update `repo_commit` tests so its response contract matches the clarified post-commit non-terminal workflow semantics.",
+    "Add or update `repo_verify` tests if its response shape is expanded to include canonical next-step workflow guidance.",
+    "Add assertions that tool response workflow fields match persisted canonical `tx_state` rather than diverging from it.",
+    "Keep the regression suite focused on machine-actionable workflow alignment rather than human-facing README wording."
+  ],
+  "dependencies": ["p1-t01", "p1-t02", "p2-t01", "p2-t02"],
+  "notes": [
+    "This ticket is about regression protection for the clarified workflow contract, not about redesigning the transaction model.",
+    "The two-stage lifecycle distinction between `committed` and `done` should remain intact; tests should reinforce that distinction rather than collapse it.",
+    "The primary failure mode to guard against is a workflow-driving tool returning success in a way that causes an agent to miss the still-required terminal lifecycle step.",
+    "Coverage should focus on machine-facing contract alignment across `.rules`, generated rules, fallback rules, bootstrap behavior, and tool responses."
+  ]
+}

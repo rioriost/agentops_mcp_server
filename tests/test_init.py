@@ -158,3 +158,31 @@ def test_init_script_documents_convention_boundary_and_helper_contract():
     assert "python - <<" in content
     assert 'exec(Path(r"$SOURCE_RULES_PY").read_text(), namespace)' in content
     assert "cat <<'RULES' > \"$SOURCE_RULES\"" not in content
+
+
+def test_init_script_rules_describe_non_terminal_committed_followup():
+    rules_path = init_mod.resources.files("agentops_mcp_server").joinpath(
+        "workflow_rules_fallback.txt"
+    )
+    content = rules_path.read_text(encoding="utf-8")
+
+    assert (
+        "Successful commit helpers may advance the active transaction only to `committed`."
+        in content
+    )
+    assert (
+        "If canonical `next_action` is `tx.end.done`, the agent must treat that as required follow-up work rather than completed work."
+        in content
+    )
+    assert (
+        'Terminal success still requires explicit lifecycle closure, typically with `ops_end_task(status="done")`.'
+        in content
+    )
+    assert (
+        "agents must use returned canonical workflow fields and/or current tx state to determine whether `ops_end_task` is still required"
+        in content
+    )
+    assert (
+        "If commit succeeds and canonical `next_action` is `tx.end.done`, agents must explicitly complete the lifecycle before treating the ticket as done."
+        in content
+    )
