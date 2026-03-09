@@ -264,14 +264,45 @@ docs/draft_0.1.0.md
 
 1. `docs/` を作る
 2. まず自分が分かっている要件を書き出す
-3. エージェントに draft をもとに phase や ticket へ分解させる
-4. その plan を workflow guidance として使う
+3. エージェントに draft をもとに、phase を意識した plan へ整理させる
+4. 必要に応じて、次のような派生 planning artifact を管理する。この作業もエージェントに依頼できます。
+   - `docs/__version__/plan.md`
+   - `docs/__version__/tickets_list.json`
+   - `docs/__version__/pX-tY.json`
+5. 作業中は、それらの planning file を workflow guidance として使う
+
+planning flow を分けて考えると、次のようになります。
+
+- `draft.md`
+  - 問題設定
+  - 目的
+  - スコープ
+  - 制約
+  - 優先順位
+  を書く場所
+- `plan.md`
+  - draft をもとに、phase ごとの実行計画へ整理する場所
+- `tickets_list.json`
+  - 進める ticket の一覧と状態を簡潔に持つ index
+- `pX-tY.json`
+  - 個別 ticket ごとの inputs / outputs / acceptance criteria / notes を持つ任意の詳細記録
+
+ticket artifact を管理する場合、status は次のような set にしておくと扱いやすいです。
+
+- `planned`
+- `in-progress`
+- `checking`
+- `verified`
+- `committed`
+- `done`
+- `blocked`
 
 v0.5.0 で重要な boundary は次です。
 
 - `docs/` 配下の planning files は有用な workflow artifact です
 - ただし server が管理する mandatory protocol state ではありません
 - server はそれら planning artifact の生成・同期・検証を保証しません
+- それらを管理する場合でも、`tickets_list.json` と各 per-ticket file の同期は user / client 側の運用責任です
 
 つまり、これらは user-managed / client-managed な workflow document と理解するのが正確です。
 

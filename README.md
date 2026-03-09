@@ -260,14 +260,36 @@ A practical pattern is:
 
 1. Create `docs/`
 2. Write an initial draft with the requirements you already know
-3. Ask the agent to help break the draft into phases and tickets
-4. Use the resulting plan as workflow guidance
+3. Ask the agent to help refine the draft into a phase-oriented plan
+4. If useful, maintain derived planning artifacts with the agent such as:
+   - `docs/__version__/plan.md`
+   - `docs/__version__/tickets_list.json`
+   - `docs/__version__/pX-tY.json`
+5. Use those planning files as workflow guidance while the work is in progress
+
+A helpful way to think about the planning flow is:
+
+- `draft.md` is the place to describe the problem, goals, scope, constraints, and priorities
+- `plan.md` is the place to turn that draft into phased execution guidance
+- `tickets_list.json` is a compact index of the tickets you intend to work through
+- `pX-tY.json` files are optional per-ticket detail records for inputs, outputs, acceptance criteria, and notes
+
+If you maintain ticket artifacts, a practical status set is:
+
+- `planned`
+- `in-progress`
+- `checking`
+- `verified`
+- `committed`
+- `done`
+- `blocked`
 
 Important v0.5.0 boundary:
 
 - planning files under `docs/` are useful workflow artifacts
 - they are not mandatory server-managed protocol state
 - the server does not guarantee generation, synchronization, or validation of those planning artifacts for you
+- if you choose to maintain them, keeping `tickets_list.json` and the per-ticket files in sync is recommended operating practice
 
 They are best understood as user- or client-managed workflow documents.
 
