@@ -277,6 +277,9 @@ The following tools should be aligned with the new contract:
 ---
 
 ### Phase 4: Normalize helper success responses and follow-up semantics
+**Status**
+- `p2-t04` is complete: lifecycle-aware resume flows can now recover prior `session_id` context from `.agent` artifacts after manual Zed session switches, with regression coverage for successful and ambiguous recovery paths.
+
 **Goals**
 - Make verify/commit helper responses explicit about remaining obligations.
 

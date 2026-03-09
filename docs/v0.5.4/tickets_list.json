@@ -53,7 +53,7 @@
       "id": "p2-t04",
       "priority": "P1",
       "title": "Recover prior session context during resume across manual Zed session changes",
-      "status": "planned",
+      "status": "done",
       "file": "v0.5.4/p2-t04.json"
     },
     {
@@ -74,7 +74,7 @@
   "status_context": {
     "active_ticket": "p2-t01",
     "canonical_sync_state": "planned",
-    "reason": "p1-t03 is complete, and p2-t01 is now the next executable ticket for normalizing helper success and follow-up semantics.",
+    "reason": "p2-t04 is complete, and p2-t01 remains the next executable ticket because it is the prerequisite for the broader failure and lifecycle-semantics follow-up tickets.",
     "recommended_action": "Begin p2-t01 by aligning verify/commit helper success responses with the standardized workflow-guidance contract and making remaining follow-up obligations explicit."
   }
 }
