@@ -55,6 +55,19 @@ Running `zed-agentops-init.sh` sets up the files you need to start using AgentOp
 - `.agent/tx_event_log.jsonl`
 - `.agent/tx_state.json`
 
+The baseline `.agent/tx_state.json` is intentionally a normalized empty-transaction state. It includes the canonical top-level fields and metadata needed for normal runtime interpretation, including:
+
+- `schema_version` for the transaction state format
+- `active_tx` initialized to the safe `none` / `planned` baseline
+- `last_applied_seq`
+- `integrity.state_hash`
+- `integrity.rebuilt_from_seq`
+- `integrity.drift_detected`
+- `integrity.active_tx_source`
+- `updated_at`
+
+This baseline is meant to be compatible with the richer runtime-rebuilt state shape without inventing runtime-only facts that can only be known after canonical event replay.
+
 It also:
 - creates a Git repository if one does not already exist
 - appends common ignore entries to `.gitignore`
@@ -202,9 +215,19 @@ Recent versions also tightened resumability and state alignment, so updating is 
 ### Current behavior summary
 
 - The scaffold now aligns `.rules` with the current workflow expectations
-- Initial transaction state starts from the current baseline
+- Initial transaction state starts from a normalized baseline shape
 - Resume behavior is centered on the local AgentOps state files
 - The default setup is aimed at safer interruption/resume cycles
+
+### Version concepts
+
+AgentOps exposes a few different version concepts, and they do not mean the same thing:
+
+- package/server version: the released MCP server implementation version
+- transaction/schema version: the version of the persisted `tx_state` structure
+- draft/release-plan version: the workflow planning or documentation version used in `docs/`
+
+Keeping these distinct helps avoid confusion when the server implementation, the transaction state schema, and a draft release plan evolve on different timelines.
 
 ### If you are upgrading from an older scaffold
 

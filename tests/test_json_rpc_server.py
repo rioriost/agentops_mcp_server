@@ -68,6 +68,7 @@ def test_handle_request_initialize(repo_context, state_store):
     assert resp["id"] == 1
     assert resp["result"]["protocolVersion"] == "2024-11-05"
     assert resp["result"]["serverInfo"]["name"] == "agentops-server"
+    assert resp["result"]["serverInfo"]["version"] == "0.4.13"
 
 
 def test_handle_request_tools_list(repo_context, state_store):

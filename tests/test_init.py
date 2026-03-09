@@ -102,3 +102,7 @@ def test_init_script_contains_canonical_artifacts_and_rules():
         "- Persist the terminal ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json."
         in content
     )
+
+    assert '"session_id": ""' in content
+    assert '"drift_detected": false' in content
+    assert '"active_tx_source": "none"' in content

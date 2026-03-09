@@ -52,7 +52,7 @@ class JsonRpcServer:
         if method == "initialize":
             result = {
                 "protocolVersion": "2024-11-05",
-                "serverInfo": {"name": "agentops-server", "version": "0.2.0"},
+                "serverInfo": {"name": "agentops-server", "version": "0.4.13"},
                 "capabilities": {"tools": {}},
             }
         elif method == "initialized":

@@ -315,7 +315,6 @@ else
   printf '%s\n' \
     '{' \
     '  "schema_version": "0.4.0",' \
-    "  \"updated_at\": \"$tx_state_ts\"," \
     '  "active_tx": {' \
     '    "tx_id": "none",' \
     '    "ticket_id": "none",' \
@@ -326,12 +325,19 @@ else
     '    "next_action": "tx.begin",' \
     '    "semantic_summary": "No active transaction.",' \
     '    "user_intent": null,' \
+    '    "session_id": "",' \
     '    "verify_state": {"status": "not_started", "last_result": null},' \
     '    "commit_state": {"status": "not_started", "last_result": null},' \
     '    "file_intents": []' \
     '  },' \
     '  "last_applied_seq": 0,' \
-    '  "integrity": {"state_hash": "", "rebuilt_from_seq": 0}' \
+    '  "integrity": {' \
+    '    "state_hash": "",' \
+    '    "rebuilt_from_seq": 0,' \
+    '    "drift_detected": false,' \
+    '    "active_tx_source": "none"' \
+    '  },' \
+    "  \"updated_at\": \"$tx_state_ts\"" \
     '}' > "$AGENT_DIR/tx_state.json"
 fi
 

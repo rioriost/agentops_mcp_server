@@ -55,7 +55,7 @@
       "id": "p4-t02",
       "priority": "P3",
       "title": "Normalize bootstrap state shape and clarify version surfaces",
-      "status": "planned",
+      "status": "done",
       "file": "v0.5.0/p4-t02.json"
     },
     {

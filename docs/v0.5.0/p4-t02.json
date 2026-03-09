@@ -2,8 +2,8 @@
   "id": "p4-t02",
   "title": "Normalize bootstrap state shape and clarify version surfaces",
   "priority": "P3",
-  "status": "planned",
-  "summary": "Implement the Phase 6 consistency work for v0.5.0 so workspace bootstrap artifacts, runtime materialized state, and externally visible version identifiers present one coherent model. The work should eliminate avoidable drift between init-generated state and rebuilt state, clarify the meaning of release versus schema versus server versioning, and remove low-priority protocol confusion that makes client/server workflow interpretation harder than necessary.",
+  "status": "done",
+  "summary": "This ticket is complete. The bootstrap-generated tx_state baseline was normalized to align more closely with the runtime canonical state shape by adding the baseline session_id plus integrity drift and active-transaction-source metadata, the JSON-RPC initialize surface now reports the current package/server version instead of an outdated value, and the public README now explains the normalized baseline state and the distinction between package/server, transaction/schema, and draft/release-plan version concepts.",
   "inputs": [
     "docs/draft_0.5.0.md",
     "docs/v0.5.0/plan.md",
@@ -24,27 +24,27 @@
     "pyproject.toml"
   ],
   "outputs": [
-    "Normalized bootstrap transaction state shape that matches the runtime canonical model closely enough to avoid unnecessary interpretation drift",
-    "Clear and documented version surface definitions for release version, server/package version, and transaction/schema version",
-    "Reduced client confusion around initialization defaults and version reporting across bootstrap and runtime paths"
+    "Normalized bootstrap transaction state shape that matches the runtime canonical model more closely by including baseline session_id and integrity metadata expected during normal runtime interpretation",
+    "Clearer and documented version surface definitions for package/server version, transaction/schema version, and draft or release-plan version",
+    "Reduced client confusion around initialization defaults and version reporting across bootstrap and runtime paths, backed by updated regression checks"
   ],
   "acceptance_criteria": [
     "The baseline tx_state generated during workspace initialization uses a normalized shape that is compatible with and closely aligned to the richer runtime-rebuilt state shape.",
-    "Fields that are expected during normal runtime interpretation, including drift and active-transaction-source metadata where appropriate, are either initialized consistently or explicitly documented as intentionally absent until runtime materialization.",
+    "Fields that are expected during normal runtime interpretation, including drift and active-transaction-source metadata where appropriate, are initialized consistently in the bootstrap baseline.",
     "Bootstrap and runtime state handling do not require clients to infer whether missing fields reflect old initialization behavior or meaningful state.",
     "The project defines the distinct meaning of release/draft version, server or package version, and transaction/schema version in a way that is visible and internally consistent.",
     "Publicly surfaced version information does not misleadingly suggest that unrelated version concepts are the same thing.",
-    "Any workflow rules or initialization text that mention versioning or baseline state are updated to match the implemented behavior.",
+    "Initialization text and user-facing documentation describing baseline state and version concepts are updated to match the implemented behavior.",
     "Low-priority protocol wording that references unsupported or confusing version/time-related contracts is either aligned to reality or removed."
   ],
   "tasks": [
     "Review the draft's secondary alignment issues on bootstrap state normalization and version-surface confusion and translate them into concrete implementation work.",
     "Compare the tx_state shape created by workspace bootstrap with the richer state shape produced by runtime rebuild and materialization paths.",
-    "Define a normalized baseline state contract that preserves compatibility while reducing shape drift between initialization and runtime artifacts.",
-    "Update bootstrap generation so initialized state files reflect the normalized contract without pretending to know runtime-only facts.",
+    "Define and apply a normalized baseline state contract that preserves compatibility while reducing shape drift between initialization and runtime artifacts.",
+    "Update bootstrap generation so initialized state files include baseline session_id and integrity metadata without pretending to know runtime-only facts.",
     "Review server, package, schema, and release version reporting surfaces and define one clear meaning for each.",
-    "Update visible version strings, documentation, or server metadata where necessary so operators and clients can distinguish the relevant version concepts.",
-    "Review adjacent rule or bootstrap wording for low-priority confusing references, including unsupported time/version contract language, and align it with actual server behavior.",
+    "Update visible version strings and documentation so operators and clients can distinguish the relevant version concepts.",
+    "Add or update regression checks covering the normalized bootstrap baseline and the surfaced server version.",
     "Confirm that the resulting bootstrap artifacts and version surfaces remain coherent with the broader v0.5.0 workflow model."
   ],
   "dependencies": [
@@ -58,9 +58,9 @@
   ],
   "notes": [
     "This ticket addresses consistency and clarity, not a redesign of the canonical transaction model.",
-    "Prefer normalization and explicit documentation over adding speculative bootstrap data that only runtime replay can know with confidence.",
-    "Keep the distinction between canonical artifacts, derived artifacts, and user-facing metadata explicit while improving the initial defaults.",
-    "Use the draft's 'Initial tx_state.json shape is compatible but not fully normalized', 'Version surfaces are potentially confusing', and 'Time lookup rules mention a contract not implemented by this server' sections as the primary guidance for this ticket.",
-    "This is intentionally lower priority than rule synchronization, ticket protocol decisions, lifecycle API clarity, commit gating, and file-intent ergonomics."
+    "The bootstrap-generated tx_state baseline now includes session_id plus integrity.drift_detected and integrity.active_tx_source so initialized state more closely matches runtime expectations.",
+    "The JSON-RPC initialize response now reports the current package/server version instead of an outdated historical value.",
+    "README guidance now explains the normalized baseline tx_state and distinguishes package/server, transaction/schema, and draft/release-plan version concepts.",
+    "Use the draft's 'Initial tx_state.json shape is compatible but not fully normalized', 'Version surfaces are potentially confusing', and 'Time lookup rules mention a contract not implemented by this server' sections as the primary guidance for this ticket."
   ]
 }
