@@ -112,7 +112,7 @@
   "status_context": {
     "active_ticket": "p1-t03",
     "canonical_sync_state": "in-progress",
-    "reason": "Phase 1 has completed the transaction model and state-machine definition work. The active focus is now p1-t03, which is refining the canonical persistence, rebuild, and issuance contract down to field-level responsibilities and failure classifications for durable resume behavior.",
-    "recommended_action": "Continue p1-t03 by locking the minimum JSON-facing field sets for `.agent/tx_state.json`, `.agent/tx_event_log.jsonl`, and `.agent/tx_id_counter.json`, along with write-order guarantees, rebuild and fallback ordering, missing-versus-malformed handling, issuance semantics, error classification, and JSON-facing representation rules before Phase 2 implementation begins."
+    "reason": "Phase 1 has completed the transaction model and state-machine definition work. The active focus is now p1-t03, which is refining the canonical persistence, rebuild, and issuance contract down to field-level responsibilities, invariant rules, and concrete JSON examples for durable resume behavior.",
+    "recommended_action": "Continue p1-t03 by locking the minimum JSON-facing field sets for `.agent/tx_state.json`, `.agent/tx_event_log.jsonl`, and `.agent/tx_id_counter.json`, along with `active_tx` invariants, `verify_state` and `commit_state` object shapes, sequence consistency rules, error classification, and example JSON representations before Phase 2 implementation begins."
   }
 }
