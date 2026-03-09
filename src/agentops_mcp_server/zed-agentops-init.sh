@@ -144,20 +144,11 @@ fi
 
 # --- .rules ---
 SOURCE_RULES="$root/.agentops-workflow-rules.tmp"
-SOURCE_RULES_PY="$SCRIPT_DIR/workflow_rules.py"
 SOURCE_RULES_FALLBACK="$SCRIPT_DIR/workflow_rules_fallback.txt"
 if [ -f "$SOURCE_RULES" ]; then
   cp "$SOURCE_RULES" "$SOURCE_RULES.bak"
 fi
-if [ -f "$SOURCE_RULES_PY" ]; then
-  python - <<PY > "$SOURCE_RULES"
-from pathlib import Path
-
-namespace = {}
-exec(Path(r"$SOURCE_RULES_PY").read_text(), namespace)
-print(namespace["canonical_workflow_rules"](), end="")
-PY
-elif [ -f "$SOURCE_RULES_FALLBACK" ]; then
+if [ -f "$SOURCE_RULES_FALLBACK" ]; then
   cp "$SOURCE_RULES_FALLBACK" "$SOURCE_RULES"
 else
   echo "Error: no workflow rules source available."
