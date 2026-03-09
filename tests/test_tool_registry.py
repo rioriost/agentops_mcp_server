@@ -25,6 +25,9 @@ def test_build_tool_registry_includes_expected_keys():
         ops_start_task=_dummy,
         ops_update_task=_dummy,
         ops_end_task=_dummy,
+        ops_add_file_intent=_dummy,
+        ops_update_file_intent=_dummy,
+        ops_complete_file_intent=_dummy,
         ops_capture_state=_dummy,
         ops_task_summary=_dummy,
         ops_observability_summary=_dummy,
@@ -49,6 +52,9 @@ def test_build_tool_registry_includes_expected_keys():
         "ops_start_task",
         "ops_update_task",
         "ops_end_task",
+        "ops_add_file_intent",
+        "ops_update_file_intent",
+        "ops_complete_file_intent",
         "ops_capture_state",
         "ops_task_summary",
         "ops_observability_summary",
@@ -77,6 +83,9 @@ def test_registry_entries_include_schema_and_handler():
         ops_start_task=_dummy,
         ops_update_task=_dummy,
         ops_end_task=_dummy,
+        ops_add_file_intent=_dummy,
+        ops_update_file_intent=_dummy,
+        ops_complete_file_intent=_dummy,
         ops_capture_state=_dummy,
         ops_task_summary=_dummy,
         ops_observability_summary=_dummy,
@@ -103,6 +112,22 @@ def test_registry_entries_include_schema_and_handler():
     commit = registry["commit_if_verified"]
     assert commit["handler"] is _dummy
     assert commit["input_schema"]["required"] == ["message"]
+
+    ops_add_file_intent = registry["ops_add_file_intent"]
+    assert ops_add_file_intent["handler"] is _dummy
+    assert ops_add_file_intent["input_schema"]["required"] == [
+        "path",
+        "operation",
+        "purpose",
+    ]
+
+    ops_update_file_intent = registry["ops_update_file_intent"]
+    assert ops_update_file_intent["handler"] is _dummy
+    assert ops_update_file_intent["input_schema"]["required"] == ["path", "state"]
+
+    ops_complete_file_intent = registry["ops_complete_file_intent"]
+    assert ops_complete_file_intent["handler"] is _dummy
+    assert ops_complete_file_intent["input_schema"]["required"] == ["path"]
 
     ops_capture_state = registry["ops_capture_state"]
     assert ops_capture_state["handler"] is _dummy

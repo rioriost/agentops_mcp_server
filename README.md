@@ -249,6 +249,8 @@ In most cases, `--update` is enough.
 
 For most users, the important point is simple: keep `.rules` current by using the latest scaffold or running `--update`.
 
+For a release-facing explanation of the supported v0.5.0 client/server contract, see `docs/v0.5.0/interoperability.md`. That guide summarizes what is enforced by the server, what is exposed as helper behavior, and what remains client-side operating convention.
+
 ## Notes
 
 - macOS only at the moment

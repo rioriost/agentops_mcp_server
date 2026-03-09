@@ -62,7 +62,7 @@
       "id": "p5-t01",
       "priority": "P1",
       "title": "Add interoperability verification coverage and workflow alignment documentation",
-      "status": "planned",
+      "status": "done",
       "file": "v0.5.0/p5-t01.json"
     },
     {
