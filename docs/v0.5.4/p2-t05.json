@@ -1,0 +1,59 @@
+{
+  "id": "p2-t05",
+  "title": "Make helper tx.begin bootstrap canonical-aware and resume-safe",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Prevent helper-driven duplicate `tx.begin` emission when materialized state is missing, stale, or temporarily inconsistent with canonical history. This ticket makes helper bootstrap logic canonical-aware so verify/commit helper flows consult replay-derived transaction state before emitting `tx.begin`, prefer resuming an existing non-terminal canonical transaction over re-beginning it, and fail safely when integrity drift blocks trustworthy progression.",
+  "inputs": [
+    "docs/draft_0.5.4.md",
+    "docs/v0.5.4/plan.md",
+    "docs/v0.5.4/tickets_list.json",
+    "docs/v0.5.4/p1-t01.json",
+    "docs/v0.5.4/p1-t02.json",
+    "docs/v0.5.4/p1-t03.json",
+    "docs/v0.5.4/p2-t01.json",
+    "docs/v0.5.4/p2-t02.json",
+    "docs/v0.5.4/p2-t03.json",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "tests/test_commit_manager.py",
+    "tests/test_ops_tools.py",
+    "tests/test_state_store.py",
+    "tests/test_state_rebuilder.py"
+  ],
+  "outputs": [
+    "Canonical-aware helper bootstrap rules for `tx.begin` emission",
+    "Implementation changes that prevent duplicate `tx.begin` during helper resume/bootstrap flows",
+    "Structured failure behavior when canonical integrity drift blocks safe helper bootstrap",
+    "Regression tests covering stale-materialized-state and canonical-resume scenarios"
+  ],
+  "acceptance_criteria": [
+    "Helper bootstrap logic does not emit `tx.begin` solely because materialized state appears empty or inactive when canonical replay shows an existing non-terminal transaction.",
+    "When canonical replay identifies an already-active non-terminal transaction for the same task, helper entry points resume that transaction or return structured resume guidance instead of emitting duplicate `tx.begin`.",
+    "When canonical replay identifies integrity drift or otherwise unsafe history, helper bootstrap fails safely with machine-readable recovery guidance rather than attempting implicit repair by emitting `tx.begin`.",
+    "Helper bootstrap behavior remains consistent with the lifecycle guidance contract introduced in 0.5.4 and does not report healthier canonical state than replay can support.",
+    "Regression tests fail if helper flows reintroduce duplicate `tx.begin` emission under stale materialized state, missing active materialized state, or resume-after-interruption scenarios.",
+    "The implementation preserves strict canonical ordering and does not weaken replay validation merely to make helper flows more permissive."
+  ],
+  "tasks": [
+    "Audit helper entry points, especially verify/commit helper bootstrap paths, to identify where `tx.begin` can be emitted from materialized-state assumptions instead of canonical replay evidence.",
+    "Define canonical-aware bootstrap rules for helpers: prefer materialized active state when valid, fall back to replay-derived canonical state when materialized state is incomplete, and never emit `tx.begin` when canonical non-terminal work already exists for the same task.",
+    "Refactor helper bootstrap logic so replay-derived active transaction identity and terminality are consulted before any helper-driven `tx.begin` emission.",
+    "Ensure helper bootstrap distinguishes among no-active-transaction, resumable-active-transaction, terminal-history, and integrity-blocked-history cases using machine-readable guidance where applicable.",
+    "Align helper bootstrap failure behavior with the 0.5.4 structured failure contract so duplicate-begin prevention yields actionable recovery semantics rather than only free-form validation errors.",
+    "Add regression tests covering stale materialized state, missing active materialized state with canonical non-terminal history, helper resume after interruption, and integrity-drift-blocked bootstrap paths."
+  ],
+  "dependencies": ["p1-t01", "p1-t02", "p1-t03", "p2-t01", "p2-t02", "p2-t03"],
+  "notes": [
+    "This ticket is specifically about helper-driven bootstrap and resume safety, not a general redesign of transaction lifecycle semantics.",
+    "The highest-risk area is helper logic that decides to emit `tx.begin` using only materialized-state visibility such as an empty or inactive-looking `tx_state` snapshot.",
+    "Canonical replay must remain the source of truth when materialized state and history disagree.",
+    "This ticket should complement, not replace, the broader 0.5.4 work on structured guidance and lifecycle field consistency.",
+    "A successful fix should prevent begin duplication from becoming the first failure in a cascade of secondary lifecycle errors.",
+    "Implementation focus should start with `commit_manager._ensure_tx_begin()`, because that helper-side bootstrap path currently relies on event-log emptiness rather than a canonical replay-aware active-transaction check.",
+    "The preferred guard order is: use healthy materialized active transaction state when present, otherwise consult replay-derived canonical state, then block with structured recovery guidance if integrity drift or an already-active matching non-terminal transaction makes helper-driven `tx.begin` unsafe.",
+    "Regression coverage should include cases where materialized state looks inactive but canonical replay still shows a matching non-terminal transaction, so helper entry cannot silently re-begin the same ticket."
+  ]
+}

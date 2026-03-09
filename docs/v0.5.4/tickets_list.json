@@ -57,6 +57,13 @@
       "file": "v0.5.4/p2-t04.json"
     },
     {
+      "id": "p2-t05",
+      "priority": "P1",
+      "title": "Make helper tx.begin bootstrap canonical-aware and resume-safe",
+      "status": "planned",
+      "file": "v0.5.4/p2-t05.json"
+    },
+    {
       "id": "p3-t01",
       "priority": "P1",
       "title": "Add regression tests for workflow guidance contract",
@@ -74,7 +81,7 @@
   "status_context": {
     "active_ticket": "p2-t01",
     "canonical_sync_state": "planned",
-    "reason": "p2-t04 is complete, and p2-t01 remains the next executable ticket because it is the prerequisite for the broader failure and lifecycle-semantics follow-up tickets.",
-    "recommended_action": "Begin p2-t01 by aligning verify/commit helper success responses with the standardized workflow-guidance contract and making remaining follow-up obligations explicit."
+    "reason": "p2-t04 is complete, and p2-t01 remains the next executable ticket because it is the prerequisite for the broader helper, failure, lifecycle-semantics, and helper-bootstrap resume-safety follow-up tickets.",
+    "recommended_action": "Begin p2-t01 by aligning verify/commit helper success responses with the standardized workflow-guidance contract and making remaining follow-up obligations explicit, then schedule p2-t05 to harden helper tx.begin bootstrap against duplicate-begin resume failures."
   }
 }

@@ -62,6 +62,7 @@ That means resume-safe behavior must recover prior transaction session context f
 - Clarifying response semantics for `status`, `phase`, `next_action`, and terminality.
 - Standardizing follow-up signaling after verify/commit helpers.
 - Defining resume-safe recovery behavior for `session_id` and related transaction context when a new client session resumes prior work.
+- Making helper-side `tx.begin` bootstrap canonical-aware so materialized-state gaps do not trigger duplicate non-terminal `tx.begin` emission during resume or helper entry.
 - Adding regression tests for success and failure guidance contracts.
 - Updating docs and contract-facing descriptions where necessary.
 
@@ -79,6 +80,7 @@ After 0.5.4:
 - helpers explicitly report whether more lifecycle work remains,
 - failure responses become machine-readable enough for deterministic branching,
 - resume logic can recover the prior transaction session context from persisted canonical artifacts when the user has started a new Zed session,
+- helper bootstrap paths do not emit duplicate `tx.begin` when canonical history already contains the active non-terminal transaction,
 - and canonical status remains strict without becoming opaque.
 
 ## Design Principles
@@ -102,10 +104,13 @@ Agents should be able to distinguish:
 - terminal transaction,
 - integrity-blocked state,
 - invalid operation ordering,
+- duplicate-begin risk caused by incomplete materialized state versus canonical history,
 - and missing or recoverable session-context state
 from structured response data.
 
 Resume behavior must not assume that the current client session id matches the session id that originally opened the active transaction. When the user starts a new Zed session, lifecycle-aware tools must recover the prior transaction session context from canonical persisted state before deciding whether resume can proceed.
+
+Helper bootstrap behavior must also prefer canonical transaction history over a stale or incomplete materialized view when deciding whether `tx.begin` may be emitted. If canonical state already shows a matching active non-terminal transaction, helper entry must resume or fail with structured guidance instead of emitting another `tx.begin`.
 
 ## Proposed Response Contract
 
@@ -234,6 +239,10 @@ The following tools should be aligned with the new contract:
   1. materialized `tx_state`,
   2. canonical `tx_event_log` / replay-derived state,
   3. structured recovery failure when neither source can supply safe session context.
+- Define helper bootstrap lookup order for `tx.begin` eligibility:
+  1. current materialized active transaction when healthy and complete,
+  2. canonical replay/rebuild result when materialized state is missing, stale, terminal, or incomplete,
+  3. structured failure when integrity drift or an already-active matching transaction makes new `tx.begin` unsafe.
 
 **Deliverables**
 - Shared response-building utilities.
@@ -282,6 +291,7 @@ The following tools should be aligned with the new contract:
 
 **Goals**
 - Make verify/commit helper responses explicit about remaining obligations.
+- Make helper bootstrap behavior canonical-aware so helper entry does not create duplicate `tx.begin` events when resume should occur instead.
 
 **Tasks**
 - Review and normalize:
@@ -298,13 +308,18 @@ The following tools should be aligned with the new contract:
   - `committed` is non-terminal,
   - helper success does not imply `done`,
   - and explicit lifecycle closure may still be required.
+- Audit helper bootstrap paths, especially implicit `tx.begin` emission, against canonical rebuild results rather than event-log-emptiness or incomplete materialized state alone.
+- Ensure helper entry resumes an already-active matching transaction, or fails with structured guidance, instead of emitting a duplicate non-terminal `tx.begin`.
+- Cover integrity-drift and stale-materialized-state cases explicitly so helper bootstrap does not advance canonical history unsafely.
 
 **Deliverables**
 - Standardized helper response contract.
 - Clear machine-readable indication of follow-up obligations.
+- Canonical-aware helper bootstrap rules for safe `tx.begin` handling during resume and helper entry.
 
 **Acceptance for phase**
 - An agent can determine from helper success alone whether it must still call terminal lifecycle completion.
+- Helper bootstrap logic does not emit duplicate non-terminal `tx.begin` when canonical history already contains the active transaction.
 
 ---
 
@@ -317,6 +332,7 @@ The following tools should be aligned with the new contract:
   - begin required,
   - resume required,
   - missing session context during resume,
+  - duplicate-begin prevention during helper bootstrap,
   - event after terminal,
   - cannot verify terminal transaction,
   - file intent already exists,
@@ -381,9 +397,12 @@ The following tools should be aligned with the new contract:
   - integrity-blocked guidance,
   - active transaction identity reporting,
   - can-start/resume-required signaling,
+  - helper bootstrap duplicate-begin prevention when canonical state already has a matching active transaction,
+  - canonical rebuild fallback when materialized active state is missing or stale,
   - and resume behavior after the user starts a new Zed session without the old session id in live caller context.
 - Add regression tests that fail if tools revert to ambiguous minimal lifecycle responses.
 - Add regression tests that verify prior `session_id` recovery prefers `tx_state`, falls back to canonical event history when needed, and returns structured failure when safe recovery is impossible.
+- Add regression tests that fail if helper bootstrap logic relies only on event-log emptiness or incomplete materialized state and emits a duplicate non-terminal `tx.begin`.
 
 **Deliverables**
 - A regression suite protecting the workflow-guidance contract.
@@ -532,6 +551,28 @@ Ensure `status`, `phase`, `next_action`, and terminality remain consistent acros
 - no contradictory canonical guidance is returned
 - `done`/`blocked` remain terminal
 - `committed` remains non-terminal
+
+---
+
+### P2-T5: Make helper `tx.begin` bootstrap canonical-aware and resume-safe
+**Goal**
+Prevent helper entry paths from emitting duplicate non-terminal `tx.begin` events when canonical history already contains the active transaction.
+
+**Inputs**
+- helper bootstrap behavior in verify/commit flows
+- canonical replay/rebuild behavior
+- materialized `tx_state` fallback behavior
+
+**Outputs**
+- canonical-aware helper bootstrap rules
+- safe duplicate-begin prevention for helper entry paths
+- structured helper failure guidance when bootstrap is unsafe because canonical history must be resumed or repaired first
+
+**Acceptance criteria**
+- helper bootstrap logic does not rely only on event-log emptiness or incomplete materialized state when deciding whether `tx.begin` may be emitted
+- if canonical state already contains a matching active non-terminal transaction, helper entry resumes or fails with structured guidance instead of emitting another `tx.begin`
+- integrity-drift or ambiguous canonical history blocks unsafe helper bootstrap rather than creating new canonical events
+- regression tests cover stale materialized state, canonical replay fallback, and duplicate-begin prevention in helper paths
 
 ---
 
