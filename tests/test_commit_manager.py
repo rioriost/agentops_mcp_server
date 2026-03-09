@@ -1642,10 +1642,21 @@ def test_repo_commit_returns_summary_from_run_git_commit(monkeypatch):
     assert result["summary"] == "cached diff summary"
     assert result["tx_status"] == ""
     assert result["tx_phase"] == ""
+    assert result["canonical_status"] == ""
+    assert result["canonical_phase"] == ""
     assert result["next_action"] == ""
     assert result["terminal"] is False
     assert result["requires_followup"] is False
     assert result["followup_tool"] is None
+    assert result["active_tx_id"] is None
+    assert result["active_ticket_id"] is None
+    assert result["current_step"] is None
+    assert result["verify_status"] is None
+    assert result["commit_status"] is None
+    assert result["integrity_status"] is None
+    assert result["can_start_new_ticket"] is True
+    assert result["resume_required"] is False
+    assert result["active_tx"] == {}
 
 
 def test_run_git_commit_failure_emits_event(tmp_path, monkeypatch):

@@ -32,7 +32,7 @@
       "id": "p2-t01",
       "priority": "P1",
       "title": "Normalize helper success and follow-up semantics",
-      "status": "planned",
+      "status": "in-progress",
       "file": "v0.5.4/p2-t01.json"
     },
     {
@@ -64,6 +64,13 @@
       "file": "v0.5.4/p2-t05.json"
     },
     {
+      "id": "p2-t06",
+      "priority": "P1",
+      "title": "Implement canonical-aware helper tx.begin bootstrap guard",
+      "status": "planned",
+      "file": "v0.5.4/p2-t06.json"
+    },
+    {
       "id": "p3-t01",
       "priority": "P1",
       "title": "Add regression tests for workflow guidance contract",
@@ -80,8 +87,8 @@
   ],
   "status_context": {
     "active_ticket": "p2-t01",
-    "canonical_sync_state": "planned",
-    "reason": "p2-t04 is complete, and p2-t01 remains the next executable ticket because it is the prerequisite for the broader helper, failure, lifecycle-semantics, and helper-bootstrap resume-safety follow-up tickets.",
-    "recommended_action": "Begin p2-t01 by aligning verify/commit helper success responses with the standardized workflow-guidance contract and making remaining follow-up obligations explicit, then schedule p2-t05 to harden helper tx.begin bootstrap against duplicate-begin resume failures."
+    "canonical_sync_state": "in-progress",
+    "reason": "p2-t01 is now in progress, and it remains the prerequisite for the broader helper, failure, lifecycle-semantics, helper-bootstrap resume-safety, and implementation follow-up tickets including p2-t05 and p2-t06.",
+    "recommended_action": "Continue p2-t01 until its helper response contract work is done, then proceed to p2-t05 and the new dependent p2-t06 implementation ticket for canonical-aware helper tx.begin bootstrap hardening."
   }
 }

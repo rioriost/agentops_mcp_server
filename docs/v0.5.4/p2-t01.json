@@ -2,7 +2,7 @@
   "id": "p2-t01",
   "title": "Normalize helper success responses and follow-up semantics",
   "priority": "P1",
-  "status": "planned",
+  "status": "in-progress",
   "summary": "Standardize the success-response contract for workflow helpers so AI agents can determine the resulting canonical state and any remaining lifecycle obligations without relying on implicit behavior. This ticket focuses on helper-style tools such as verify and commit flows, especially the distinction between successful helper completion and terminal lifecycle completion. The key requirement is that helper responses must expose machine-readable canonical guidance, including resulting status, phase, next action, terminality, active transaction identity, and whether follow-up lifecycle completion is still required.",
   "inputs": [
     "docs/draft_0.5.4.md",
@@ -36,11 +36,7 @@
     "Ensure helper responses remain truthful to canonical state rather than implying terminal completion prematurely.",
     "Add or update regression tests for helper success responses, especially cases where commit helper success still requires explicit ops_end_task handling."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02",
-    "p1-t03"
-  ],
+  "dependencies": ["p1-t01", "p1-t02", "p1-t03"],
   "notes": [
     "This ticket is limited to helper-style success responses and their follow-up semantics; it does not cover the full structured failure contract.",
     "The most important behavioral guarantee is that helper completion and terminal lifecycle completion remain distinguishable in machine-readable form.",

@@ -576,6 +576,32 @@ Prevent helper entry paths from emitting duplicate non-terminal `tx.begin` event
 
 ---
 
+### P2-T6: Implement canonical-aware helper `tx.begin` bootstrap after helper contract normalization
+**Goal**
+Implement the helper-side duplicate-`tx.begin` prevention and canonical replay fallback work after the prerequisite helper response, failure, and lifecycle-semantics tickets are complete.
+
+**Inputs**
+- completed helper response contract from `p2-t01`
+- completed structured failure contract from `p2-t02`
+- completed lifecycle field semantics from `p2-t03`
+- helper bootstrap behavior in verify/commit flows
+- canonical replay/rebuild behavior
+- materialized `tx_state` fallback behavior
+
+**Outputs**
+- implementation of canonical-aware helper bootstrap rules in helper entry paths
+- helper-side duplicate-begin prevention aligned with normalized structured guidance
+- regression coverage for canonical replay fallback and blocked bootstrap cases
+
+**Acceptance criteria**
+- `p2-t06` is not started until `p2-t01`, `p2-t02`, and `p2-t03` are done
+- helper bootstrap implementation uses the normalized 0.5.4 success and failure contracts rather than introducing an incompatible ad hoc path
+- if canonical state already contains a matching active non-terminal transaction, helper entry resumes or fails with structured guidance instead of emitting another `tx.begin`
+- integrity-drift or ambiguous canonical history blocks unsafe helper bootstrap rather than creating new canonical events
+- regression tests cover stale materialized state, canonical replay fallback, and duplicate-begin prevention in helper paths
+
+---
+
 ### P3-T1: Add regression tests for workflow guidance contract
 **Goal**
 Protect the new machine-readable response contract from regression.

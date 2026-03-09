@@ -1,0 +1,55 @@
+{
+  "id": "p2-t06",
+  "title": "Implement helper bootstrap duplicate-begin prevention after helper guidance normalization",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Implement the helper-side duplicate `tx.begin` prevention work after the prerequisite 0.5.4 helper guidance, structured failure, and lifecycle-semantics tickets are complete. This ticket is the execution follow-up for the planning captured in p2-t05, and it should convert that analysis into production changes that make helper bootstrap logic canonical-aware, resume-safe, and consistent with the machine-readable workflow contract established earlier in 0.5.4.",
+  "inputs": [
+    "docs/draft_0.5.4.md",
+    "docs/v0.5.4/plan.md",
+    "docs/v0.5.4/tickets_list.json",
+    "docs/v0.5.4/p2-t01.json",
+    "docs/v0.5.4/p2-t02.json",
+    "docs/v0.5.4/p2-t03.json",
+    "docs/v0.5.4/p2-t05.json",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/workflow_response.py",
+    "tests/test_commit_manager.py",
+    "tests/test_ops_tools.py",
+    "tests/test_state_store.py",
+    "tests/test_state_rebuilder.py"
+  ],
+  "outputs": [
+    "Production implementation of canonical-aware helper bootstrap guards",
+    "Helper behavior that avoids duplicate non-terminal `tx.begin` emission during resume/bootstrap flows",
+    "Structured machine-readable recovery behavior when helper bootstrap is blocked by canonical integrity or an already-active matching transaction",
+    "Regression coverage for stale materialized state, replay fallback, and helper resume interruption scenarios"
+  ],
+  "acceptance_criteria": [
+    "This ticket is not started until p2-t01, p2-t02, and p2-t03 are done, because it depends on the helper response contract, structured failure contract, and aligned lifecycle field semantics being established first.",
+    "Helper bootstrap code does not emit `tx.begin` solely because materialized state appears empty, inactive, or incomplete when canonical replay shows an existing active non-terminal transaction.",
+    "When canonical replay identifies a matching active non-terminal transaction, helper entry resumes that transaction or returns structured machine-readable recovery guidance instead of emitting a duplicate `tx.begin`.",
+    "When canonical replay identifies integrity drift, ambiguous active state, or otherwise unsafe history, helper bootstrap fails safely and consistently with the 0.5.4 response contract rather than attempting implicit repair by creating new canonical events.",
+    "Implementation behavior remains consistent with p2-t01, p2-t02, and p2-t03 so helper bootstrap responses expose correct canonical status, phase, next action, terminality, and recommended recovery guidance.",
+    "Regression tests fail if helper flows reintroduce duplicate `tx.begin` emission or regress to ad hoc string-only recovery behavior in the guarded bootstrap paths."
+  ],
+  "tasks": [
+    "Confirm p2-t01, p2-t02, and p2-t03 are complete and use their finalized contracts as the implementation baseline for helper bootstrap behavior.",
+    "Refactor helper bootstrap logic, especially in commit and verify helper entry paths, so `tx.begin` eligibility is determined from healthy materialized active state first and replay-derived canonical state second.",
+    "Block helper-driven `tx.begin` emission when canonical replay already shows a matching active non-terminal transaction, and surface resume-safe structured guidance instead.",
+    "Block helper bootstrap when integrity drift, ambiguous replay state, or other unsafe canonical conditions prevent trustworthy progression.",
+    "Align helper bootstrap failure and success responses with the finalized 0.5.4 workflow-guidance and structured-failure contracts rather than introducing one-off response semantics.",
+    "Add or update regression tests for stale materialized state, missing active materialized state with canonical non-terminal history, helper resume after interruption, and integrity-blocked bootstrap scenarios."
+  ],
+  "dependencies": ["p2-t01", "p2-t02", "p2-t03", "p2-t05"],
+  "notes": [
+    "This ticket is intentionally downstream of p2-t01, p2-t02, and p2-t03 so the implementation can rely on already-stabilized helper response fields and failure semantics.",
+    "p2-t05 is the planning and scoping prerequisite for this work; p2-t06 is the implementation ticket that executes that plan.",
+    "The primary production hotspot is expected to be `commit_manager._ensure_tx_begin()`, but the final implementation may require coordinated changes in shared workflow and state helpers to stay contract-consistent.",
+    "The goal is not to weaken canonical ordering. The goal is to prevent helper bootstrap from making unsafe decisions when materialized state visibility lags behind canonical replay truth.",
+    "Successful completion should eliminate duplicate-begin as the first failure in the common helper-resume cascade while preserving strict replay and lifecycle validation."
+  ]
+}
