@@ -9,7 +9,7 @@
   "planning_focus": {
     "theme": "Redesign the work loop as a resumable transactional protocol for ticket completion.",
     "problem_statement": "The core 0.6.0 problem is not only identifier ambiguity. The deeper issue is that the work loop itself must be specified as a durable, resumable transaction protocol so an interrupted MCP server session can still deterministically finish the active ticket.",
-    "transaction_definition": "A transaction is one durable execution attempt for one ticket. It is the canonical unit of resumable work, distinct from planning identity and distinct from repository commit.",
+    "transaction_definition": "A transaction is one durable execution attempt for one ticket. It is the canonical unit of resumable work, distinct from planning identity and distinct from repository commit or terminal completion.",
     "design_priorities": [
       "single active non-terminal transaction per workspace",
       "explicit state-machine-driven continuation",
@@ -45,7 +45,7 @@
     {
       "id": "p2-t01",
       "priority": "P0",
-      "title": "Replace ticket-derived tx_id generation with issued transaction IDs",
+      "title": "Implement issued transaction IDs in place of ticket-derived tx_id generation",
       "status": "planned",
       "file": "v0.6.0/p2-t01.json"
     },
@@ -73,14 +73,14 @@
     {
       "id": "p3-t01",
       "priority": "P1",
-      "title": "Add interruption and resume regression coverage for transaction checkpoints",
+      "title": "Add first-resume regression coverage for interruption at transaction checkpoints",
       "status": "planned",
       "file": "v0.6.0/p3-t01.json"
     },
     {
       "id": "p3-t02",
       "priority": "P1",
-      "title": "Add idempotent continuation coverage for verify, commit, and terminal flows",
+      "title": "Add repeated-resume and idempotent continuation coverage for verify, commit, and terminal flows",
       "status": "planned",
       "file": "v0.6.0/p3-t02.json"
     },
@@ -95,24 +95,24 @@
   "phase_summary": [
     {
       "phase": "Phase 1",
-      "goal": "Define the resumable transaction protocol, state machine, and persistence contract before runtime code changes.",
+      "goal": "Define the resumable transaction protocol, state machine, and persistence contract before runtime implementation changes.",
       "ticket_ids": ["p1-t01", "p1-t02", "p1-t03"]
     },
     {
       "phase": "Phase 2",
-      "goal": "Simplify runtime identity and recovery behavior so the active transaction can be resumed deterministically.",
+      "goal": "Implement runtime identity and recovery simplifications so the active transaction can be resumed deterministically.",
       "ticket_ids": ["p2-t01", "p2-t02", "p2-t03", "p2-t04"]
     },
     {
       "phase": "Phase 3",
-      "goal": "Harden the redesigned protocol with interruption-focused regression coverage and updated guidance.",
+      "goal": "Harden the redesigned protocol with first-resume checkpoint coverage, repeated-resume idempotence coverage, and updated guidance.",
       "ticket_ids": ["p3-t01", "p3-t02", "p3-t03"]
     }
   ],
   "status_context": {
     "active_ticket": "p1-t01",
     "canonical_sync_state": "ready",
-    "reason": "The 0.6.0 effort has been reframed around redesigning the work loop itself as a resumable transaction protocol. The next step is to lock the canonical transaction model before implementation tickets change runtime behavior.",
-    "recommended_action": "Start with p1-t01 to define the canonical meaning of a transaction, its relationship to tickets, the single-active-transaction invariant, explicit terminal completion, and the non-terminal role of repository commit."
+    "reason": "The 0.6.0 effort has been reframed around redesigning the work loop itself as a resumable transaction protocol. The next step is to lock the canonical transaction model, state machine, and persistence contract before implementation tickets change runtime behavior.",
+    "recommended_action": "Start with p1-t01, then p1-t02 and p1-t03, to lock the transaction model, the state-machine and `next_action` contract, and the minimal persistence or issuance model before runtime implementation begins."
   }
 }

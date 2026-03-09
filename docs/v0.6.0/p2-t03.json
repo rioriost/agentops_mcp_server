@@ -1,0 +1,125 @@
+{
+  "id": "p2-t03",
+  "title": "Simplify resume logic to continue the exact active transaction",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Implement the 0.6.0 runtime simplification that makes resume behavior continue the exact active non-terminal transaction instead of relying on heuristic candidate selection, string-shape matching, or replacement transaction reconstruction. This ticket updates resume-entry logic, active-transaction lookup, and continuation checks so canonical transaction state becomes the primary resume anchor, event history becomes the rebuild fallback, and `next_action` becomes the main machine-readable continuation guide for interrupted work.",
+  "inputs": [
+    "docs/draft_0.6.0.md",
+    "docs/v0.6.0/plan.md",
+    "docs/v0.6.0/tickets_list.json",
+    "docs/v0.6.0/p1-t01.json",
+    "docs/v0.6.0/p1-t02.json",
+    "docs/v0.6.0/p1-t03.json",
+    "docs/v0.6.0/p2-t01.json",
+    "docs/v0.6.0/p2-t02.json",
+    ".rules",
+    ".agent/tx_state.json",
+    ".agent/tx_event_log.jsonl",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "tests/test_ops_tools.py",
+    "tests/test_repo_tools.py"
+  ],
+  "outputs": [
+    "Runtime resume logic that treats the exact active non-terminal transaction as the only canonical resumable work item",
+    "Updated active-transaction lookup rules that prefer healthy materialized transaction state and exact rebuild behavior over heuristic selection",
+    "Updated continuation behavior that uses `next_action` as the primary machine-readable guide for interrupted work",
+    "Updated runtime checks that distinguish clearly between no active transaction, active non-terminal transaction, and terminal historical transactions",
+    "Updated bounded compatibility handling for historical legacy histories without reintroducing heuristic resume behavior into new runtime logic",
+    "Regression coverage for exact active-transaction resume behavior and interruption-safe continuation"
+  ],
+  "acceptance_criteria": [
+    "Resume logic continues the exact active non-terminal transaction when one exists.",
+    "Resume logic does not heuristically pick a replacement transaction candidate when canonical active transaction state is available.",
+    "Healthy materialized transaction state is treated as the primary resume entrypoint.",
+    "Event-history rebuild is used as a fallback only when materialized transaction state is missing, incomplete, or inconsistent.",
+    "Resume logic no longer depends on transaction-name prefixes, substring matching, ticket-name-derived inference, or similar identity heuristics in normal flow.",
+    "Resume logic uses canonical status, terminal state, exact active transaction identity, and `next_action` to decide continuation behavior.",
+    "If the active transaction is terminal, resume does not re-activate it as current work.",
+    "If no active non-terminal transaction exists, runtime behavior distinguishes that state clearly from interrupted active work.",
+    "If canonical persistence is malformed or ambiguous, resume fails clearly instead of silently guessing a continuation target.",
+    "Historical legacy histories remain replayable under bounded compatibility handling without weakening the strict exact-active-transaction behavior of new runtime logic.",
+    "Regression tests cover at least: healthy-state resume, rebuild-based resume, interrupted verify continuation, interrupted commit continuation, post-commit pre-end continuation, and terminal re-entry behavior.",
+    "The implementation preserves canonical lifecycle ordering, resumability, replay integrity, and explicit terminal-state handling."
+  ],
+  "tasks": [
+    "Identify all runtime resume-entry code paths that currently infer, select, or recover resumable work through heuristic transaction matching or fallback selection.",
+    "Update resume-entry behavior so it first loads canonical materialized transaction state and validates whether an exact active non-terminal transaction exists.",
+    "Update fallback behavior so event-history rebuild is used only when materialized transaction state is missing, incomplete, or inconsistent.",
+    "Ensure rebuild logic reconstructs the exact active transaction from canonical history instead of guessing a replacement candidate.",
+    "Update continuation logic so `next_action` is the primary machine-readable guide for how interrupted work should proceed after resume.",
+    "Ensure resume behavior distinguishes clearly between active non-terminal work, terminal historical work, and no active work.",
+    "Ensure interrupted verify, commit, and post-commit pre-terminal states resume the same active transaction without duplicating logical completion.",
+    "Remove or refactor runtime logic that uses ticket-derived inference, transaction string-shape checks, timestamp-first selection, or other heuristic matching to decide which transaction to resume.",
+    "Update validation and error behavior so malformed or ambiguous canonical persistence fails clearly rather than silently guessing a continuation target.",
+    "Add or update regression tests covering exact active-transaction resume, rebuild fallback, and idempotent continuation across key interruption checkpoints.",
+    "Document any bounded compatibility rules required so legacy histories remain replayable without reintroducing heuristic resume selection into new runtime behavior."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03",
+    "p2-t01",
+    "p2-t02"
+  ],
+  "notes": [
+    "This ticket is runtime implementation work, not only contract-definition work.",
+    "The most important outcome is that resume behavior becomes exact and deterministic: continue the active transaction if it exists, otherwise do not invent one.",
+    "This ticket should make interruption recovery simpler by centering runtime behavior on exact active transaction state plus `next_action`.",
+    "The implementation should prefer explicit failure over hidden heuristic recovery when canonical persistence is malformed or ambiguous.",
+    "Historical compatibility matters, but it must not dilute the strict exact-active-transaction behavior expected from new runtime logic."
+  ],
+  "schema_notes": {
+    "resume_model": {
+      "primary_resume_anchor": "Healthy canonical materialized transaction state.",
+      "fallback_resume_anchor": "Canonical event-history rebuild when materialized state is missing, incomplete, or inconsistent.",
+      "forbidden_normal_resume_behavior": [
+        "heuristic replacement transaction selection",
+        "ticket-name-derived resume inference",
+        "transaction prefix or substring matching",
+        "timestamp-first active transaction selection"
+      ]
+    },
+    "continuation_rules": {
+      "active_non_terminal": "Resume must continue the exact active transaction and follow canonical `next_action`.",
+      "terminal_transaction": "Resume must not re-activate a terminal transaction as active work.",
+      "no_active_transaction": "Runtime behavior must represent and handle the absence of active non-terminal work explicitly."
+    },
+    "error_behavior": {
+      "ambiguous_state": "Fail clearly when canonical persistence is ambiguous and no safe deterministic continuation target exists.",
+      "malformed_state": "Fail clearly when canonical persistence is malformed and must not be silently treated as resumable baseline state.",
+      "design_goal": "Prefer explicit correctness failure over silent heuristic continuation."
+    },
+    "compatibility_rules": {
+      "historical_replay": "Legacy historical data remains replayable as bounded compatibility behavior.",
+      "new_runtime_behavior": "New resume logic must remain exact-active-transaction-first and must not reintroduce heuristic candidate selection.",
+      "no_forced_rewrite": "Forward migration does not require rewriting historical event logs in place."
+    },
+    "test_focus": [
+      "resume from healthy materialized active state",
+      "resume from rebuild fallback when state is missing or incomplete",
+      "interrupted verify continuation",
+      "interrupted commit continuation",
+      "post-commit pre-terminal continuation",
+      "terminal re-entry does not resume active work",
+      "malformed or ambiguous persistence fails clearly"
+    ],
+    "design_bias": {
+      "preferred_anchor": "Exact active transaction identity plus canonical status plus `next_action`.",
+      "avoid": [
+        "heuristic candidate selection",
+        "guessing replacement active transactions",
+        "re-activating terminal transactions",
+        "using planning artifacts as canonical resume truth"
+      ]
+    }
+  },
+  "canonical_alignment": {
+    "intended_canonical_task_id": "p2-t03",
+    "synchronization_intent": "Use this ticket to make runtime resume behavior match the 0.6.0 exact-active-transaction protocol.",
+    "current_canonical_constraint": "Implementation must preserve the single-active-transaction model and treat exact active transaction continuation as the only canonical resumable work path."
+  }
+}

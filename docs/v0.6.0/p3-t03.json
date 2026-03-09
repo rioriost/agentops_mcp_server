@@ -1,0 +1,150 @@
+{
+  "id": "p3-t03",
+  "title": "Update documentation and operator guidance for the redesigned protocol",
+  "priority": "P2",
+  "status": "planned",
+  "summary": "Update the 0.6.0 documentation and operator-facing guidance so the redesigned work loop can be understood and used as a resumable transactional protocol for ticket completion. This ticket documents the canonical meaning of a transaction, the single-active-transaction invariant, the state machine and continuation model, the persistence and rebuild responsibilities, the bounded role of session context, the compatibility policy for historical data, and the operational distinction between repository commit and explicit terminal transaction completion.",
+  "inputs": [
+    "docs/draft_0.6.0.md",
+    "docs/v0.6.0/plan.md",
+    "docs/v0.6.0/tickets_list.json",
+    "docs/v0.6.0/p1-t01.json",
+    "docs/v0.6.0/p1-t02.json",
+    "docs/v0.6.0/p1-t03.json",
+    "docs/v0.6.0/p2-t01.json",
+    "docs/v0.6.0/p2-t02.json",
+    "docs/v0.6.0/p2-t03.json",
+    "docs/v0.6.0/p2-t04.json",
+    "docs/v0.6.0/p3-t01.json",
+    "docs/v0.6.0/p3-t02.json",
+    ".rules",
+    ".agent/tx_state.json",
+    ".agent/tx_event_log.jsonl",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "tests/test_ops_tools.py",
+    "tests/test_repo_tools.py"
+  ],
+  "outputs": [
+    "Updated implementation-facing documentation for the 0.6.0 resumable transaction protocol",
+    "Updated operator guidance that explains how to understand and resume interrupted work safely",
+    "Documented guidance for the canonical status model, checkpoint semantics, and `next_action` continuation behavior",
+    "Documented guidance for the persistence model, rebuild behavior, and transaction ID issuance responsibilities",
+    "Documented guidance for compatibility handling of historical transaction data and bounded session context",
+    "A consistent explanation of why repository commit remains non-terminal until explicit terminal end handling occurs"
+  ],
+  "acceptance_criteria": [
+    "Documentation clearly explains that a transaction in this project is one durable execution attempt for one ticket rather than a database-style row mutation batch.",
+    "Documentation clearly explains that the canonical unit of resumable work is the transaction and that at most one non-terminal active transaction may exist in a workspace at a time.",
+    "Documentation clearly explains the canonical status model: `in-progress`, `checking`, `verified`, `committed`, `done`, and `blocked`.",
+    "Documentation clearly explains that `next_action` is the primary machine-readable continuation guide for interrupted active work.",
+    "Documentation clearly explains the distinction between repository commit and terminal transaction success, including why `committed` remains non-terminal until explicit end handling.",
+    "Documentation clearly explains the canonical persistence model centered on `.agent/tx_state.json`, `.agent/tx_event_log.jsonl`, and `.agent/tx_id_counter.json`.",
+    "Documentation clearly explains the resume entrypoint and rebuild fallback model, including healthy materialized state first and event-history rebuild second.",
+    "Documentation clearly explains that `tx_id` is an issued runtime transaction identity, that `ticket_id` remains planning identity, and that normal flow no longer uses sentinel transaction identifiers such as `none`.",
+    "Documentation clearly explains the bounded role of `session_id` as observability or correlation context rather than the primary correctness anchor for resumable continuation.",
+    "Documentation clearly explains the compatibility policy for historical legacy transaction IDs, older session-oriented assumptions, and any bounded handling of legacy sentinel-bearing historical data.",
+    "Documentation is specific enough that developers and operators can understand how interruption-safe continuation is supposed to work without having to infer the model from source code alone.",
+    "Documentation remains aligned with the 0.6.0 plan and does not weaken canonical lifecycle ordering, replay integrity, resumability, or explicit terminal-state handling."
+  ],
+  "tasks": [
+    "Identify the documentation surfaces that must be updated so the 0.6.0 redesigned work loop is understandable to future developers and operators.",
+    "Document the canonical meaning of a transaction as one durable execution attempt for one ticket.",
+    "Document the single-active-transaction invariant and the rule that non-terminal active work must be resumed before new ticket work begins.",
+    "Document the canonical status model and the meaning of each status, including which states are terminal and which remain resumable.",
+    "Document the role of `next_action` as the primary continuation guide for interrupted active work.",
+    "Document the canonical checkpoint model and how interruption at verify, commit, and explicit end boundaries should be understood.",
+    "Document the persistence model centered on `.agent/tx_state.json`, `.agent/tx_event_log.jsonl`, and `.agent/tx_id_counter.json`.",
+    "Document the canonical resume entrypoint, rebuild fallback behavior, and malformed-versus-missing artifact handling at a level appropriate for developers and operators.",
+    "Document the identity model, including the separation of `ticket_id`, `tx_id`, `seq`, and bounded `session_id`.",
+    "Document the removal of sentinel active-transaction semantics from normal flow and explain the structural representation of no active work.",
+    "Document the bounded role of session context so future changes do not re-promote session-first correctness logic.",
+    "Document the compatibility policy for historical legacy transaction IDs, older session-oriented assumptions, and bounded historical sentinel handling.",
+    "Document the operational distinction between repository commit and explicit terminal transaction completion so commit-equals-success assumptions do not reappear.",
+    "Ensure the resulting guidance remains aligned with the 0.6.0 plan, ticket contracts, and regression-hardening expectations."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03",
+    "p2-t01",
+    "p2-t02",
+    "p2-t03",
+    "p2-t04",
+    "p3-t01",
+    "p3-t02"
+  ],
+  "notes": [
+    "This ticket is documentation and guidance work and should land after the core 0.6.0 contracts and runtime behavior are established.",
+    "The most important outcome is that the redesigned protocol becomes understandable without relying on source-code archaeology or implicit tribal knowledge.",
+    "The guidance should serve both implementers and operators: one audience needs semantic clarity for future changes, the other needs practical clarity for interruption and resume behavior.",
+    "The documentation should reinforce the transaction-centered model and make it hard for future readers to confuse planning identity, runtime identity, commit completion, and terminal success.",
+    "The guidance should remain explicit about bounded compatibility behavior so historical support does not get mistaken for the primary 0.6.0 model."
+  ],
+  "schema_notes": {
+    "documentation_focus": {
+      "primary_goal": "Make the 0.6.0 resumable transaction protocol understandable, reviewable, and operable without requiring readers to reconstruct the model from code.",
+      "audiences": [
+        "developers implementing or modifying runtime behavior",
+        "operators or maintainers trying to understand interruption and resume behavior"
+      ],
+      "non_goal": "Produce vague release-note prose that omits the canonical runtime model and continuation semantics."
+    },
+    "required_topics": {
+      "transaction_semantics": "A transaction is one durable execution attempt for one ticket and is the canonical unit of resumable work.",
+      "state_machine": "Document the canonical statuses, terminal versus non-terminal behavior, and the role of `next_action` in continuation.",
+      "persistence_model": "Document the roles of `.agent/tx_state.json`, `.agent/tx_event_log.jsonl`, and `.agent/tx_id_counter.json`.",
+      "identity_model": "Document the separation of `ticket_id`, `tx_id`, `seq`, and bounded `session_id`.",
+      "resume_model": "Document the healthy-state-first and rebuild-second continuation model.",
+      "compatibility_model": "Document bounded compatibility handling for historical legacy transaction data.",
+      "operational_model": "Document why repository commit remains non-terminal until explicit terminal end handling occurs."
+    },
+    "messaging_constraints": {
+      "must_reinforce": [
+        "single active non-terminal transaction per workspace",
+        "`next_action` as continuation guidance",
+        "commit does not equal success",
+        "exact active transaction continuation",
+        "sentinel-free normal flow",
+        "bounded session context"
+      ],
+      "must_avoid": [
+        "describing ticket identity as runtime transaction identity",
+        "describing commit as implicit done",
+        "describing session context as the primary correctness anchor",
+        "treating compatibility rules as the normal new-write model",
+        "reintroducing heuristic recovery concepts as recommended practice"
+      ]
+    },
+    "operator_guidance_expectations": {
+      "should_explain": [
+        "how to think about interrupted work",
+        "how canonical transaction state and event history cooperate",
+        "why a committed transaction may still need explicit ending",
+        "why terminal transactions should not resume as active work",
+        "when compatibility behavior applies and when it does not"
+      ],
+      "should_not_require": [
+        "reading internal source code to understand core protocol semantics",
+        "guessing whether commit means completion",
+        "guessing whether session context overrides exact active transaction identity"
+      ]
+    },
+    "design_bias": {
+      "preferred_anchor": "Clear, explicit, transaction-centered guidance that maps directly to the 0.6.0 plan and ticket contracts.",
+      "avoid": [
+        "documentation that blurs planning and runtime identities",
+        "documentation that hides the non-terminal meaning of `committed`",
+        "documentation that treats compatibility behavior as the default model",
+        "documentation that leaves interruption and resume semantics implicit"
+      ]
+    }
+  },
+  "canonical_alignment": {
+    "intended_canonical_task_id": "p3-t03",
+    "synchronization_intent": "Use this ticket to align implementation-facing and operator-facing guidance with the 0.6.0 transaction-centered resumable protocol after the contract and regression work is in place.",
+    "current_canonical_constraint": "Documentation must reflect the exact-active-transaction model, non-terminal commit semantics, bounded session role, and bounded historical compatibility behavior established by the earlier 0.6.0 tickets."
+  }
+}
