@@ -97,8 +97,8 @@ def test_init_script_contains_canonical_artifacts_and_rules():
     assert '"session_id": ""' in content
     assert '"drift_detected": false' in content
     assert '"active_tx_source": "none"' in content
-    assert "SOURCE_RULES_FALLBACK" in content
-    assert "workflow_rules_fallback.txt" in content
+    assert "SOURCE_RULES_TEMPLATE" in content
+    assert "rules_template.txt" in content
 
 
 def test_init_script_uses_script_relative_rules_lookup():
@@ -109,15 +109,10 @@ def test_init_script_uses_script_relative_rules_lookup():
 
     assert 'SCRIPT_PATH="${BASH_SOURCE[0]}"' in content
     assert 'SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"' in content
-    assert 'SOURCE_RULES_PY="$SCRIPT_DIR/workflow_rules.py"' in content
-    assert 'SOURCE_RULES_FALLBACK="$SCRIPT_DIR/workflow_rules_fallback.txt"' in content
+    assert 'SOURCE_RULES_TEMPLATE="$SCRIPT_DIR/rules_template.txt"' in content
     assert 'SOURCE_RULES="${PWD}/.rules"' not in content
     assert (
-        'SOURCE_RULES_PY="${PWD}/src/agentops_mcp_server/workflow_rules.py"'
-        not in content
-    )
-    assert (
-        'SOURCE_RULES_FALLBACK="${PWD}/src/agentops_mcp_server/workflow_rules_fallback.txt"'
+        'SOURCE_RULES_TEMPLATE="${PWD}/src/agentops_mcp_server/rules_template.txt"'
         not in content
     )
 
@@ -152,37 +147,37 @@ def test_init_script_documents_convention_boundary_and_helper_contract():
     )
     content = script_path.read_text(encoding="utf-8")
 
-    assert 'SOURCE_RULES_FALLBACK="$SCRIPT_DIR/workflow_rules_fallback.txt"' in content
-    assert 'elif [ -f "$SOURCE_RULES_FALLBACK" ]; then' in content
-    assert 'cp "$SOURCE_RULES_FALLBACK" "$SOURCE_RULES"' in content
-    assert "python - <<" in content
-    assert 'exec(Path(r"$SOURCE_RULES_PY").read_text(), namespace)' in content
+    assert 'SOURCE_RULES_TEMPLATE="$SCRIPT_DIR/rules_template.txt"' in content
+    assert 'if [ -f "$SOURCE_RULES_TEMPLATE" ]; then' in content
+    assert 'cp "$SOURCE_RULES_TEMPLATE" "$SOURCE_RULES"' in content
+    assert "python - <<" not in content
+    assert 'exec(Path(r"$SOURCE_RULES_PY").read_text(), namespace)' not in content
     assert "cat <<'RULES' > \"$SOURCE_RULES\"" not in content
 
 
 def test_init_script_rules_describe_non_terminal_committed_followup():
     rules_path = init_mod.resources.files("agentops_mcp_server").joinpath(
-        "workflow_rules_fallback.txt"
+        "rules_template.txt"
     )
     content = rules_path.read_text(encoding="utf-8")
 
     assert (
-        "Successful commit helpers may advance the active transaction only to `committed`."
+        "Successful commit helpers may advance canonical transaction state only to `committed`; they do not by themselves imply terminal success."
         in content
     )
     assert (
-        "If canonical `next_action` is `tx.end.done`, the agent must treat that as required follow-up work rather than completed work."
+        'If post-commit canonical `next_action` is `tx.end.done`, explicitly complete the lifecycle with terminal success handling, typically `ops_end_task(status="done")`.'
         in content
     )
     assert (
-        'Terminal success still requires explicit lifecycle closure, typically with `ops_end_task(status="done")`.'
+        'Terminal success requires explicit lifecycle completion, typically `ops_end_task(status="done")`.'
         in content
     )
     assert (
-        "agents must use returned canonical workflow fields and/or current tx state to determine whether `ops_end_task` is still required"
+        "Agents must use canonical transaction status/phase and `next_action` to determine whether follow-up lifecycle completion is still required after verify or commit helpers succeed."
         in content
     )
     assert (
-        "If commit succeeds and canonical `next_action` is `tx.end.done`, agents must explicitly complete the lifecycle before treating the ticket as done."
+        "Helper success does not by itself imply terminal completion; non-terminal `committed` must remain distinguishable from terminal `done` and `blocked`."
         in content
     )

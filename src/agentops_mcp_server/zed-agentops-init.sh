@@ -144,12 +144,12 @@ fi
 
 # --- .rules ---
 SOURCE_RULES="$root/.agentops-workflow-rules.tmp"
-SOURCE_RULES_FALLBACK="$SCRIPT_DIR/workflow_rules_fallback.txt"
+SOURCE_RULES_TEMPLATE="$SCRIPT_DIR/rules_template.txt"
 if [ -f "$SOURCE_RULES" ]; then
   cp "$SOURCE_RULES" "$SOURCE_RULES.bak"
 fi
-if [ -f "$SOURCE_RULES_FALLBACK" ]; then
-  cp "$SOURCE_RULES_FALLBACK" "$SOURCE_RULES"
+if [ -f "$SOURCE_RULES_TEMPLATE" ]; then
+  cp "$SOURCE_RULES_TEMPLATE" "$SOURCE_RULES"
 else
   echo "Error: no workflow rules source available."
   exit 1
