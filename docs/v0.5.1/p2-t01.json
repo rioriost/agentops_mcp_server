@@ -1,0 +1,44 @@
+{
+  "id": "p2-t01",
+  "title": "Document the script-relative rules lookup model for 0.5.1",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Document the 0.5.1 bootstrap fix so the release artifacts clearly explain that `zed-agentops-init.sh` now resolves workflow rule assets relative to the script location rather than the caller's current working directory. This ticket ensures the release plan, ticket set, and future maintainers all describe the same script-relative resource model and its intended guarantees.",
+  "inputs": [
+    "docs/draft_0.5.1.md",
+    "docs/v0.5.1/plan.md",
+    "docs/v0.5.1/tickets_list.json",
+    "docs/v0.5.1/p1-t01.json",
+    "docs/v0.5.1/p1-t02.json",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "tests/test_init.py"
+  ],
+  "outputs": [
+    "A completed `docs/v0.5.1/p2-t01.json` ticket describing the documentation scope for the bootstrap path fix",
+    "Clear release-facing wording that explains script-relative rule lookup and why it fixes installed invocation",
+    "Consistent planning artifacts for the 0.5.1 release"
+  ],
+  "acceptance_criteria": [
+    "The 0.5.1 planning artifacts explicitly describe that workflow rule asset lookup is anchored to `BASH_SOURCE[0]` rather than the caller's current working directory.",
+    "The documentation ticket explains the user-visible effect of the fix: `.rules` is created reliably when `zed-agentops-init` is run from arbitrary directories.",
+    "The ticket aligns with the existing 0.5.1 draft and implementation plan without introducing a conflicting resource-resolution model.",
+    "The documented scope preserves the current `.rules` overwrite and update semantics, clarifying that the change is about path resolution rather than policy changes.",
+    "The 0.5.1 ticket set is complete and internally consistent after this file is added."
+  ],
+  "tasks": [
+    "Describe the script-relative lookup model introduced for `zed-agentops-init.sh` in release planning artifacts.",
+    "Explain that the fix replaces `${PWD}`-dependent workflow rules discovery with script-relative resource resolution.",
+    "Clarify that the main user-facing outcome is reliable `.rules` generation for installed-style invocation from unrelated working directories.",
+    "Keep the ticket aligned with the implementation and regression-test work already planned in `p1-t01` and `p1-t02`.",
+    "Avoid expanding scope into broader bootstrap redesign, transaction changes, or workflow rules content changes."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02"
+  ],
+  "notes": [
+    "This ticket is documentation/planning focused and should not redefine the implementation strategy chosen for 0.5.1.",
+    "The emphasis is on making the release artifacts self-explanatory for future maintenance and release review.",
+    "The change being documented is specifically the move to script-relative workflow rules lookup, not a change to canonical rules content."
+  ]
+}

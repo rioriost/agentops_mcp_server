@@ -1,0 +1,42 @@
+{
+  "id": "p1-t02",
+  "title": "Add regression coverage for script-relative `.rules` bootstrap behavior",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Add focused regression coverage for the 0.5.1 bootstrap fix so `.rules` generation remains reliable when `zed-agentops-init` is invoked from arbitrary working directories. This ticket should verify that rule asset lookup no longer depends on the caller’s current directory and that both packaged-style and source-tree execution paths continue to create `.rules` correctly.",
+  "inputs": [
+    "docs/draft_0.5.1.md",
+    "docs/v0.5.1/plan.md",
+    "docs/v0.5.1/tickets_list.json",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "src/agentops_mcp_server/init.py",
+    "tests/test_init.py"
+  ],
+  "outputs": [
+    "Regression tests covering script-relative rules lookup in `zed-agentops-init.sh`",
+    "Coverage for invocation from a working directory unrelated to the repository layout",
+    "Protection against reintroducing `${PWD}`-dependent `.rules` bootstrap behavior"
+  ],
+  "acceptance_criteria": [
+    "Test coverage proves that `.rules` creation succeeds when the init entrypoint is executed from a current working directory that does not contain `src/agentops_mcp_server`.",
+    "Tests verify that the bootstrap path resolves packaged rule assets relative to the script location rather than the caller’s working directory.",
+    "Source-tree execution remains covered so the fix does not regress repository-local use of `src/agentops_mcp_server/zed-agentops-init.sh`.",
+    "Regression checks fail if the bootstrap implementation reintroduces `${PWD}`-based rule source discovery for packaged assets.",
+    "Existing initialization expectations for `.agent`, `.gitignore`, and `.zed` scaffolding remain intact under the tested invocation paths."
+  ],
+  "tasks": [
+    "Add tests that model execution from an arbitrary current working directory and assert that target workspaces still receive `.rules`.",
+    "Add assertions that cover script-relative rule asset resolution behavior in the bootstrap implementation.",
+    "Preserve or extend existing source-tree tests so local repository execution remains supported alongside installed-style execution.",
+    "Ensure the regression suite protects against future changes that accidentally depend on the caller’s working directory layout.",
+    "Keep the added coverage focused on `.rules` bootstrap reliability without weakening existing initialization checks."
+  ],
+  "dependencies": [
+    "p1-t01"
+  ],
+  "notes": [
+    "This ticket depends on the path-resolution implementation being completed first so tests can target the intended steady-state behavior.",
+    "The goal is regression protection, not a redesign of the bootstrap API.",
+    "Coverage should be strong enough to catch packaging-path mistakes and working-directory assumptions introduced by future refactors."
+  ]
+}

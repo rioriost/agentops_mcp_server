@@ -1,0 +1,27 @@
+{
+  "version": "0.5.1",
+  "source": "draft_0.5.1.md",
+  "tickets": [
+    {
+      "id": "p1-t01",
+      "priority": "P0",
+      "title": "Make zed-agentops-init resolve workflow rules from the script location",
+      "status": "planned",
+      "file": "v0.5.1/p1-t01.json"
+    },
+    {
+      "id": "p1-t02",
+      "priority": "P1",
+      "title": "Add regression coverage for installed init invocation outside the repository root",
+      "status": "planned",
+      "file": "v0.5.1/p1-t02.json"
+    },
+    {
+      "id": "p2-t01",
+      "priority": "P1",
+      "title": "Document the script-relative rules lookup model for 0.5.1",
+      "status": "planned",
+      "file": "v0.5.1/p2-t01.json"
+    }
+  ]
+}

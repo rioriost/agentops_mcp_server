@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -h "$SCRIPT_PATH" ]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+  SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+  case "$SCRIPT_PATH" in
+    /*) ;;
+    *) SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH" ;;
+  esac
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+
 update_mode=0
 root=""
 
@@ -132,18 +143,18 @@ else
 fi
 
 # --- .rules ---
-SOURCE_RULES="${PWD}/.rules"
-SOURCE_RULES_PY="${PWD}/src/agentops_mcp_server/workflow_rules.py"
-SOURCE_RULES_FALLBACK="${PWD}/src/agentops_mcp_server/workflow_rules_fallback.txt"
+SOURCE_RULES="$root/.agentops-workflow-rules.tmp"
+SOURCE_RULES_PY="$SCRIPT_DIR/workflow_rules.py"
+SOURCE_RULES_FALLBACK="$SCRIPT_DIR/workflow_rules_fallback.txt"
 if [ -f "$SOURCE_RULES" ]; then
   cp "$SOURCE_RULES" "$SOURCE_RULES.bak"
 fi
 if [ -f "$SOURCE_RULES_PY" ]; then
-  python - <<'PY' > "$SOURCE_RULES"
+  python - <<PY > "$SOURCE_RULES"
 from pathlib import Path
 
 namespace = {}
-exec(Path("src/agentops_mcp_server/workflow_rules.py").read_text(), namespace)
+exec(Path(r"$SOURCE_RULES_PY").read_text(), namespace)
 print(namespace["canonical_workflow_rules"](), end="")
 PY
 elif [ -f "$SOURCE_RULES_FALLBACK" ]; then
@@ -163,6 +174,7 @@ else
   fi
   cp "$SOURCE_RULES" "$root/.rules"
 fi
+rm -f "$SOURCE_RULES" "$SOURCE_RULES.bak"
 
 
 

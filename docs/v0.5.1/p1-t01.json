@@ -1,0 +1,42 @@
+{
+  "id": "p1-t01",
+  "title": "Make `zed-agentops-init.sh` resolve workflow rules relative to the script location",
+  "priority": "P0",
+  "status": "planned",
+  "summary": "Fix the bootstrap bug where `.rules` generation depends on the caller's current working directory instead of the packaged script location. This ticket updates `zed-agentops-init.sh` to resolve workflow rule assets from `BASH_SOURCE[0]` so installed usage and source-tree usage both write `.rules` reliably.",
+  "inputs": [
+    "docs/draft_0.5.1.md",
+    "docs/v0.5.1/plan.md",
+    "docs/v0.5.1/tickets_list.json",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "src/agentops_mcp_server/workflow_rules_fallback.txt",
+    "src/agentops_mcp_server/init.py",
+    "tests/test_init.py"
+  ],
+  "outputs": [
+    "Script-relative workflow rules lookup in `zed-agentops-init.sh`",
+    "Reliable `.rules` creation when `zed-agentops-init` is run from arbitrary working directories",
+    "Regression tests covering installed-style invocation and script-relative asset discovery"
+  ],
+  "acceptance_criteria": [
+    "The init script no longer uses `${PWD}` as the primary lookup base for workflow rule assets.",
+    "The init script computes a script-relative base path from `BASH_SOURCE[0]` and uses it to resolve packaged rule resources.",
+    "Running installed `zed-agentops-init <project>` from a working directory unrelated to the repository still writes `<project>/.rules`.",
+    "Running `src/agentops_mcp_server/zed-agentops-init.sh <project>` from the source tree still writes `<project>/.rules` successfully.",
+    "Existing `.rules` overwrite and backup semantics remain unchanged except for the path resolution fix.",
+    "Tests cover the regression scenario where installed execution previously failed because rule assets were searched relative to the caller's current directory."
+  ],
+  "tasks": [
+    "Add script self-location logic near the top of `zed-agentops-init.sh` using `BASH_SOURCE[0]`.",
+    "Replace `${PWD}`-based workflow rules source paths with script-relative packaged resource paths.",
+    "Preserve compatibility for source-tree execution while prioritizing packaged adjacent assets.",
+    "Keep the current target `.rules` skip and backup behavior unchanged.",
+    "Add or update tests to assert script-relative lookup behavior and `.rules` creation under installed-style invocation."
+  ],
+  "dependencies": [],
+  "notes": [
+    "This ticket implements the chosen 0.5.1 approach of fixing bootstrap path resolution inside the shell script rather than introducing a new environment-variable contract.",
+    "The main risk is incorrect path normalization on packaged installs, so tests should exercise invocation from outside the repository root.",
+    "The fallback rules text is already packaged and should remain a valid source for `.rules` generation even when repository-only paths do not exist."
+  ]
+}

@@ -1,3 +1,6 @@
+import os
+import subprocess
+
 import pytest
 
 from agentops_mcp_server import init as init_mod
@@ -98,21 +101,60 @@ def test_init_script_contains_canonical_artifacts_and_rules():
     assert "workflow_rules_fallback.txt" in content
 
 
+def test_init_script_uses_script_relative_rules_lookup():
+    script_path = init_mod.resources.files("agentops_mcp_server").joinpath(
+        "zed-agentops-init.sh"
+    )
+    content = script_path.read_text(encoding="utf-8")
+
+    assert 'SCRIPT_PATH="${BASH_SOURCE[0]}"' in content
+    assert 'SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"' in content
+    assert 'SOURCE_RULES_PY="$SCRIPT_DIR/workflow_rules.py"' in content
+    assert 'SOURCE_RULES_FALLBACK="$SCRIPT_DIR/workflow_rules_fallback.txt"' in content
+    assert 'SOURCE_RULES="${PWD}/.rules"' not in content
+    assert (
+        'SOURCE_RULES_PY="${PWD}/src/agentops_mcp_server/workflow_rules.py"'
+        not in content
+    )
+    assert (
+        'SOURCE_RULES_FALLBACK="${PWD}/src/agentops_mcp_server/workflow_rules_fallback.txt"'
+        not in content
+    )
+
+
+def test_init_script_writes_rules_from_unrelated_cwd(tmp_path):
+    script_path = init_mod.resources.files("agentops_mcp_server").joinpath(
+        "zed-agentops-init.sh"
+    )
+    project_dir = tmp_path / "project"
+    unrelated_cwd = tmp_path / "elsewhere"
+    unrelated_cwd.mkdir()
+
+    result = subprocess.run(
+        ["bash", os.fspath(script_path), os.fspath(project_dir)],
+        input="y\n",
+        text=True,
+        capture_output=True,
+        cwd=unrelated_cwd,
+        check=True,
+    )
+
+    assert (project_dir / ".rules").is_file()
+    rules_text = (project_dir / ".rules").read_text(encoding="utf-8")
+    assert "# AgentOps (strict rules)" in rules_text
+    assert "workspace_initialize(cwd)" in rules_text
+    assert "Initialized AgentOps scaffold in:" in result.stdout
+
+
 def test_init_script_documents_convention_boundary_and_helper_contract():
     script_path = init_mod.resources.files("agentops_mcp_server").joinpath(
         "zed-agentops-init.sh"
     )
     content = script_path.read_text(encoding="utf-8")
 
-    assert (
-        'SOURCE_RULES_FALLBACK="${PWD}/src/agentops_mcp_server/workflow_rules_fallback.txt"'
-        in content
-    )
+    assert 'SOURCE_RULES_FALLBACK="$SCRIPT_DIR/workflow_rules_fallback.txt"' in content
     assert 'elif [ -f "$SOURCE_RULES_FALLBACK" ]; then' in content
     assert 'cp "$SOURCE_RULES_FALLBACK" "$SOURCE_RULES"' in content
     assert "python - <<" in content
-    assert (
-        'exec(Path("src/agentops_mcp_server/workflow_rules.py").read_text(), namespace)'
-        in content
-    )
+    assert 'exec(Path(r"$SOURCE_RULES_PY").read_text(), namespace)' in content
     assert "cat <<'RULES' > \"$SOURCE_RULES\"" not in content
