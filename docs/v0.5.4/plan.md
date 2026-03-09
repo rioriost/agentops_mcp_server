@@ -63,6 +63,7 @@ That means resume-safe behavior must recover prior transaction session context f
 - Standardizing follow-up signaling after verify/commit helpers.
 - Defining resume-safe recovery behavior for `session_id` and related transaction context when a new client session resumes prior work.
 - Making helper-side `tx.begin` bootstrap canonical-aware so materialized-state gaps do not trigger duplicate non-terminal `tx.begin` emission during resume or helper entry.
+- Defining and documenting globally unique ticket/transaction identifier guidance so version-local ticket names do not collide in the shared canonical event log.
 - Adding regression tests for success and failure guidance contracts.
 - Updating docs and contract-facing descriptions where necessary.
 
@@ -81,6 +82,7 @@ After 0.5.4:
 - failure responses become machine-readable enough for deterministic branching,
 - resume logic can recover the prior transaction session context from persisted canonical artifacts when the user has started a new Zed session,
 - helper bootstrap paths do not emit duplicate `tx.begin` when canonical history already contains the active non-terminal transaction,
+- versioned planning workflows no longer reuse short ticket ids like `p2-t01` as canonical transaction ids across releases,
 - and canonical status remains strict without becoming opaque.
 
 ## Design Principles
@@ -105,10 +107,13 @@ Agents should be able to distinguish:
 - integrity-blocked state,
 - invalid operation ordering,
 - duplicate-begin risk caused by incomplete materialized state versus canonical history,
+- duplicate-begin risk caused by reusing the same short ticket id across multiple releases in one canonical event log,
 - and missing or recoverable session-context state
 from structured response data.
 
-Resume behavior must not assume that the current client session id matches the session id that originally opened the active transaction. When the user starts a new Zed session, lifecycle-aware tools must recover the prior transaction session context from canonical persisted state before deciding whether resume can proceed.
+Resume behavior must not assume that the current client session id matches the session id that originally opened the active transaction. When the user starts a new Zed session, lifecycle-aware tools must recover the prior transaction session context from canonical persisted state before deciding whether resume can proceed. Session identifiers should remain version-agnostic opaque values, such
+
+Ticket and transaction identifiers must also be globally unique across the shared canonical history, not merely unique within a versioned plan directory. Reusing short ids such as `p2-t01` in multiple releases can itself create duplicate-`tx.begin` drift even when helper bootstrap logic is otherwise correct.
 
 Helper bootstrap behavior must also prefer canonical transaction history over a stale or incomplete materialized view when deciding whether `tx.begin` may be emitted. If canonical state already shows a matching active non-terminal transaction, helper entry must resume or fail with structured guidance instead of emitting another `tx.begin`.
 
@@ -239,6 +244,10 @@ The following tools should be aligned with the new contract:
   1. materialized `tx_state`,
   2. canonical `tx_event_log` / replay-derived state,
   3. structured recovery failure when neither source can supply safe session context.
+- Define canonical identifier rules for planned tickets and runtime transactions:
+  1. identifiers used as canonical `tx_id` / `ticket_id` must be globally unique within the repository event log,
+  2. version-local names such as `p2-t01` must be prefixed or otherwise namespaced before being used as canonical transaction ids,
+  3. repair guidance must distinguish helper-bootstrap duplicate begin from identifier-collision duplicate begin.
 - Define helper bootstrap lookup order for `tx.begin` eligibility:
   1. current materialized active transaction when healthy and complete,
   2. canonical replay/rebuild result when materialized state is missing, stale, terminal, or incomplete,
@@ -333,6 +342,7 @@ The following tools should be aligned with the new contract:
   - resume required,
   - missing session context during resume,
   - duplicate-begin prevention during helper bootstrap,
+  - duplicate-begin caused by canonical identifier collision across releases,
   - event after terminal,
   - cannot verify terminal transaction,
   - file intent already exists,
@@ -399,10 +409,12 @@ The following tools should be aligned with the new contract:
   - can-start/resume-required signaling,
   - helper bootstrap duplicate-begin prevention when canonical state already has a matching active transaction,
   - canonical rebuild fallback when materialized active state is missing or stale,
+  - canonical identifier collision detection when a short ticket id is reused across releases,
   - and resume behavior after the user starts a new Zed session without the old session id in live caller context.
 - Add regression tests that fail if tools revert to ambiguous minimal lifecycle responses.
 - Add regression tests that verify prior `session_id` recovery prefers `tx_state`, falls back to canonical event history when needed, and returns structured failure when safe recovery is impossible.
 - Add regression tests that fail if helper bootstrap logic relies only on event-log emptiness or incomplete materialized state and emits a duplicate non-terminal `tx.begin`.
+- Add regression tests that fail if version-local ticket names are reused as canonical transaction ids without collision-safe namespacing.
 
 **Deliverables**
 - A regression suite protecting the workflow-guidance contract.
@@ -602,6 +614,31 @@ Implement the helper-side duplicate-`tx.begin` prevention and canonical replay f
 
 ---
 
+### P2-T7: Repair identifier-collision duplicate `tx.begin` handling and enforce global ticket-id uniqueness
+**Goal**
+Prevent canonical drift caused by reusing short version-local ticket ids such as `p2-t01` across multiple releases, and define the repair/migration guidance needed when such collisions already exist in the shared event log.
+
+**Inputs**
+- canonical event-log evidence of repeated `tx_id` / `ticket_id` reuse across releases
+- rebuild drift reporting behavior
+- versioned planning artifacts and ticket naming conventions
+- helper/bootstrap duplicate-begin handling from `p2-t05` and `p2-t06`
+
+**Outputs**
+- documented global uniqueness rules for canonical ticket and transaction ids
+- repair guidance for existing identifier-collision drift
+- implementation and/or validation changes that distinguish identifier-collision duplicate begin from helper-bootstrap duplicate begin
+- regression coverage for release-to-release ticket id reuse
+
+**Acceptance criteria**
+- canonical transaction identifiers are documented as globally unique within the shared repository event log, not merely unique inside a version folder
+- planning guidance tells clients to namespace or prefix version-local ticket ids before using them as canonical `tx_id` / `ticket_id`
+- repair guidance explains how to handle existing duplicate-begin drift caused by prior id reuse without treating damaged history as healthy state
+- runtime or validation behavior can distinguish id-collision duplicate begin from helper-bootstrap duplicate begin well enough to support correct recovery guidance
+- regression tests cover reuse of the same short ticket id in multiple releases and fail if that collision is silently accepted as healthy canonical history
+
+---
+
 ### P3-T1: Add regression tests for workflow guidance contract
 **Goal**
 Protect the new machine-readable response contract from regression.
@@ -693,7 +730,15 @@ If only helper tools or only wrapper tools are normalized, ambiguity remains.
 **Mitigation**
 - Treat 0.5.4 as contract-wide work, not isolated helper cleanup.
 
-### 4. Overexposing inferred state
+### 4. Identifier-collision drift in shared history
+Version-local ticket naming can silently collide in the shared canonical event log even when individual plan directories look internally valid.
+
+**Mitigation**
+- Treat canonical `tx_id` / `ticket_id` values as globally unique identifiers.
+- Add explicit naming guidance and collision-focused regression coverage.
+- Separate repair guidance for historical id collisions from helper-bootstrap duplicate-begin handling.
+
+### 5. Overexposing inferred state
 Responses could accidentally expose guessed rather than canonical state.
 
 **Mitigation**

@@ -32,7 +32,7 @@
       "id": "p2-t01",
       "priority": "P1",
       "title": "Normalize helper success and follow-up semantics",
-      "status": "in-progress",
+      "status": "done",
       "file": "v0.5.4/p2-t01.json"
     },
     {
@@ -67,8 +67,15 @@
       "id": "p2-t06",
       "priority": "P1",
       "title": "Implement canonical-aware helper tx.begin bootstrap guard",
-      "status": "planned",
+      "status": "blocked",
       "file": "v0.5.4/p2-t06.json"
+    },
+    {
+      "id": "p2-t07",
+      "priority": "P0",
+      "title": "Repair canonical ticket ID collision handling and global tx_id uniqueness",
+      "status": "planned",
+      "file": "v0.5.4/p2-t07.json"
     },
     {
       "id": "p3-t01",
@@ -86,9 +93,9 @@
     }
   ],
   "status_context": {
-    "active_ticket": "p2-t01",
-    "canonical_sync_state": "in-progress",
-    "reason": "p2-t01 is now in progress, and it remains the prerequisite for the broader helper, failure, lifecycle-semantics, helper-bootstrap resume-safety, and implementation follow-up tickets including p2-t05 and p2-t06.",
-    "recommended_action": "Continue p2-t01 until its helper response contract work is done, then proceed to p2-t05 and the new dependent p2-t06 implementation ticket for canonical-aware helper tx.begin bootstrap hardening."
+    "active_ticket": "p2-t07",
+    "canonical_sync_state": "blocked",
+    "reason": "Canonical history is currently blocked by duplicate tx.begin caused by global ticket ID collisions: p2-t01 was reused across multiple versions, so new 0.5.4 lifecycle events collided with prior canonical transactions. Until repair is complete, downstream implementation work such as p2-t06 must remain blocked even though p2-t01 is functionally complete.",
+    "recommended_action": "Start p2-t07 first to repair the ticket ID collision issue, document and enforce globally unique tx_id/ticket_id naming, and then resume blocked follow-up work such as p2-t06 only after canonical history is trustworthy again."
   }
 }

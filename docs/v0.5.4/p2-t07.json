@@ -1,0 +1,52 @@
+{
+  "id": "p2-t07",
+  "title": "Repair canonical tx_id collisions and rebuild invalid-seq reporting mismatch",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Repair the canonical-history damage caused by treating user-controlled ticket identifiers as canonical transaction identifiers, and fix the rebuild/reporting mismatch that currently reports `rebuild_invalid_seq` as the last valid sequence rather than the invalid event sequence in some drift cases. This ticket shifts the repair model toward opaque database-style `tx_id` values, keeps human-facing ticket naming separate from canonical transaction identity, and restores trustworthy canonical observability before further lifecycle automation depends on it.",
+  "inputs": [
+    "docs/draft_0.5.4.md",
+    "docs/v0.5.4/plan.md",
+    "docs/v0.5.4/tickets_list.json",
+    "docs/v0.5.4/p2-t05.json",
+    "docs/v0.5.4/p2-t06.json",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/workflow_response.py",
+    "tests/test_state_rebuilder.py",
+    "tests/test_ops_tools.py",
+    ".agent/tx_event_log.jsonl",
+    ".agent/tx_state.json"
+  ],
+  "outputs": [
+    "A documented repair plan for canonical tx_id collisions caused by using user-controlled ticket names as canonical identifiers",
+    "Implementation changes that report invalid event sequence metadata consistently during rebuild drift detection",
+    "Guidance and validation for opaque database-style canonical transaction identifiers",
+    "Regression tests covering duplicate-begin collision reporting and invalid-sequence metadata consistency"
+  ],
+  "acceptance_criteria": [
+    "The ticket explicitly identifies user-controlled ticket naming being reused as canonical `tx_id` as a root cause of duplicate `tx.begin` drift and treats it separately from helper-bootstrap guard work.",
+    "Rebuild/reporting output does not contradict itself: when an invalid event is known, the reported invalid sequence matches that invalid event rather than a different last-valid sequence value.",
+    "The implementation or documented contract makes it clear that canonical `tx_id` values should be opaque database-style identifiers rather than user-controlled version names or ticket labels.",
+    "Repair guidance distinguishes between historical log repair, future tx_id-generation rules, and runtime duplicate-begin prevention so those concerns are not conflated.",
+    "Regression tests fail if rebuild drift output reports mismatched invalid-event and invalid-sequence metadata for the same failure.",
+    "Regression tests or documented checks cover tx_id collision scenarios where distinct releases reuse the same human ticket label such as `p2-t01`."
+  ],
+  "tasks": [
+    "Document the observed canonical collision pattern where user-controlled ticket labels such as `p2-t01` were reused and later replay treated the newest `tx.begin` as a duplicate because `tx_id` was not an opaque unique key.",
+    "Audit rebuild drift reporting so invalid-event metadata, invalid-sequence metadata, and observed-mismatch summaries all refer to the same offending event when available.",
+    "Decide and document the canonical identifier rule for future work: `tx_id` should be generated as an opaque database-style identifier, while user-facing ticket labels remain separate descriptive fields.",
+    "Determine the safest repair strategy for existing damaged history, including whether the system should rely on explicit operator repair guidance, derived mapping, or replacement transactions with fresh opaque `tx_id` values rather than pretending the old history is healthy.",
+    "Add or update tests for duplicate-begin collision scenarios and for the invalid-seq reporting mismatch in rebuild drift output.",
+    "Ensure any runtime or documentation updates preserve strict canonical ordering and do not silently mask tx_id collisions as healthy resumable state."
+  ],
+  "dependencies": ["p2-t02", "p2-t03", "p2-t05"],
+  "notes": [
+    "This ticket is about canonical-history repairability and observability accuracy, not just about preventing one more helper-side duplicate begin.",
+    "The root cause includes using user-controlled labels as canonical identifiers, so the fix must separate opaque `tx_id` generation from human-facing ticket naming in addition to any code-level drift reporting change.",
+    "The known reporting bug is that rebuild logic can retain the invalid event itself while later overwriting `rebuild_invalid_seq` with the last valid sequence, which makes diagnostics misleading during incident triage.",
+    "This ticket should complement p2-t06: p2-t06 hardens helper bootstrap behavior, while p2-t07 repairs the diagnostic and operational clarity around historical collisions, opaque tx_id discipline, and rebuild reporting.",
+    "Successful completion should make it much easier to distinguish a real duplicate-begin caused by tx_id collision from a misleading reporting artifact in rebuild output."
+  ]
+}
