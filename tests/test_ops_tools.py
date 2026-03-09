@@ -989,6 +989,132 @@ def test_ops_start_task_terminal_active_tx_without_task_id_requires_begin(
         ops.ops_start_task(title="Restart", session_id="s1")
 
 
+def test_ops_start_task_rejects_begin_when_materialized_state_is_missing_but_rebuild_has_active_tx(
+    repo_context, state_store, state_rebuilder
+):
+    class ActiveRebuilder:
+        def rebuild_tx_state(self):
+            return {
+                "ok": True,
+                "state": {
+                    "schema_version": "0.4.0",
+                    "active_tx": {
+                        "tx_id": "t-1",
+                        "ticket_id": "t-1",
+                        "status": "in-progress",
+                        "phase": "in-progress",
+                        "current_step": "resume-step",
+                        "last_completed_step": "",
+                        "next_action": "tx.verify.start",
+                        "semantic_summary": "Entered step resume-step",
+                        "user_intent": None,
+                        "session_id": "s1",
+                        "verify_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "commit_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "file_intents": [],
+                        "_last_event_seq": 1,
+                        "_terminal": False,
+                    },
+                    "last_applied_seq": 1,
+                    "integrity": {
+                        "state_hash": "test-hash",
+                        "rebuilt_from_seq": 1,
+                        "drift_detected": False,
+                        "active_tx_source": "active_candidate",
+                    },
+                    "updated_at": "2026-03-08T00:00:00+00:00",
+                },
+            }
+
+    ops = _build_ops_tools(repo_context, state_store, ActiveRebuilder())
+    repo_context.tx_state.unlink(missing_ok=True)
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: active_tx=t-1, requested_task=t-2, "
+            "active_ticket=t-1, status=in-progress, next_action=tx.verify.start. "
+            "Resume or complete the active transaction before starting a new ticket."
+        ),
+    ):
+        ops.ops_start_task(title="Restart", task_id="t-2", session_id="s1")
+
+    assert _tx_event_types(repo_context) == []
+
+
+def test_ops_start_task_rejects_begin_when_materialized_terminal_state_conflicts_with_rebuilt_active_tx(
+    repo_context, state_store, state_rebuilder
+):
+    class ActiveRebuilder:
+        def rebuild_tx_state(self):
+            return {
+                "ok": True,
+                "state": {
+                    "schema_version": "0.4.0",
+                    "active_tx": {
+                        "tx_id": "t-1",
+                        "ticket_id": "t-1",
+                        "status": "in-progress",
+                        "phase": "in-progress",
+                        "current_step": "resume-step",
+                        "last_completed_step": "",
+                        "next_action": "tx.verify.start",
+                        "semantic_summary": "Entered step resume-step",
+                        "user_intent": None,
+                        "session_id": "s1",
+                        "verify_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "commit_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "file_intents": [],
+                        "_last_event_seq": 2,
+                        "_terminal": False,
+                    },
+                    "last_applied_seq": 2,
+                    "integrity": {
+                        "state_hash": "test-hash",
+                        "rebuilt_from_seq": 2,
+                        "drift_detected": False,
+                        "active_tx_source": "active_candidate",
+                    },
+                    "updated_at": "2026-03-08T00:00:00+00:00",
+                },
+            }
+
+    ops = _build_ops_tools(repo_context, state_store, ActiveRebuilder())
+    _set_active_tx(
+        repo_context,
+        tx_id="t-9",
+        ticket_id="t-9",
+        status="done",
+        phase="done",
+        current_step="complete",
+        session_id="s1",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: active_tx=t-1, requested_task=t-2, "
+            "active_ticket=t-1, status=in-progress, next_action=tx.verify.start. "
+            "Resume or complete the active transaction before starting a new ticket."
+        ),
+    ):
+        ops.ops_start_task(title="Restart", task_id="t-2", session_id="s1")
+
+    assert _tx_event_types(repo_context) == []
+
+
 def test_ops_add_file_intent_emits_add_event_and_updates_state(
     repo_context, state_store, state_rebuilder
 ):

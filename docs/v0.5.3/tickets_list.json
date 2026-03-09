@@ -6,14 +6,14 @@
       "id": "p1-t01",
       "priority": "P0",
       "title": "Reproduce duplicate tx.begin drift and identify the emitting path",
-      "status": "planned",
+      "status": "verified",
       "file": "v0.5.3/p1-t01.json"
     },
     {
       "id": "p1-t02",
       "priority": "P0",
       "title": "Prevent duplicate tx.begin emission through stricter lifecycle guards",
-      "status": "planned",
+      "status": "verified",
       "file": "v0.5.3/p1-t02.json"
     },
     {

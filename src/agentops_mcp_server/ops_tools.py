@@ -97,6 +97,51 @@ class OpsTools:
         active_tx = state.get("active_tx")
         return active_tx if isinstance(active_tx, dict) else {}
 
+    def _canonical_begin_conflict(
+        self, requested_task_id: Optional[str]
+    ) -> Optional[ValueError]:
+        requested_id = self._normalize_tx_identifier(requested_task_id)
+        if not requested_id:
+            return None
+
+        rebuild = self.state_rebuilder.rebuild_tx_state()
+        if not rebuild.get("ok") or not isinstance(rebuild.get("state"), dict):
+            return None
+
+        rebuilt_state = rebuild["state"]
+        integrity = (
+            rebuilt_state.get("integrity")
+            if isinstance(rebuilt_state.get("integrity"), dict)
+            else {}
+        )
+        if integrity.get("drift_detected") is True:
+            return ValueError(
+                "cannot start task because canonical transaction history has integrity drift; "
+                "repair or resume the canonical active transaction before emitting tx.begin"
+            )
+
+        rebuilt_active_tx = (
+            rebuilt_state.get("active_tx")
+            if isinstance(rebuilt_state.get("active_tx"), dict)
+            else {}
+        )
+        rebuilt_identity = self._active_tx_identity(rebuilt_active_tx)
+        rebuilt_canonical_id = rebuilt_identity["canonical_id"]
+
+        if not rebuilt_canonical_id:
+            return None
+
+        if self._is_terminal_active_tx(rebuilt_active_tx):
+            return None
+
+        if rebuilt_canonical_id == requested_id:
+            return ValueError(
+                "cannot emit tx.begin for an already-active non-terminal transaction; "
+                "resume it with task update semantics instead"
+            )
+
+        return self._active_tx_mismatch_error(requested_id, rebuilt_active_tx)
+
     def _normalize_tx_identifier(self, value: Any) -> str:
         if not isinstance(value, str):
             return ""
@@ -673,6 +718,9 @@ class OpsTools:
         if not resolved_tx_id or terminal_active_tx:
             if not resolved_task_id:
                 raise ValueError("tx.begin required before other events")
+            begin_conflict = self._canonical_begin_conflict(resolved_task_id)
+            if begin_conflict is not None:
+                raise begin_conflict
             self._emit_tx_event(
                 event_type="tx.begin",
                 payload={"ticket_id": resolved_task_id, "ticket_title": title.strip()},

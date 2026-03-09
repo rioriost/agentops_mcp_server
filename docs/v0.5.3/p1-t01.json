@@ -2,8 +2,8 @@
   "id": "p1-t01",
   "title": "Reproduce duplicate `tx.begin` drift and trace the originating lifecycle path",
   "priority": "P0",
-  "status": "planned",
-  "summary": "Establish a deterministic understanding of the observed transaction-log drift by reproducing the duplicate `tx.begin` condition and tracing exactly which lifecycle path emits the invalid second begin event. This ticket focuses on identifying the root cause before guard, replay, or recovery fixes are finalized.",
+  "status": "verified",
+  "summary": "Establish a deterministic understanding of the observed transaction-log drift by reproducing the duplicate `tx.begin` condition and tracing exactly which lifecycle path emits the invalid second begin event. Current investigation indicates the observed drift is evidence-based rather than freshly reproduced: the invalid event is seq 132 in `.agent/tx_event_log.jsonl`, replay flags it as a duplicate begin for `tx_id=ticket_id=p2-t03`, and the most likely origin is a resume/start path that emitted `ops_start_task` for `p2-t03` after canonical history had already recorded a non-terminal `tx.begin` for that same transaction lineage. The key code surface is `ops_start_task` in `src/agentops_mcp_server/ops_tools.py`, which emits `tx.begin` whenever materialized state is terminal or lacks a canonical id, without validating whether canonical event history already contains a still-open begin for the same ticket when the materialized snapshot is stale or inconsistent.",
   "inputs": [
     "docs/draft_0.5.3.md",
     "docs/v0.5.3/plan.md",
@@ -17,10 +17,10 @@
     "tests/"
   ],
   "outputs": [
-    "A documented reproduction path for the duplicate `tx.begin` drift condition",
-    "A clear identification of the code path or lifecycle transition that emits the invalid second begin event",
-    "A narrowed root-cause analysis describing whether the issue originates in start, resume, replay, or recovery behavior",
-    "Implementation notes that define what later prevention and replay-hardening tickets must change"
+    "An evidence-based trace for the duplicate `tx.begin` drift condition centered on invalid event seq 132 in `.agent/tx_event_log.jsonl`",
+    "A clear identification that the likely emitting path is `ops_start_task` resume/start handling in `src/agentops_mcp_server/ops_tools.py` rather than replay itself",
+    "A narrowed root-cause analysis describing the issue as begin emission under stale or inconsistent materialized state during resume-oriented flow",
+    "Implementation notes that later prevention tickets should harden begin-time guards against canonical-history conflicts and improve resume-path validation before emitting `tx.begin`"
   ],
   "acceptance_criteria": [
     "The team can reproduce the observed duplicate `tx.begin` condition deterministically or can precisely explain the currently known triggering sequence from available evidence.",
@@ -31,17 +31,19 @@
     "The investigation does not weaken replay validation or suppress integrity failures just to make the symptom disappear."
   ],
   "tasks": [
-    "Inspect the observed invalid-event metadata and current transaction log history to characterize the duplicate `tx.begin` condition.",
-    "Trace the lifecycle path that emits `tx.begin` and map the preconditions that should have prevented the second begin event.",
-    "Determine whether the duplication occurs during normal task start, resume, repair, or another recovery-oriented flow.",
-    "Confirm how transaction id, ticket id, session id, and active transaction state relate across the original and duplicated begin events.",
-    "Document the root-cause hypothesis and identify the minimum set of code surfaces that subsequent fix tickets must address."
+    "Inspect the observed invalid-event metadata and current transaction log history to characterize the duplicate `tx.begin` condition. Done: seq 132 is the invalid duplicate begin reported by replay, with `tx_id=ticket_id=p2-t03`, `session_id=agentops_mcp_server`, and payload title `Resume p2-t03 synchronized canonical progression work`.",
+    "Trace the lifecycle path that emits `tx.begin` and map the preconditions that should have prevented the second begin event. Current finding: `ops_start_task` emits `tx.begin` when materialized `active_tx` is terminal or lacks canonical identity, then immediately records `tx.step.enter`; this is the primary suspect path.",
+    "Determine whether the duplication occurs during normal task start, resume, repair, or another recovery-oriented flow. Current finding: the evidence points to a resume-oriented start flow, not replay classification and not commit/verify helpers.",
+    "Confirm how transaction id, ticket id, session id, and active transaction state relate across the original and duplicated begin events. Current finding: the duplicate event reuses the same transaction and ticket identifier family (`p2-t03`) instead of introducing an identifier mismatch.",
+    "Document the root-cause hypothesis and identify the minimum set of code surfaces that subsequent fix tickets must address. Current hypothesis: stale or inconsistent materialized state allowed begin emission to proceed even though canonical history already contained a non-terminal begin; follow-up work should target `ops_start_task`, begin-time validation around materialized-versus-replayed state, and regression coverage for resume-with-stale-state scenarios."
   ],
   "dependencies": [],
   "notes": [
     "This ticket is diagnostic first: the main goal is to understand the failure path before changing lifecycle guards or replay behavior.",
     "The target issue is the observed duplicate `tx.begin` integrity drift, not the broader committed-versus-done workflow clarified in 0.5.2.",
     "A successful outcome should make later preventive and regression work much smaller and safer.",
-    "If deterministic reproduction is difficult, the ticket should still produce a precise evidence-based trace from existing log and state artifacts."
+    "Deterministic reproduction has not yet been re-run in isolation, but the existing canonical artifacts already provide a precise evidence-based trace from log and state history.",
+    "Replay behavior currently looks correct and strict: `state_rebuilder.py` classifies a second non-terminal `tx.begin` as `duplicate tx.begin`, so the likely defect is upstream begin emission rather than downstream replay validation.",
+    "The present investigation also suggests a specific stale-state hazard: `ops_start_task` can synthesize a fresh `tx.begin` from materialized state conditions without first proving that canonical history does not already contain a still-open begin for the same ticket lineage."
   ]
 }

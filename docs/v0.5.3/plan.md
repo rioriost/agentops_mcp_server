@@ -127,6 +127,19 @@ Invalid history should remain visible and diagnosable. The system should not sil
 - Reproduction notes or a traced causal path.
 - A narrowed list of lifecycle entry points involved in the invalid sequence.
 
+**Investigation progress**
+- Existing canonical state already records the invalid lifecycle event as `rebuild_invalid_event` with `event_type="tx.begin"`, `tx_id="p2-t03"`, `ticket_id="p2-t03"`, `session_id="agentops_mcp_server"`, and `seq=132`.
+- The surrounding event history shows an earlier non-terminal `p2-t02` transaction beginning at seq 130 and only reaching `tx.step.enter` checking at seq 131, so the duplicate-begin integrity failure is not a replay false positive.
+- The duplicated begin reuses the same transaction and ticket identifiers for `p2-t03`; the observed drift is therefore a begin-emission / resume-path issue rather than an identifier-mismatch issue.
+- The current `ops_start_task` path emits `tx.begin` whenever materialized `active_tx` is missing or terminal, and then immediately records `tx.step.enter`.
+- The most likely historical trigger is a resume flow that relied on stale or absent materialized state while canonical history already contained an unfinished transaction, allowing a second lifecycle start to be appended before replay later classified it as invalid.
+- `state_rebuilder` is already behaving strictly by rejecting this pattern as `duplicate tx.begin`; the investigation points at lifecycle-start write guards, not replay leniency, as the primary fix surface.
+
+**Traced root-cause hypothesis**
+- The invalid second begin appears to have been emitted through the task-start lifecycle wrapper rather than verify/commit helpers.
+- The key write path is `ops_start_task` → lifecycle event emission for `tx.begin` when local materialized state indicates “no active transaction” or “terminal transaction”, even if canonical event history still contains a non-terminal transaction that should have been resumed instead.
+- Later work should harden start-time validation so begin emission is blocked when canonical history and materialized state are inconsistent, instead of appending the event and discovering the integrity violation only during replay/rebuild.
+
 ---
 
 ### Phase 2: Tighten begin-event write guards

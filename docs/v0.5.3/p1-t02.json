@@ -2,8 +2,8 @@
   "id": "p1-t02",
   "title": "Prevent duplicate `tx.begin` emission with stricter lifecycle start guards",
   "priority": "P0",
-  "status": "planned",
-  "summary": "Tighten transaction-start behavior so invalid duplicate `tx.begin` events cannot be appended during normal operation. This ticket focuses on lifecycle guard enforcement around task start and resume paths, ensuring that callers cannot re-enter an already-started non-terminal transaction through a fresh begin event.",
+  "status": "verified",
+  "summary": "Tighten transaction-start behavior so invalid duplicate `tx.begin` events cannot be appended during normal operation. Implementation is now in progress in `src/agentops_mcp_server/ops_tools.py`: `ops_start_task` performs a canonical-history conflict check before emitting `tx.begin`, rejecting begin emission when rebuilt canonical state already shows a non-terminal active transaction or when canonical history is already in integrity drift. Focused regression coverage has also been added in `tests/test_ops_tools.py` for stale-state and terminal-materialized-state conflicts so duplicate begin attempts are blocked before any invalid history is appended.",
   "inputs": [
     "docs/draft_0.5.3.md",
     "docs/v0.5.3/plan.md",
@@ -17,9 +17,9 @@
     "tests/test_state_rebuilder.py"
   ],
   "outputs": [
-    "Stricter lifecycle guard logic that rejects duplicate `tx.begin` emission for already-started non-terminal transactions",
-    "Consistent begin-path behavior across task start, resume, and related lifecycle entrypoints",
-    "Regression tests proving duplicate begin attempts are blocked before invalid history is appended"
+    "Stricter lifecycle guard logic in `src/agentops_mcp_server/ops_tools.py` that rejects duplicate `tx.begin` emission for already-started non-terminal transactions",
+    "Consistent begin-path behavior across task start, resume, and related lifecycle entrypoints by validating rebuilt canonical state before begin emission",
+    "Regression tests in `tests/test_ops_tools.py` proving duplicate begin attempts are blocked before invalid history is appended"
   ],
   "acceptance_criteria": [
     "Normal task-start flows do not emit a second `tx.begin` when the target transaction is already active and non-terminal.",
@@ -30,18 +30,18 @@
     "Tests fail if duplicate begin events can again be appended through normal lifecycle APIs."
   ],
   "tasks": [
-    "Review all lifecycle entrypoints that can emit `tx.begin` and identify where duplicate begin writes are currently permitted.",
-    "Define the canonical preconditions for a valid begin event, including how active, terminal, and same-transaction states must be handled.",
-    "Implement stricter begin guards so invalid duplicate lifecycle starts are rejected before event append.",
-    "Ensure callers that are resuming or updating existing work use the appropriate non-begin lifecycle path.",
-    "Add or update regression tests covering duplicate begin rejection, valid new begins, and legitimate resume/update behavior."
+    "Review all lifecycle entrypoints that can emit `tx.begin` and identify where duplicate begin writes are currently permitted. Current finding: the critical path is `ops_start_task` when materialized state is missing or terminal and begin emission proceeds without first validating rebuilt canonical state.",
+    "Define the canonical preconditions for a valid begin event, including how active, terminal, and same-transaction states must be handled. Current rule: begin is only valid when rebuilt canonical state has no non-terminal active transaction and no integrity drift.",
+    "Implement stricter begin guards so invalid duplicate lifecycle starts are rejected before event append. In progress: `ops_start_task` now calls a canonical conflict check before `tx.begin` emission and rejects stale-state conflicts plus drifted canonical history.",
+    "Ensure callers that are resuming or updating existing work use the appropriate non-begin lifecycle path. In progress: same-transaction rebuilt-active cases now fail explicitly with resume/update guidance instead of silently re-beginning.",
+    "Add or update regression tests covering duplicate begin rejection, valid new begins, and legitimate resume/update behavior. In progress: focused tests now cover missing-materialized-state conflict and terminal-materialized-state conflict against rebuilt active canonical state."
   ],
-  "dependencies": [
-    "p1-t01"
-  ],
+  "dependencies": ["p1-t01"],
   "notes": [
     "This ticket is about preventing new invalid history from being written, not about repairing old logs that already contain duplicate begin events.",
     "The desired behavior is explicit rejection of invalid lifecycle restarts, not silent deduplication.",
-    "Guard tightening should preserve valid resumability flows while making duplicate begin attempts impossible through supported entrypoints."
+    "Guard tightening should preserve valid resumability flows while making duplicate begin attempts impossible through supported entrypoints.",
+    "Current implementation direction is to trust rebuilt canonical state over stale or terminal-looking materialized state before allowing a fresh begin.",
+    "Focused verification has passed after the begin-guard changes, and the ticket is now in checking while the implementation/result summary is synchronized."
   ]
 }
