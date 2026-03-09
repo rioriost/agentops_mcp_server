@@ -1709,6 +1709,74 @@ def test_ops_capture_state_refuses_rebuild_with_integrity_drift(
     assert result["active_tx"]["next_action"] == "tx.begin"
 
 
+def test_ops_capture_state_returns_actionable_guidance_for_duplicate_begin_drift(
+    repo_context, state_store, state_rebuilder
+):
+    class DriftingRebuilder:
+        def rebuild_tx_state(self):
+            return {
+                "ok": True,
+                "state": {
+                    "schema_version": "0.4.0",
+                    "active_tx": {
+                        "tx_id": "none",
+                        "ticket_id": "none",
+                        "status": "planned",
+                        "phase": "planned",
+                        "current_step": "none",
+                        "last_completed_step": "",
+                        "next_action": "tx.begin",
+                        "semantic_summary": "No active transaction.",
+                        "user_intent": None,
+                        "session_id": "",
+                        "verify_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "commit_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "file_intents": [],
+                    },
+                    "last_applied_seq": 1,
+                    "integrity": {
+                        "state_hash": "test-hash",
+                        "rebuilt_from_seq": 1,
+                        "drift_detected": True,
+                        "active_tx_source": "none",
+                    },
+                    "rebuild_warning": "duplicate tx.begin",
+                    "rebuild_invalid_seq": 1,
+                    "rebuild_observed_mismatch": {
+                        "drift_reason": "duplicate tx.begin",
+                        "last_applied_seq": 1,
+                        "active_tx_id": "none",
+                        "active_ticket_id": "none",
+                        "invalid_reason": "duplicate tx.begin",
+                        "invalid_event": {
+                            "seq": 2,
+                            "event_type": "tx.begin",
+                            "tx_id": "t-1",
+                            "ticket_id": "t-1",
+                        },
+                    },
+                    "updated_at": "2026-03-08T00:00:00+00:00",
+                },
+            }
+
+    ops = _build_ops_tools(repo_context, state_store, DriftingRebuilder())
+    repo_context.tx_state.unlink(missing_ok=True)
+
+    result = ops.ops_capture_state(session_id="s1")
+
+    assert result["ok"] is False
+    assert result["rebuild_warning"] == "duplicate tx.begin"
+    assert result["rebuild_observed_mismatch"]["invalid_reason"] == "duplicate tx.begin"
+    assert result["rebuild_observed_mismatch"]["active_tx_id"] == "none"
+    assert result["rebuild_observed_mismatch"]["active_ticket_id"] == "none"
+
+
 def test_ops_handoff_export_defaults_to_tx_begin_without_canonical_event_log(
     repo_context, state_store, state_rebuilder
 ):
@@ -1718,6 +1786,82 @@ def test_ops_handoff_export_defaults_to_tx_begin_without_canonical_event_log(
 
     assert result["ok"] is True
     assert result["handoff"]["next_step"] == "tx.begin"
+
+
+def test_ops_handoff_export_uses_materialized_state_when_rebuild_has_duplicate_begin_drift(
+    repo_context, state_store, state_rebuilder
+):
+    class DriftingRebuilder:
+        def rebuild_tx_state(self):
+            return {
+                "ok": True,
+                "state": {
+                    "schema_version": "0.4.0",
+                    "active_tx": {
+                        "tx_id": "drifted-tx",
+                        "ticket_id": "drifted-ticket",
+                        "status": "checking",
+                        "phase": "checking",
+                        "current_step": "drift-step",
+                        "last_completed_step": "",
+                        "next_action": "tx.commit.start",
+                        "semantic_summary": "Drifted rebuild should not drive handoff.",
+                        "user_intent": None,
+                        "session_id": "s1",
+                        "verify_state": {
+                            "status": "passed",
+                            "last_result": {"ok": True},
+                        },
+                        "commit_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "file_intents": [],
+                    },
+                    "last_applied_seq": 1,
+                    "integrity": {
+                        "state_hash": "test-hash",
+                        "rebuilt_from_seq": 1,
+                        "drift_detected": True,
+                        "active_tx_source": "none",
+                    },
+                    "rebuild_warning": "duplicate tx.begin",
+                    "rebuild_invalid_seq": 1,
+                    "rebuild_observed_mismatch": {
+                        "drift_reason": "duplicate tx.begin",
+                        "last_applied_seq": 1,
+                        "active_tx_id": "none",
+                        "active_ticket_id": "none",
+                        "invalid_reason": "duplicate tx.begin",
+                        "invalid_event": {
+                            "seq": 2,
+                            "event_type": "tx.begin",
+                            "tx_id": "t-1",
+                            "ticket_id": "t-1",
+                        },
+                    },
+                    "updated_at": "2026-03-08T00:00:00+00:00",
+                },
+            }
+
+    _set_active_tx(
+        repo_context,
+        tx_id="materialized-tx",
+        ticket_id="materialized-ticket",
+        status="checking",
+        phase="checking",
+        current_step="resume-step",
+        session_id="s1",
+    )
+    ops = _build_ops_tools(repo_context, state_store, DriftingRebuilder())
+
+    result = ops.ops_handoff_export()
+
+    assert result["ok"] is True
+    assert result["handoff"]["current_task"] == "materialized-ticket"
+    assert result["handoff"]["last_action"] == "Entered step resume-step"
+    assert result["handoff"]["next_step"] == "tx.verify.start"
+    assert result["handoff"]["compact_context"] == "Entered step resume-step"
 
 
 def test_ops_task_summary_uses_failure_reason_and_truncates(
@@ -1807,6 +1951,72 @@ def test_ops_resume_brief_uses_defaults_when_no_active_transaction(
     assert result["ok"] is True
     assert result["max_chars"] == 400
     assert "- can_start_new_ticket: yes" in result["brief"]
+
+
+def test_ops_resume_brief_defaults_to_safe_no-active-transaction_view_when_rebuild_drifts(
+    repo_context, state_store, state_rebuilder
+):
+    class DriftingRebuilder:
+        def rebuild_tx_state(self):
+            return {
+                "ok": True,
+                "state": {
+                    "schema_version": "0.4.0",
+                    "active_tx": {
+                        "tx_id": "drifted-tx",
+                        "ticket_id": "drifted-ticket",
+                        "status": "checking",
+                        "phase": "checking",
+                        "current_step": "drift-step",
+                        "last_completed_step": "",
+                        "next_action": "tx.commit.start",
+                        "semantic_summary": "Drifted rebuild should not drive resume guidance.",
+                        "user_intent": None,
+                        "session_id": "s1",
+                        "verify_state": {
+                            "status": "passed",
+                            "last_result": {"ok": True},
+                        },
+                        "commit_state": {
+                            "status": "not_started",
+                            "last_result": None,
+                        },
+                        "file_intents": [],
+                    },
+                    "last_applied_seq": 1,
+                    "integrity": {
+                        "state_hash": "test-hash",
+                        "rebuilt_from_seq": 1,
+                        "drift_detected": True,
+                        "active_tx_source": "active_candidate",
+                    },
+                    "rebuild_warning": "duplicate tx.begin",
+                    "rebuild_invalid_seq": 1,
+                    "rebuild_observed_mismatch": {
+                        "drift_reason": "duplicate tx.begin",
+                        "last_applied_seq": 1,
+                        "active_tx_id": "none",
+                        "active_ticket_id": "none",
+                        "invalid_reason": "duplicate tx.begin",
+                        "invalid_event": {
+                            "seq": 2,
+                            "event_type": "tx.begin",
+                            "tx_id": "t-1",
+                            "ticket_id": "t-1",
+                        },
+                    },
+                    "updated_at": "2026-03-08T00:00:00+00:00",
+                },
+            }
+
+    repo_context.tx_state.unlink(missing_ok=True)
+    ops = _build_ops_tools(repo_context, state_store, DriftingRebuilder())
+
+    result = ops.ops_resume_brief(max_chars=400)
+
+    assert result["ok"] is True
+    assert "- can_start_new_ticket: yes" in result["brief"]
+    assert "- active_ticket:" not in result["brief"]
 
 
 def test_ops_resume_brief_ignores_ticket_only_active_transaction(

@@ -20,7 +20,7 @@
       "id": "p2-t01",
       "priority": "P1",
       "title": "Clarify replay, capture, and operational behavior for invalid begin history",
-      "status": "planned",
+      "status": "verified",
       "file": "v0.5.3/p2-t01.json"
     },
     {

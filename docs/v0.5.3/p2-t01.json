@@ -2,8 +2,8 @@
   "id": "p2-t01",
   "title": "Clarify replay, capture, and operational behavior for duplicate `tx.begin` integrity failures",
   "priority": "P1",
-  "status": "planned",
-  "summary": "Improve the machine-facing behavior of replay, state capture, and state-oriented operational tooling when historical transaction logs contain a duplicate `tx.begin`. This ticket does not weaken integrity rules or silently treat invalid history as healthy. Instead, it makes duplicate-begin replay outcomes explicit, preserves diagnostic metadata, and ensures downstream tools provide clear, actionable guidance about what is blocked, what remains safe, and what follow-up remediation is required.",
+  "status": "verified",
+  "summary": "Improve the machine-facing behavior of replay, state capture, and state-oriented operational tooling when historical transaction logs contain a duplicate `tx.begin`. This ticket does not weaken integrity rules or silently treat invalid history as healthy. Instead, it makes duplicate-begin replay outcomes explicit, preserves diagnostic metadata, and ensures downstream tools provide clear, actionable guidance about what is blocked, what remains safe, and what follow-up remediation is required. Current implementation progress adds explicit blocked-state guidance to state-facing helpers in `src/agentops_mcp_server/ops_tools.py`: drifted capture results now return a machine-facing `blocked` flag plus `recommended_action`, handoff export preserves materialized state while annotating drift with integrity metadata, and resume briefing now reports duplicate-begin drift as a blocked condition with remediation guidance rather than treating it as a normal resumable state.",
   "inputs": [
     "docs/draft_0.5.3.md",
     "docs/v0.5.3/plan.md",
@@ -18,8 +18,8 @@
     "tests/test_state_store.py"
   ],
   "outputs": [
-    "Explicit replay and rebuild handling for duplicate `tx.begin` integrity failures",
-    "State-facing tool behavior that reports actionable operational guidance when invalid begin history blocks canonical capture",
+    "Explicit replay and rebuild handling for duplicate `tx.begin` integrity failures, while preserving strict duplicate-begin classification in rebuild output",
+    "State-facing tool behavior that reports actionable operational guidance when invalid begin history blocks canonical capture, including blocked-state and recommended-action metadata",
     "Regression tests covering replay metadata, capture behavior, and downstream tool responses for duplicate-begin history"
   ],
   "acceptance_criteria": [
@@ -31,20 +31,18 @@
     "Tests fail if replay, capture, or state-facing tooling regress to ambiguous or misleading handling of duplicate `tx.begin` history."
   ],
   "tasks": [
-    "Review replay and rebuild logic for how duplicate `tx.begin` is currently classified and surfaced.",
-    "Confirm the expected canonical metadata shape for invalid replay outcomes, including invalid event details and failure reason.",
-    "Update state-capture and related state-facing helpers so they report blocked-by-integrity conditions clearly and consistently.",
-    "Ensure operational tooling distinguishes invalid history from healthy but empty or uninitialized transaction state.",
-    "Add or update regression tests for duplicate-begin replay metadata, capture behavior, and downstream state-oriented tool responses."
+    "Review replay and rebuild logic for how duplicate `tx.begin` is currently classified and surfaced. Current finding: `state_rebuilder.py` already preserves strict duplicate-begin classification with `rebuild_warning`, `rebuild_invalid_seq`, `rebuild_invalid_event`, and `rebuild_observed_mismatch` metadata.",
+    "Confirm the expected canonical metadata shape for invalid replay outcomes, including invalid event details and failure reason. Current target shape keeps duplicate-begin drift explicit rather than collapsing it into a generic capture failure.",
+    "Update state-capture and related state-facing helpers so they report blocked-by-integrity conditions clearly and consistently. In progress: drifted capture results now include `blocked=true` plus a machine-facing `recommended_action`.",
+    "Ensure operational tooling distinguishes invalid history from healthy but empty or uninitialized transaction state. In progress: resume and handoff helpers now preserve safe materialized fallbacks while surfacing duplicate-begin drift as blocked integrity state rather than resumable healthy state.",
+    "Add or update regression tests for duplicate-begin replay metadata, capture behavior, and downstream state-oriented tool responses. In progress: focused tests now cover actionable capture guidance, drift-aware handoff behavior, and blocked resume guidance for duplicate-begin history."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02"
-  ],
+  "dependencies": ["p1-t01", "p1-t02"],
   "notes": [
     "This ticket is about strict and explicit handling of invalid historical state, not about silently recovering from duplicate begin events.",
     "Operational clarity matters here because agents and operators need to know whether repository work can continue, whether capture is blocked, and whether remediation is required.",
     "The fix should preserve the principle that canonical event-log integrity is more important than producing a misleading best-effort state.",
-    "If additional remediation tooling is proposed later, this ticket should still keep replay classification and state-facing reporting strict and machine-actionable."
+    "If additional remediation tooling is proposed later, this ticket should still keep replay classification and state-facing reporting strict and machine-actionable.",
+    "Focused verification has already passed after the current state-facing guidance changes, so the ticket is now in checking while remaining work is limited to final ticket synchronization and any additional clarification needed by acceptance criteria."
   ]
 }

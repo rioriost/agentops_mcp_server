@@ -312,6 +312,29 @@ class OpsTools:
             "last_error": last_error,
             "compact_context": active_tx.get("semantic_summary") or "",
         }
+        if (
+            rebuild.get("ok")
+            and isinstance(rebuild.get("state"), dict)
+            and isinstance(rebuild.get("state", {}).get("integrity"), dict)
+            and rebuild["state"]["integrity"].get("drift_detected") is True
+        ):
+            observed_mismatch = (
+                rebuild["state"].get("rebuild_observed_mismatch")
+                if isinstance(rebuild["state"].get("rebuild_observed_mismatch"), dict)
+                else {}
+            )
+            handoff["integrity_status"] = "blocked"
+            handoff["blocked_reason"] = (
+                rebuild["state"].get("rebuild_warning")
+                or "rebuild integrity drift detected"
+            )
+            handoff["recommended_action"] = (
+                "Do not treat canonical state as healthy; inspect the invalid event "
+                "metadata and repair or replace the damaged transaction history "
+                "before relying on capture-derived state."
+            )
+            if observed_mismatch:
+                handoff["rebuild_observed_mismatch"] = observed_mismatch
 
         target = self.repo_context.handoff
         self.state_store.write_text(
@@ -360,7 +383,35 @@ class OpsTools:
         _line("verify_status", verify_state.get("status"))
         _line("commit_status", commit_state.get("status"))
 
-        if has_active_tx:
+        rebuild = self.state_rebuilder.rebuild_tx_state()
+        rebuild_state = (
+            rebuild.get("state") if isinstance(rebuild.get("state"), dict) else {}
+        )
+        rebuild_integrity = (
+            rebuild_state.get("integrity")
+            if isinstance(rebuild_state.get("integrity"), dict)
+            else {}
+        )
+        observed_mismatch = (
+            rebuild_state.get("rebuild_observed_mismatch")
+            if isinstance(rebuild_state.get("rebuild_observed_mismatch"), dict)
+            else {}
+        )
+
+        if rebuild_integrity.get("drift_detected") is True:
+            lines.append("- can_start_new_ticket: no")
+            lines.append("- status: blocked")
+            _line("blocked_reason", rebuild_state.get("rebuild_warning"))
+            invalid_reason = observed_mismatch.get("invalid_reason")
+            if isinstance(invalid_reason, str) and invalid_reason.strip():
+                lines.append(f"- invalid_reason: {invalid_reason.strip()}")
+            lines.append(
+                "- reason: canonical transaction history has integrity drift; capture and resume decisions are blocked until the invalid history is repaired"
+            )
+            lines.append(
+                "- recommended_action: inspect rebuild_invalid_event and rebuild_observed_mismatch, then repair or replace the damaged transaction log before continuing"
+            )
+        elif has_active_tx:
             _line("active_ticket", active_tx.get("ticket_id") or active_tx_id)
             _line("active_status", active_status)
             _line("required_next_action", active_tx.get("next_action"))
@@ -897,6 +948,12 @@ class OpsTools:
                 "rebuild_invalid_seq": state.get("rebuild_invalid_seq"),
                 "rebuild_observed_mismatch": state.get("rebuild_observed_mismatch"),
                 "active_tx": active_tx,
+                "blocked": True,
+                "recommended_action": (
+                    "Do not capture or trust canonical state until the invalid transaction "
+                    "history is repaired. Inspect rebuild_invalid_event and "
+                    "rebuild_observed_mismatch to identify the offending lifecycle event."
+                ),
             }
 
         active_tx = (
