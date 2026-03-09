@@ -2,7 +2,7 @@
   "id": "p1-t03",
   "title": "Normalize lifecycle wrapper success responses to expose canonical workflow guidance",
   "priority": "P0",
-  "status": "done",
+  "status": "planned",
   "summary": "Update the lifecycle wrapper tools so successful operations return consistent machine-readable canonical workflow guidance instead of minimal payloads that force AI agents to infer the resulting state. This ticket focuses on success responses for wrapper-style tools, ensuring that after task start, task update, task end, file-intent operations, and state capture, the response clearly describes the resulting canonical status, phase, next action, terminality, follow-up requirements, and active transaction identity.",
   "inputs": [
     "docs/draft_0.5.4.md",

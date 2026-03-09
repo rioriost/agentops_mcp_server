@@ -2,7 +2,7 @@
   "id": "p2-t04",
   "title": "Recover prior session context during resume across manual Zed session changes",
   "priority": "P1",
-  "status": "done",
+  "status": "planned",
   "summary": "Ensure lifecycle-aware resume behavior can recover the active transaction's prior `session_id` and related context from canonical persisted state when the user starts a new Zed session and the old session id is no longer available from live caller context. This ticket covers canonical lookup order, machine-readable recovery failures, and regression protection for manual session-switch resume flows without weakening strict lifecycle validation.",
   "inputs": [
     "docs/draft_0.5.4.md",

@@ -39,14 +39,14 @@
       "id": "p2-t02",
       "priority": "P1",
       "title": "Normalize structured lifecycle and state failure responses",
-      "status": "planned",
+      "status": "done",
       "file": "v0.5.4/p2-t02.json"
     },
     {
       "id": "p2-t03",
       "priority": "P1",
       "title": "Clarify and enforce lifecycle field semantics",
-      "status": "planned",
+      "status": "done",
       "file": "v0.5.4/p2-t03.json"
     },
     {
