@@ -71,41 +71,14 @@ def test_init_script_contains_canonical_artifacts_and_rules():
     assert "handoff.md" not in content
 
     assert "work-in-progress.md" not in content
-    assert "Treat `.agent/handoff.json` as derived-only" in content
     assert "workspace_root" not in content
-    assert "- `tx.begin` before task lifecycle events" in content
-    assert "- task lifecycle tools" in content
-    assert "- do not call task start/update/end before `tx.begin`" in content
-    assert "- semantic_summary is required for non-terminal tx" in content
-    assert "- Identify active ticket (status != done) and resume it." in content
-    assert "active_tx.next_action is required" not in content
-    assert (
-        "- Ticket status persistence is mandatory throughout execution, not optional bookkeeping."
-        in content
-    )
-    assert "- Every ticket status change must be persisted to both:" in content
-    assert "- the per-ticket JSON file, and" in content
-    assert "- docs/__version__/tickets_list.json." in content
-    assert (
-        "- The per-ticket JSON file and docs/__version__/tickets_list.json must stay synchronized with each other for the same ticket."
-        in content
-    )
-    assert (
-        "- Runtime transaction status/phase and persisted ticket-document status must stay synchronized at each ticket lifecycle transition and must not be reconciled later as optional follow-up bookkeeping."
-        in content
-    )
-    assert (
-        "- Persist the matching ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json when work begins."
-        in content
-    )
-    assert (
-        "- Persist the terminal ticket status to both the per-ticket JSON file and docs/__version__/tickets_list.json."
-        in content
-    )
-
+    assert ".agent/tx_event_log.jsonl" in content
+    assert ".agent/tx_state.json" in content
+    assert ".agent/handoff.json" in content
     assert '"session_id": ""' in content
     assert '"drift_detected": false' in content
     assert '"active_tx_source": "none"' in content
+    assert "SOURCE_RULES_FALLBACK" in content
     assert "workflow_rules_fallback.txt" in content
 
 
@@ -116,34 +89,14 @@ def test_init_script_documents_convention_boundary_and_helper_contract():
     content = script_path.read_text(encoding="utf-8")
 
     assert (
-        "- Ticket artifacts are client-managed workflow convention, not mandatory server protocol."
-        in content
-    )
-    assert (
-        "- MCP clients must not assume the server generates, persists, synchronizes, or validates:"
-        in content
-    )
-    assert (
-        "- If a client chooses to maintain ticket artifacts, keeping per-ticket JSON and docs/__version__/tickets_list.json synchronized is recommended operating practice."
-        in content
-    )
-    assert "- `tx.begin` before task lifecycle events" in content
-    assert (
-        "- `tx.verify.pass` before `tx.file_intent.update` with `state=verified`"
-        in content
-    )
-    assert (
-        "- file intent updates require a previously registered file intent for the same path"
-        in content
-    )
-    assert (
-        "- commit operations require a valid verify sequence and existing transaction context"
-        in content
-    )
-    assert (
         'SOURCE_RULES_FALLBACK="${PWD}/src/agentops_mcp_server/workflow_rules_fallback.txt"'
         in content
     )
     assert 'elif [ -f "$SOURCE_RULES_FALLBACK" ]; then' in content
     assert 'cp "$SOURCE_RULES_FALLBACK" "$SOURCE_RULES"' in content
+    assert "python - <<" in content
+    assert (
+        'exec(Path("src/agentops_mcp_server/workflow_rules.py").read_text(), namespace)'
+        in content
+    )
     assert "cat <<'RULES' > \"$SOURCE_RULES\"" not in content

@@ -1158,6 +1158,15 @@ def test_ops_complete_file_intent_emits_complete_after_verify_pass(
         session_id="s1",
         payload={"ok": True},
     )
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    tx_state["active_tx"]["verify_state"] = {
+        "status": "passed",
+        "last_result": {"ok": True},
+    }
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
     result = ops.ops_complete_file_intent(
         path="src/file.py",

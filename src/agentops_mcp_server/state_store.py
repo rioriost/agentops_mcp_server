@@ -681,6 +681,40 @@ class StateStore:
                 "next_action"
             ):
                 active_tx["next_action"] = "tx.verify.start"
+        elif event_type and event_type.startswith("tx.file_intent."):
+            file_intents = active_tx.get("file_intents")
+            if not isinstance(file_intents, list):
+                file_intents = []
+                active_tx["file_intents"] = file_intents
+            path = payload.get("path") if isinstance(payload.get("path"), str) else ""
+            intent = None
+            for item in file_intents:
+                if isinstance(item, dict) and item.get("path") == path:
+                    intent = item
+                    break
+            if event_type == "tx.file_intent.add":
+                if intent is None:
+                    intent = {
+                        "path": path,
+                        "operation": payload.get("operation")
+                        if isinstance(payload.get("operation"), str)
+                        else "",
+                        "purpose": payload.get("purpose")
+                        if isinstance(payload.get("purpose"), str)
+                        else "",
+                        "planned_step": payload.get("planned_step")
+                        if isinstance(payload.get("planned_step"), str)
+                        else "",
+                        "state": payload.get("state")
+                        if isinstance(payload.get("state"), str)
+                        else "planned",
+                        "last_event_seq": 0,
+                    }
+                    file_intents.append(intent)
+            elif intent is not None and isinstance(payload.get("state"), str):
+                intent["state"] = payload.get("state")
+            if intent is not None and isinstance(payload.get("state"), str):
+                intent["state"] = payload.get("state")
         elif event_type == "tx.end.done":
             active_tx["semantic_summary"] = "Transaction ended"
             active_tx["next_action"] = "tx.end.done"
@@ -711,6 +745,16 @@ class StateStore:
             event_id=event_id,
         )
         event_seq = event_result["seq"]
+        if event_type and event_type.startswith("tx.file_intent."):
+            file_intents = active_tx.get("file_intents")
+            if isinstance(file_intents, list):
+                path = (
+                    payload.get("path") if isinstance(payload.get("path"), str) else ""
+                )
+                for intent in file_intents:
+                    if isinstance(intent, dict) and intent.get("path") == path:
+                        intent["last_event_seq"] = event_seq
+                        break
         next_state["last_applied_seq"] = event_seq
         integrity = next_state.get("integrity")
         if not isinstance(integrity, dict):
