@@ -39,7 +39,7 @@
       "id": "p1-t03",
       "priority": "P0",
       "title": "Define persistence, rebuild, and issuance responsibilities",
-      "status": "planned",
+      "status": "in-progress",
       "file": "v0.6.0/p1-t03.json"
     },
     {
@@ -110,9 +110,9 @@
     }
   ],
   "status_context": {
-    "active_ticket": "p1-t01",
-    "canonical_sync_state": "ready",
-    "reason": "The 0.6.0 effort has been reframed around redesigning the work loop itself as a resumable transaction protocol. The next step is to lock the canonical transaction model, state machine, and persistence contract before implementation tickets change runtime behavior.",
-    "recommended_action": "Start with p1-t01, then p1-t02 and p1-t03, to lock the transaction model, the state-machine and `next_action` contract, and the minimal persistence or issuance model before runtime implementation begins."
+    "active_ticket": "p1-t03",
+    "canonical_sync_state": "in-progress",
+    "reason": "Phase 1 has completed the transaction model and state-machine definition work. The active focus is now p1-t03, which is refining the canonical persistence, rebuild, and issuance contract for durable resume behavior.",
+    "recommended_action": "Continue p1-t03 by locking the roles of `.agent/tx_state.json`, `.agent/tx_event_log.jsonl`, and `.agent/tx_id_counter.json`, along with write-order guarantees, rebuild and fallback ordering, missing-versus-malformed handling, issuance semantics, and JSON-facing representation rules before Phase 2 implementation begins."
   }
 }

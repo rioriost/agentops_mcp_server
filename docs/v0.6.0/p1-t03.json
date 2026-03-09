@@ -2,8 +2,8 @@
   "id": "p1-t03",
   "title": "Define persistence, rebuild, and issuance responsibilities",
   "priority": "P0",
-  "status": "planned",
-  "summary": "Create the authoritative 0.6.0 contract for the minimal canonical persistence model that makes the redesigned work loop durably resumable. This ticket defines the roles of `.agent/tx_state.json`, `.agent/tx_event_log.jsonl`, and `.agent/tx_id_counter.json`, the canonical write-order guarantees between event append and materialized state update, the rebuild and fallback responsibilities when materialized state is missing or incomplete, and the monotonic transaction ID issuance rules that prevent ad hoc transaction creation during resume or repair flows.",
+  "status": "in-progress",
+  "summary": "Create the authoritative 0.6.0 contract for the minimal canonical persistence model that makes the redesigned work loop durably resumable. This ticket defines the roles of `.agent/tx_state.json`, `.agent/tx_event_log.jsonl`, and `.agent/tx_id_counter.json`, the canonical write-order guarantees between event append, materialized state update, and cursor or snapshot persistence, the rebuild and fallback order when canonical artifacts are missing, incomplete, inconsistent, or malformed, the monotonic transaction ID issuance rules that prevent ad hoc transaction creation during resume or repair flows, and the JSON-facing representation rules for issued transaction identifiers.",
   "inputs": [
     "docs/draft_0.6.0.md",
     "docs/v0.6.0/plan.md",
@@ -20,9 +20,10 @@
     "A documented canonical role for `.agent/tx_state.json` as the primary resume entrypoint",
     "A documented canonical role for `.agent/tx_event_log.jsonl` as the append-only history and rebuild source",
     "A documented canonical role for `.agent/tx_id_counter.json` as transaction issuance metadata",
-    "A documented write-order contract for event append, materialized state update, and required cursor or snapshot persistence",
-    "A documented rebuild and fallback contract for missing, incomplete, or malformed persistence artifacts",
+    "A documented canonical write-order contract for event append, materialized state update, and required cursor or snapshot persistence",
+    "A documented rebuild and fallback contract for missing, incomplete, inconsistent, or malformed persistence artifacts",
     "A documented monotonic transaction ID issuance contract for new transaction creation only",
+    "A documented JSON-facing representation rule for issued transaction identifiers",
     "Implementation-ready acceptance boundaries for downstream 0.6.0 tickets"
   ],
   "acceptance_criteria": [
@@ -33,8 +34,9 @@
     "The contract defines the minimum required canonical fields or responsibilities for `.agent/tx_state.json` needed to continue an interrupted active transaction safely.",
     "The contract defines the required fields and meanings for `.agent/tx_id_counter.json`, including `last_issued_id` and `updated_at`.",
     "The contract explicitly defines the canonical write-order rule: event append before materialized state update before any required cursor or snapshot persistence.",
-    "The contract explicitly defines the fallback and rebuild order when `.agent/tx_state.json` is missing, incomplete, or inconsistent.",
+    "The contract explicitly defines the resume and rebuild source-of-truth order: healthy `.agent/tx_state.json` first, then exact rebuild from `.agent/tx_event_log.jsonl` when materialized state is missing, incomplete, or inconsistent, then explicit failure when deterministic continuation cannot be established safely.",
     "The contract explicitly distinguishes missing artifacts from malformed artifacts and states that malformed canonical persistence must fail clearly rather than degrade silently.",
+    "The contract explicitly defines artifact-specific missing behavior, including that missing `.agent/tx_event_log.jsonl` indicates an uninitialized or damaged workspace while a present-but-empty event log is a valid zero-event baseline.",
     "The contract explicitly states that a new `tx_id` may be minted only during canonical transaction begin and must not be minted during resume, rebuild, verify, commit, or repair continuation.",
     "The contract defines the expected JSON-facing representation for newly issued transaction identifiers.",
     "The contract is specific enough that downstream tickets can implement issuance, rebuild, resume fallback, and persistence validation without inventing per-module semantics ad hoc.",
@@ -48,17 +50,14 @@
     "Define the required fields and field meanings for `.agent/tx_id_counter.json`, including `last_issued_id` and `updated_at`.",
     "Clarify the JSON-facing representation for newly issued `tx_id` values and document the rule explicitly.",
     "Define the write-order guarantees between event append, materialized transaction state update, and any required cursor or snapshot persistence.",
-    "Define the canonical resume source-of-truth order, including when to trust materialized state and when rebuild from event history is required.",
-    "Define the fallback behavior for missing `.agent/tx_state.json`, missing `.agent/tx_id_counter.json`, and missing-but-valid zero-event baselines where applicable.",
-    "Define the failure behavior for malformed `.agent/tx_state.json`, malformed `.agent/tx_event_log.jsonl`, and malformed `.agent/tx_id_counter.json`.",
+    "Define the canonical resume source-of-truth order, including when to trust materialized state and when exact rebuild from event history is required.",
+    "Define the fallback behavior for missing `.agent/tx_state.json`, missing `.agent/tx_id_counter.json`, missing `.agent/tx_event_log.jsonl`, and missing-but-valid zero-event baselines where applicable.",
+    "Define the failure behavior for malformed `.agent/tx_state.json`, malformed `.agent/tx_event_log.jsonl`, malformed `.agent/tx_id_counter.json`, and ambiguous integrity states that cannot safely continue.",
     "Define the monotonic transaction ID issuance semantics, including initial counter value, first issued ID, increment rule, and issuance timing.",
     "Define the rule that only canonical transaction begin may mint a new `tx_id`, and explicitly forbid minting new IDs during resume, rebuild, verify, commit, or repair continuation.",
     "Leave implementation-ready notes for downstream tickets that will update state persistence, rebuild logic, transaction issuance helpers, validation behavior, and interruption-focused regression coverage."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02"
-  ],
+  "dependencies": ["p1-t01", "p1-t02"],
   "notes": [
     "This ticket is contract-definition work, not the full runtime implementation.",
     "The most important outcome is a minimal persistence contract that is strong enough to support deterministic continuation after interruption without proliferating canonical artifacts unnecessarily.",
@@ -94,10 +93,7 @@
     },
     "tx_id_counter_contract": {
       "path": ".agent/tx_id_counter.json",
-      "required_fields": [
-        "last_issued_id",
-        "updated_at"
-      ],
+      "required_fields": ["last_issued_id", "updated_at"],
       "field_semantics": {
         "last_issued_id": "The most recent issued monotonic transaction identifier.",
         "updated_at": "RFC 3339 timestamp of the most recent successful counter update."
@@ -114,9 +110,15 @@
     "rebuild_policy": {
       "resume_source_of_truth_order": [
         "healthy materialized transaction state",
-        "canonical event-log rebuild when materialized state is missing or incomplete",
+        "canonical event-log rebuild when materialized state is missing, incomplete, or inconsistent",
         "explicit failure when integrity is ambiguous and no safe deterministic continuation exists"
       ],
+      "artifact_specific_rules": {
+        "tx_state_missing": "If `.agent/tx_state.json` is missing, resume may fall back to exact reconstruction from canonical event history when the event log is healthy.",
+        "tx_event_log_missing": "Missing `.agent/tx_event_log.jsonl` means the workspace is uninitialized or damaged and must not be silently treated as a valid empty history.",
+        "tx_event_log_present_empty": "A present-but-empty `.agent/tx_event_log.jsonl` is a valid initialized zero-event baseline.",
+        "tx_id_counter_missing": "Missing `.agent/tx_id_counter.json` blocks new transaction issuance until issuance metadata is initialized or repaired, but it does not by itself rewrite lifecycle history."
+      },
       "missing_vs_malformed": {
         "missing": "May trigger documented initialization or rebuild behavior when the artifact type allows it.",
         "malformed": "Must fail clearly and must not be silently treated as empty or valid baseline state."
@@ -135,11 +137,11 @@
       "Verify, commit, and repair continuation must not mint new transaction IDs."
     ],
     "representation_rules": {
-      "recommended_json_representation": "Serialize newly issued monotonic positive transaction identifiers as strings in JSON-facing artifacts.",
-      "examples": [
-        "1",
-        "2",
-        "3"
+      "recommended_json_representation": "Serialize newly issued monotonic positive transaction identifiers as decimal strings in JSON-facing artifacts.",
+      "examples": ["1", "2", "3"],
+      "notes": [
+        "The JSON-facing form is stringified even when the issuance counter is tracked numerically.",
+        "Resume, rebuild, verify, commit, and repair continuation must preserve the originally issued `tx_id` representation rather than reminting or renumbering it."
       ]
     },
     "design_bias": {
