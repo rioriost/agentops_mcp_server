@@ -2,7 +2,7 @@
   "id": "p2-t07",
   "title": "Repair canonical tx_id collisions and rebuild invalid-seq reporting mismatch",
   "priority": "P1",
-  "status": "planned",
+  "status": "in-progress",
   "summary": "Repair the canonical-history damage caused by treating user-controlled ticket identifiers as canonical transaction identifiers, and fix the rebuild/reporting mismatch that currently reports `rebuild_invalid_seq` as the last valid sequence rather than the invalid event sequence in some drift cases. This ticket shifts the repair model toward opaque database-style `tx_id` values, keeps human-facing ticket naming separate from canonical transaction identity, and restores trustworthy canonical observability before further lifecycle automation depends on it.",
   "inputs": [
     "docs/draft_0.5.4.md",

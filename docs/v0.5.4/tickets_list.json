@@ -60,21 +60,21 @@
       "id": "p2-t05",
       "priority": "P1",
       "title": "Make helper tx.begin bootstrap canonical-aware and resume-safe",
-      "status": "planned",
+      "status": "done",
       "file": "v0.5.4/p2-t05.json"
     },
     {
       "id": "p2-t06",
       "priority": "P1",
       "title": "Implement canonical-aware helper tx.begin bootstrap guard",
-      "status": "blocked",
+      "status": "done",
       "file": "v0.5.4/p2-t06.json"
     },
     {
       "id": "p2-t07",
       "priority": "P0",
       "title": "Repair canonical ticket ID collision handling and global tx_id uniqueness",
-      "status": "planned",
+      "status": "in-progress",
       "file": "v0.5.4/p2-t07.json"
     },
     {
@@ -93,9 +93,9 @@
     }
   ],
   "status_context": {
-    "active_ticket": "p2-t06",
+    "active_ticket": "p2-t07",
     "canonical_sync_state": "blocked",
     "reason": "Canonical history is currently blocked by duplicate tx.begin caused by global ticket ID collisions: p2-t01 was reused across multiple versions, so new 0.5.4 lifecycle events collided with prior canonical transactions. Until repair is complete, downstream implementation work such as p2-t06 must remain blocked even though p2-t01 is functionally complete.",
-    "recommended_action": "Work p2-t06 now to implement the canonical-aware helper bootstrap guard using the completed p2-t05 planning, while keeping the canonical collision issue visible for follow-up repair."
+    "recommended_action": "Work p2-t07 now to repair the canonical tx_id collision issue and the rebuild invalid-seq reporting mismatch before relying further on canonical observability."
   }
 }
