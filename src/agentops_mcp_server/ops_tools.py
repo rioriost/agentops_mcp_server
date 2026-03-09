@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .git_repo import GitRepo
 from .repo_context import RepoContext
 from .state_rebuilder import StateRebuilder
-from .state_store import StateStore, now_iso
+from .state_store import StateStore, canonical_tx_id, now_iso
 from .workflow_response import (
     build_failure_response,
     build_success_response,
@@ -752,11 +752,12 @@ class OpsTools:
     ) -> Optional[Dict[str, Any]]:
         resolved_title = title.strip() if isinstance(title, str) else ""
         resolved_task_id = task_id.strip() if isinstance(task_id, str) else ""
-        tx_id = resolved_task_id or resolved_title
-        if not tx_id:
+        ticket_id = resolved_task_id or resolved_title
+        if not ticket_id:
             return None
-        ticket_id = tx_id
         active_tx = self._active_tx()
+        active_tx_id = self._normalize_tx_identifier(active_tx.get("tx_id"))
+        tx_id = active_tx_id or ticket_id
         resolved_session_id = self._resolve_session_id(session_id, active_tx)
         actor: Dict[str, Any] = {"tool": "ops_tools"}
         if isinstance(agent_id, str) and agent_id.strip():
@@ -772,6 +773,8 @@ class OpsTools:
                 )
                 has_materialized_identity = bool(existing_tx_id or existing_ticket_id)
                 if event_type == "tx.begin" or has_materialized_identity:
+                    if event_type == "tx.begin":
+                        tx_id = canonical_tx_id(ticket_id)
                     active_tx["tx_id"] = tx_id
                     active_tx["ticket_id"] = ticket_id
                     active_tx["status"] = phase
@@ -799,6 +802,8 @@ class OpsTools:
                 else {}
             )
             if integrity.get("drift_detected") is not True:
+                if event_type == "tx.begin":
+                    tx_id = canonical_tx_id(ticket_id)
                 active_tx = state.get("active_tx")
                 if isinstance(active_tx, dict):
                     active_tx["tx_id"] = tx_id

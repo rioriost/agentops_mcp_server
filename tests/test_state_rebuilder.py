@@ -717,6 +717,91 @@ def test_rebuild_tx_state_logs_observed_mismatch_for_duplicate_begin(
     assert rebuild["state"]["active_tx"]["current_step"] == "none"
 
 
+def test_rebuild_tx_state_duplicate_begin_reports_invalid_seq_not_last_valid_seq(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(
+        state_store,
+        tx_id="tx-1",
+        ticket_id="p2-t01",
+        step_id="none",
+        payload={"ticket_id": "p2-t01", "ticket_title": "first release"},
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-duplicate-begin",
+            "tx_id": "tx-1",
+            "ticket_id": "p2-t01",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a1"},
+            "session_id": "s1",
+            "payload": {"ticket_id": "p2-t01", "ticket_title": "duplicate begin"},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 1
+    assert rebuild["state"]["rebuild_warning"] == "duplicate tx.begin"
+    assert rebuild["state"]["rebuild_invalid_seq"] == 2
+    assert rebuild["state"]["rebuild_invalid_seq"] != rebuild["last_applied_seq"]
+
+    observed = rebuild["state"]["rebuild_observed_mismatch"]
+    assert observed["last_applied_seq"] == 1
+    assert observed["invalid_reason"] == "duplicate tx.begin"
+    assert observed["invalid_event"]["seq"] == 2
+    assert rebuild["state"]["rebuild_invalid_seq"] == observed["invalid_event"]["seq"]
+
+
+def test_rebuild_tx_state_detects_ticket_label_collision_across_distinct_tx_ids(
+    repo_context, state_store, state_rebuilder
+):
+    _append_tx_event(
+        state_store,
+        tx_id="tx-release-1",
+        ticket_id="p2-t01",
+        step_id="none",
+        payload={"ticket_id": "p2-t01", "ticket_title": "release 1"},
+    )
+    _append_raw_tx_event(
+        repo_context,
+        {
+            "seq": 2,
+            "event_id": "evt-collision-begin",
+            "tx_id": "tx-release-2",
+            "ticket_id": "p2-t01",
+            "event_type": "tx.begin",
+            "phase": "in-progress",
+            "step_id": "none",
+            "actor": {"agent_id": "a2"},
+            "session_id": "s2",
+            "payload": {"ticket_id": "p2-t01", "ticket_title": "release 2"},
+        },
+    )
+
+    rebuild = state_rebuilder.rebuild_tx_state()
+
+    assert rebuild["ok"] is True
+    assert rebuild["last_applied_seq"] == 1
+    assert rebuild["state"]["integrity"]["drift_detected"] is True
+    assert rebuild["state"]["rebuild_warning"] == "duplicate tx.begin"
+    assert rebuild["state"]["rebuild_invalid_seq"] == 2
+    assert rebuild["state"]["rebuild_invalid_event"]["seq"] == 2
+    assert rebuild["state"]["rebuild_invalid_event"]["tx_id"] == "tx-release-2"
+    assert rebuild["state"]["rebuild_invalid_event"]["ticket_id"] == "p2-t01"
+
+    observed = rebuild["state"]["rebuild_observed_mismatch"]
+    assert observed["invalid_reason"] == "duplicate tx.begin"
+    assert observed["invalid_event"]["seq"] == 2
+    assert observed["invalid_event"]["tx_id"] == "tx-release-2"
+    assert observed["invalid_event"]["ticket_id"] == "p2-t01"
+
+
 def test_rebuild_tx_state_allows_tx_begin_after_terminal_for_same_tx(
     repo_context, state_store, state_rebuilder
 ):

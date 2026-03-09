@@ -1,4 +1,5 @@
 import json
+import uuid
 from pathlib import Path
 from typing import Any, Dict
 
@@ -429,22 +430,102 @@ def test_ops_start_task_bootstraps_tx_on_zero_event_baseline(
     assert result["tx_phase"] == "in-progress"
     assert result["next_action"] == "tx.verify.start"
     assert result["terminal"] is False
+
+
+def test_ops_start_task_separates_opaque_tx_id_from_user_task_label(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops.ops_start_task(
+        title="Build",
+        task_id="v0.5.4/p2-t07",
+        session_id="s1",
+    )
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert [event["event_type"] for event in events] == ["tx.begin", "tx.step.enter"]
+    assert events[0]["ticket_id"] == "v0.5.4/p2-t07"
+    assert events[1]["ticket_id"] == "v0.5.4/p2-t07"
+    assert events[0]["payload"]["ticket_id"] == "v0.5.4/p2-t07"
+    assert events[0]["tx_id"].startswith("tx-v0.5.4-p2-t07-")
+    assert events[1]["tx_id"] == events[0]["tx_id"]
+    assert events[0]["tx_id"] != events[0]["ticket_id"]
+
+
+def test_ops_start_task_collision_across_releases_requires_distinct_canonical_tx_id(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(
+        state_store,
+        state_rebuilder,
+        tx_id="tx-p2-t01-existing",
+        session_id="s1",
+        title="0.5.3 p2-t01",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "cannot emit tx.begin for an already-active non-terminal transaction; "
+            "resume it with task update semantics instead"
+        ),
+    ):
+        ops.ops_start_task(title="0.5.4 p2-t01", task_id="p2-t01", session_id="s2")
+
+
+def test_ops_start_task_allows_distinct_release_scoped_ticket_labels(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(
+        state_store,
+        state_rebuilder,
+        tx_id="tx-v0.5.3-p2-t01-existing",
+        session_id="s1",
+        title="0.5.3 p2-t01",
+    )
+    _set_active_tx(
+        repo_context,
+        tx_id="tx-v0.5.3-p2-t01-existing",
+        ticket_id="v0.5.3/p2-t01",
+        status="done",
+        phase="done",
+        current_step="complete",
+        session_id="s1",
+    )
+
+    result = ops.ops_start_task(
+        title="0.5.4 p2-t01",
+        task_id="v0.5.4/p2-t01",
+        session_id="s2",
+    )
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert events[-2]["event_type"] == "tx.begin"
+    assert events[-2]["tx_id"].startswith("tx-v0.5.4-p2-t01-")
+    assert events[-2]["ticket_id"] == "v0.5.4/p2-t01"
+    assert events[-1]["event_type"] == "tx.step.enter"
+    assert events[-1]["tx_id"] == events[-2]["tx_id"]
+    assert events[-1]["ticket_id"] == "v0.5.4/p2-t01"
     assert result["requires_followup"] is True
     assert result["followup_tool"] is None
-    assert result["active_tx_id"] == "t-1"
-    assert result["active_ticket_id"] == "t-1"
-    assert result["current_step"] == "t-1"
+    assert result["active_tx_id"] == events[-2]["tx_id"]
+    assert result["active_ticket_id"] == "v0.5.4/p2-t01"
+    assert result["current_step"] == "v0.5.4/p2-t01"
     assert result["verify_status"] == "not_started"
     assert result["commit_status"] == "not_started"
     assert result["can_start_new_ticket"] is False
     assert result["resume_required"] is True
-    events = _read_tx_events(repo_context)
     event_types = [event["event_type"] for event in events]
-    assert event_types == ["tx.begin", "tx.step.enter"]
-    assert events[0]["payload"]["ticket_id"] == "t-1"
-    assert events[0]["payload"]["ticket_title"] == "Build"
-    assert events[1]["payload"]["step_id"] == "t-1"
-    assert events[1]["payload"]["description"] == "task started"
+    assert event_types[-2:] == ["tx.begin", "tx.step.enter"]
+    assert events[-2]["payload"]["ticket_id"] == "v0.5.4/p2-t01"
+    assert events[-2]["payload"]["ticket_title"] == "0.5.4 p2-t01"
+    assert events[-1]["payload"]["step_id"] == "v0.5.4/p2-t01"
+    assert events[-1]["payload"]["description"] == "task started"
 
 
 def test_ops_start_task_requires_session_id(repo_context, state_store, state_rebuilder):

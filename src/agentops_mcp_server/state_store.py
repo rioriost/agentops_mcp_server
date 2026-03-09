@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,6 +43,17 @@ COMMIT_STATUS_VALUES = {"not_started", "running", "passed", "failed"}
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def canonical_tx_id(ticket_id: str) -> str:
+    if not isinstance(ticket_id, str) or not ticket_id.strip():
+        raise ValueError("ticket_id is required")
+    normalized_ticket_id = ticket_id.strip()
+    opaque_suffix = uuid.uuid4().hex[:12]
+    safe_ticket_id = re.sub(r"[^A-Za-z0-9._-]+", "-", normalized_ticket_id).strip("-")
+    if not safe_ticket_id:
+        safe_ticket_id = "ticket"
+    return f"tx-{safe_ticket_id}-{opaque_suffix}"
 
 
 class StateStore:

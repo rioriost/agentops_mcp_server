@@ -40,6 +40,16 @@ DEFAULT_FAILURE_ACTIONS = {
         "recommended_next_tool": "tx_state_rebuild",
         "recommended_action": "Repair or replace the invalid canonical history before treating the transaction state as healthy.",
     },
+    "tx_id_collision": {
+        "recoverable": False,
+        "recommended_next_tool": "tx_state_rebuild",
+        "recommended_action": "Do not treat the collided history as healthy. Repair the historical log, assign future canonical tx_id values as opaque identifiers, and keep user-facing ticket labels separate from canonical transaction identity.",
+    },
+    "historical_repair_required": {
+        "recoverable": False,
+        "recommended_next_tool": "tx_state_rebuild",
+        "recommended_action": "Historical repair is required before resume-safe automation can continue. Preserve the invalid event metadata, repair or replace the damaged canonical history, and avoid reusing human ticket labels as canonical tx_id values.",
+    },
 }
 
 

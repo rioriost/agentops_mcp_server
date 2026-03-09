@@ -2,7 +2,7 @@
   "id": "p2-t07",
   "title": "Repair canonical tx_id collisions and rebuild invalid-seq reporting mismatch",
   "priority": "P1",
-  "status": "in-progress",
+  "status": "done",
   "summary": "Repair the canonical-history damage caused by treating user-controlled ticket identifiers as canonical transaction identifiers, and fix the rebuild/reporting mismatch that currently reports `rebuild_invalid_seq` as the last valid sequence rather than the invalid event sequence in some drift cases. This ticket shifts the repair model toward opaque database-style `tx_id` values, keeps human-facing ticket naming separate from canonical transaction identity, and restores trustworthy canonical observability before further lifecycle automation depends on it.",
   "inputs": [
     "docs/draft_0.5.4.md",
@@ -47,6 +47,9 @@
     "The root cause includes using user-controlled labels as canonical identifiers, so the fix must separate opaque `tx_id` generation from human-facing ticket naming in addition to any code-level drift reporting change.",
     "The known reporting bug is that rebuild logic can retain the invalid event itself while later overwriting `rebuild_invalid_seq` with the last valid sequence, which makes diagnostics misleading during incident triage.",
     "This ticket should complement p2-t06: p2-t06 hardens helper bootstrap behavior, while p2-t07 repairs the diagnostic and operational clarity around historical collisions, opaque tx_id discipline, and rebuild reporting.",
-    "Successful completion should make it much easier to distinguish a real duplicate-begin caused by tx_id collision from a misleading reporting artifact in rebuild output."
+    "Successful completion should make it much easier to distinguish a real duplicate-begin caused by tx_id collision from a misleading reporting artifact in rebuild output.",
+    "Progress update: opaque `tx_id` generation is now separated from user-controlled ticket labels at runtime lifecycle entry points, and rebuild/reporting guidance has been clarified for collision handling.",
+    "Historical repair guidance must stay explicit: damaged logs that reused a human ticket label as canonical `tx_id` should be treated as requiring operator-visible repair or replacement with fresh opaque transaction identifiers, not silently normalized as healthy history.",
+    "Regression coverage now includes invalid-sequence reporting consistency and release-to-release ticket-label collision scenarios so canonical `tx_id` values remain unique and opaque."
   ]
 }
