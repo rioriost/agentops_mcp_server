@@ -1,0 +1,60 @@
+{
+  "id": "p2-t04",
+  "title": "Recover prior session context during resume across manual Zed session changes",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Ensure lifecycle-aware resume behavior can recover the active transaction's prior `session_id` and related context from canonical persisted state when the user starts a new Zed session and the old session id is no longer available from live caller context. This ticket covers canonical lookup order, machine-readable recovery failures, and regression protection for manual session-switch resume flows without weakening strict lifecycle validation.",
+  "inputs": [
+    "docs/draft_0.5.4.md",
+    "docs/v0.5.4/plan.md",
+    "docs/v0.5.4/tickets_list.json",
+    "docs/v0.5.4/p1-t01.json",
+    "docs/v0.5.4/p1-t02.json",
+    "docs/v0.5.4/p1-t03.json",
+    "docs/v0.5.4/p2-t02.json",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    ".agent/tx_state.json",
+    ".agent/tx_event_log.jsonl",
+    "tests/test_ops_tools.py",
+    "tests/test_state_store.py",
+    "tests/test_state_rebuilder.py"
+  ],
+  "outputs": [
+    "Resume-safe session-context recovery rules for lifecycle-aware tools",
+    "Implementation support for recovering prior `session_id` from canonical persisted state",
+    "Structured machine-readable failure behavior when safe session-context recovery is not possible",
+    "Regression tests covering manual Zed session-switch resume flows"
+  ],
+  "acceptance_criteria": [
+    "Resume-capable lifecycle tools do not assume the caller still has the original session id in memory after a manual Zed session switch.",
+    "When a non-terminal active transaction exists, prior session context is recovered from materialized `tx_state` when available.",
+    "When materialized state is missing or incomplete, canonical event history or replay-derived state is used as the fallback source for prior session context.",
+    "If safe session-context recovery is not possible, the tool returns a structured machine-readable failure instead of only a free-form validation string.",
+    "Recovery behavior preserves strict canonical lifecycle validation and does not guess healthy state from ambiguous or invalid history.",
+    "Regression tests cover both successful prior-session recovery and irrecoverable session-context failure paths."
+  ],
+  "tasks": [
+    "Audit lifecycle-aware wrapper and helper entry points that currently require explicit `session_id` input during resume flows.",
+    "Define the canonical lookup order for prior session context during resume: materialized `tx_state`, then canonical `tx_event_log` or replay-derived state, then structured recovery failure if neither source is sufficient.",
+    "Implement or refactor shared resume-context helpers so lifecycle-aware tools can recover prior `session_id` and related transaction identity safely from canonical persisted state.",
+    "Ensure recovered session context is derived from canonical persisted state rather than caller memory or ad hoc inference.",
+    "Add structured failure behavior for missing, incomplete, ambiguous, or unrecoverable prior session context during resume.",
+    "Add regression tests for manual Zed session changes where a new session resumes prior non-terminal work without the old session id in live caller context."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03",
+    "p2-t02"
+  ],
+  "notes": [
+    "This ticket exists because Zed session switching is user-driven and the runtime cannot rely on a reliable session-close signal from the client.",
+    "The main recovery source should be canonical persisted state, not transient agent memory.",
+    "Prefer materialized `tx_state` first, but use canonical event history or replay-derived state as the fallback when materialized state is missing or incomplete.",
+    "Structured recovery failures should make it clear whether the problem is missing context, ambiguous canonical state, or integrity-blocked history.",
+    "This ticket should improve resumability without weakening strict lifecycle or integrity guarantees."
+  ]
+}

@@ -7,7 +7,10 @@ from .git_repo import GitRepo
 from .state_rebuilder import StateRebuilder
 from .state_store import StateStore
 from .verify_runner import VerifyRunner
-from .workflow_response import build_guidance_from_active_tx
+from .workflow_response import (
+    build_guidance_from_active_tx,
+    build_structured_helper_failure,
+)
 
 
 class CommitManager:
@@ -80,10 +83,26 @@ class CommitManager:
     def _ensure_verify_started(self) -> None:
         tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
         if not isinstance(tx_state, dict):
-            raise RuntimeError("verify.start not recorded; tx_state missing")
+            raise RuntimeError(
+                build_structured_helper_failure(
+                    error_code="invalid_ordering",
+                    reason="verify.start not recorded; tx_state missing",
+                    tx_state=None,
+                    recommended_next_tool="repo_verify",
+                    recommended_action="Ensure canonical transaction state is materialized before returning verify results.",
+                )["reason"]
+            )
         active_tx = tx_state.get("active_tx")
         if not isinstance(active_tx, dict):
-            raise RuntimeError("verify.start not recorded; active_tx missing")
+            raise RuntimeError(
+                build_structured_helper_failure(
+                    error_code="invalid_ordering",
+                    reason="verify.start not recorded; active_tx missing",
+                    tx_state=tx_state,
+                    recommended_next_tool="repo_verify",
+                    recommended_action="Restore the active transaction state before returning verify results.",
+                )["reason"]
+            )
         verify_state = (
             active_tx.get("verify_state")
             if isinstance(active_tx.get("verify_state"), dict)
@@ -112,10 +131,22 @@ class CommitManager:
                             self.state_store.tx_state_save(rebuilt_state)
                             return
             raise RuntimeError(
-                "verify.start emitted but tx_state was not updated to running"
+                build_structured_helper_failure(
+                    error_code="invalid_ordering",
+                    reason="verify.start emitted but tx_state was not updated to running",
+                    tx_state=tx_state,
+                    recommended_next_tool="repo_verify",
+                    recommended_action="Repair state persistence so verify.start updates canonical verify_state before continuing.",
+                )["reason"]
             )
         raise RuntimeError(
-            "verify.start not recorded; tx.begin required before verify results"
+            build_structured_helper_failure(
+                error_code="begin_required",
+                reason="verify.start not recorded; tx.begin required before verify results",
+                tx_state=tx_state,
+                recommended_next_tool="ops_start_task",
+                recommended_action="Start or resume the canonical transaction before returning verify results.",
+            )["reason"]
         )
 
     def _emit_tx_event(
@@ -329,7 +360,17 @@ class CommitManager:
                 phase_override="checking",
             )
             raise RuntimeError(
-                f"verify failed (code={verify_result['returncode']}): {verify_result['stderr']}"
+                str(
+                    build_structured_helper_failure(
+                        error_code="verify_failed",
+                        reason=f"verify failed (code={verify_result['returncode']}): {verify_result['stderr']}",
+                        tx_state=self.state_store.read_json_file(
+                            self.repo_context.tx_state
+                        ),
+                        recommended_next_tool="repo_verify",
+                        recommended_action="Repair the verification failure and rerun verification before attempting commit.",
+                    )
+                )
             )
         self._emit_tx_event(
             event_type="tx.verify.pass",
@@ -394,7 +435,17 @@ class CommitManager:
                     phase_override="checking",
                 )
                 raise RuntimeError(
-                    f"verify failed (code={verify_result['returncode']}): {details}"
+                    str(
+                        build_structured_helper_failure(
+                            error_code="verify_failed",
+                            reason=f"verify failed (code={verify_result['returncode']}): {details}",
+                            tx_state=self.state_store.read_json_file(
+                                self.repo_context.tx_state
+                            ),
+                            recommended_next_tool="repo_verify",
+                            recommended_action="Repair the verification failure and rerun verification before attempting commit.",
+                        )
+                    )
                 )
             self._emit_tx_event(
                 event_type="tx.verify.pass",
@@ -432,7 +483,13 @@ class CommitManager:
                 },
                 phase_override="verified",
             )
-            result: Dict[str, Any] = {"ok": False, "reason": "no changes to commit"}
+            result = build_structured_helper_failure(
+                error_code="invalid_ordering",
+                reason="no changes to commit",
+                tx_state=self.state_store.read_json_file(self.repo_context.tx_state),
+                recommended_next_tool="ops_end_task",
+                recommended_action="If work is already verified and nothing remains to commit, close the transaction explicitly or make additional changes before retrying commit.",
+            )
             result.update(self._workflow_guidance())
             return result
 
@@ -460,7 +517,15 @@ class CommitManager:
                     },
                     phase_override="verified",
                 )
-                result: Dict[str, Any] = {"ok": False, "reason": "no files specified"}
+                result = build_structured_helper_failure(
+                    error_code="invalid_ordering",
+                    reason="no files specified",
+                    tx_state=self.state_store.read_json_file(
+                        self.repo_context.tx_state
+                    ),
+                    recommended_next_tool="repo_commit",
+                    recommended_action="Specify commit paths or use auto staging before retrying commit.",
+                )
                 result.update(self._workflow_guidance())
                 return result
             self.git_repo.git("add", *paths)

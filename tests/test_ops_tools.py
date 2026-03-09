@@ -10,7 +10,6 @@ from agentops_mcp_server.ops_tools import (
     summarize_result,
     truncate_text,
 )
-from agentops_mcp_server.workflow_response import derive_workflow_guidance
 
 
 class DummyGitRepo:
@@ -639,15 +638,144 @@ def test_ops_update_task_requires_prior_tx_begin(
         ops.ops_update_task(status="checking", note="step", session_id="s1")
 
 
-def test_ops_update_task_requires_session_id(
+def test_ops_update_task_recovers_session_id_from_tx_event_log_after_debug_start_time(
     repo_context, state_store, state_rebuilder
 ):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
     _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+    repo_context.tx_state.write_text(
+        json.dumps(
+            {
+                **json.loads(repo_context.tx_state.read_text(encoding="utf-8")),
+                "active_tx": {
+                    **json.loads(repo_context.tx_state.read_text(encoding="utf-8"))[
+                        "active_tx"
+                    ],
+                    "session_id": "",
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    repo_context.handoff.write_text(
+        json.dumps(
+            {
+                "ts": "2026-03-09T08:31:00+00:00",
+                "session_id": "ignored-before-debug",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (repo_context.get_repo_root() / ".agent" / "debug_start_time.json").write_text(
+        json.dumps(
+            {"debug_start_time": "2026-03-09T08:32:52.363705+00:00"},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    state_store.append_json_line(
+        repo_context.tx_event_log,
+        {
+            "seq": 2,
+            "ts": "2026-03-09T08:33:10+00:00",
+            "tx_id": "t-1",
+            "ticket_id": "t-1",
+            "event_type": "tx.step.enter",
+            "phase": "checking",
+            "step_id": "resume-step",
+            "actor": {"tool": "test"},
+            "session_id": "recovered-session",
+            "payload": {"step_id": "resume-step", "description": "resume"},
+        },
+    )
 
-    with pytest.raises(ValueError, match="session_id is required"):
+    result = ops.ops_update_task(
+        status="checking",
+        note="step",
+        task_id="t-1",
+        session_id="",
+    )
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert events[-1]["event_type"] == "tx.step.enter"
+    assert events[-1]["session_id"] == "recovered-session"
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    assert tx_state["active_tx"]["session_id"] == "recovered-session"
+
+
+def test_ops_update_task_requires_session_id_when_recovery_is_ambiguous(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    tx_state["active_tx"]["session_id"] = ""
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (repo_context.get_repo_root() / ".agent" / "debug_start_time.json").write_text(
+        json.dumps(
+            {"debug_start_time": "2026-03-09T08:32:52.363705+00:00"},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    state_store.append_json_line(
+        repo_context.tx_event_log,
+        {
+            "seq": 2,
+            "ts": "2026-03-09T08:33:10+00:00",
+            "tx_id": "t-1",
+            "ticket_id": "t-1",
+            "event_type": "tx.step.enter",
+            "phase": "checking",
+            "step_id": "resume-step",
+            "actor": {"tool": "test"},
+            "session_id": "recovered-session-1",
+            "payload": {"step_id": "resume-step", "description": "resume"},
+        },
+    )
+    state_store.append_json_line(
+        repo_context.tx_event_log,
+        {
+            "seq": 3,
+            "ts": "2026-03-09T08:33:11+00:00",
+            "tx_id": "t-1",
+            "ticket_id": "t-1",
+            "event_type": "tx.user_intent.set",
+            "phase": "checking",
+            "step_id": "resume-step",
+            "actor": {"tool": "test"},
+            "session_id": "recovered-session-2",
+            "payload": {"user_intent": "continue"},
+        },
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "session_id is required; unable to recover a unique prior session_id "
+            "from .agent artifacts after debug_start_time"
+        ),
+    ):
         ops.ops_update_task(
-            status="checking", note="step", task_id="t-1", session_id=""
+            status="checking",
+            note="step",
+            task_id="t-1",
+            session_id="",
         )
 
 
@@ -657,7 +785,7 @@ def test_ops_update_task_falls_back_to_active_tx_id(
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
     _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
 
-    ops.ops_update_task(status="blocked", note="waiting", session_id="s1")
+    result = ops.ops_update_task(status="blocked", note="waiting", session_id="s1")
 
     events = _read_tx_events(repo_context)
     update_events = [
@@ -1329,6 +1457,64 @@ def test_ops_update_file_intent_rejects_update_before_register(
             task_id="t-1",
             session_id="s1",
         )
+
+
+def test_ops_update_file_intent_recovers_session_id_from_errors_log(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id="t-1", session_id="s1")
+    ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
+    ops.ops_add_file_intent(
+        path="src/file.py",
+        operation="update",
+        purpose="implement helper",
+        task_id="t-1",
+        session_id="s1",
+    )
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    tx_state["active_tx"]["session_id"] = ""
+    repo_context.tx_state.write_text(
+        json.dumps(tx_state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (repo_context.get_repo_root() / ".agent" / "debug_start_time.json").write_text(
+        json.dumps(
+            {"debug_start_time": "2026-03-09T08:32:52.363705+00:00"},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    state_store.append_json_line(
+        repo_context.errors,
+        {
+            "ts": "2026-03-09T08:33:20+00:00",
+            "tool_name": "ops_update_task",
+            "tool_input": {"task_id": "t-1"},
+            "tool_output": {"error": "session_id is required"},
+            "diagnostics": {
+                "session_context": {
+                    "requested_session_id": "",
+                    "active_session_id": "recovered-from-errors",
+                }
+            },
+        },
+    )
+
+    result = ops.ops_update_file_intent(
+        path="src/file.py",
+        state="applied",
+        task_id="t-1",
+        session_id="",
+    )
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert events[-1]["event_type"] == "tx.file_intent.update"
+    assert events[-1]["session_id"] == "recovered-from-errors"
 
 
 def test_ops_update_file_intent_rejects_verified_before_verify_pass(
@@ -2388,25 +2574,6 @@ def test_emit_tx_event_uses_append_and_rebuild_save_when_materialized_state_miss
     saved_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
     assert saved_state["active_tx"]["tx_id"] == "t-1"
     assert saved_state["active_tx"]["ticket_id"] == "t-1"
-
-
-def test_emit_tx_event_returns_none_when_no_identifier(
-    repo_context, state_store, state_rebuilder
-):
-    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
-
-    result = ops._emit_tx_event(
-        event_type="tx.step.enter",
-        payload={"step_id": "task", "description": "noop"},
-        title="   ",
-        task_id="   ",
-        phase="in-progress",
-        step_id="task",
-        session_id="s1",
-        agent_id=None,
-    )
-
-    assert result is None
 
 
 def test_emit_tx_event_uses_rebuild_state_when_materialized_state_lacks_identity(

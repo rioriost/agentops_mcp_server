@@ -42,7 +42,16 @@ As a result, agents can still mis-handle:
 - begin vs resume decisions,
 - terminal vs non-terminal transaction handling,
 - follow-up requirements after helper success,
-- and lifecycle recovery after state-related failures.
+- lifecycle recovery after state-related failures,
+- and resume attempts that start in a new client session after the prior Zed session was manually switched by the user.
+
+In particular, current operational constraints matter here:
+- Zed session switching is user-driven and manual,
+- the AI agent does not receive a reliable signal that the prior session was closed,
+- the MCP server does not receive a reliable session-close event either,
+- and a newly started session therefore cannot assume the previous session id is available from live memory.
+
+That means resume-safe behavior must recover prior transaction session context from persisted canonical artifacts instead of assuming the caller can always provide the old session id explicitly.
 
 ## Scope
 
@@ -52,6 +61,7 @@ As a result, agents can still mis-handle:
 - Extending failure responses to expose structured recovery guidance consistently.
 - Clarifying response semantics for `status`, `phase`, `next_action`, and terminality.
 - Standardizing follow-up signaling after verify/commit helpers.
+- Defining resume-safe recovery behavior for `session_id` and related transaction context when a new client session resumes prior work.
 - Adding regression tests for success and failure guidance contracts.
 - Updating docs and contract-facing descriptions where necessary.
 
@@ -68,6 +78,7 @@ After 0.5.4:
 - agents can tell whether they must begin, resume, repair, commit, or explicitly end a transaction,
 - helpers explicitly report whether more lifecycle work remains,
 - failure responses become machine-readable enough for deterministic branching,
+- resume logic can recover the prior transaction session context from persisted canonical artifacts when the user has started a new Zed session,
 - and canonical status remains strict without becoming opaque.
 
 ## Design Principles
@@ -90,8 +101,11 @@ Agents should be able to distinguish:
 - active resumable transaction,
 - terminal transaction,
 - integrity-blocked state,
-- and invalid operation ordering
+- invalid operation ordering,
+- and missing or recoverable session-context state
 from structured response data.
+
+Resume behavior must not assume that the current client session id matches the session id that originally opened the active transaction. When the user starts a new Zed session, lifecycle-aware tools must recover the prior transaction session context from canonical persisted state before deciding whether resume can proceed.
 
 ## Proposed Response Contract
 
@@ -122,6 +136,7 @@ When applicable, also expose:
 - These fields must describe the resulting canonical state after the tool completes.
 - Guidance must be internally consistent across tools.
 - Missing fields should be omitted only when truly unknown, not because the tool is returning a minimal payload.
+- Resume-relevant responses should expose enough active-transaction context for an agent to tell whether prior session context was successfully recovered or further recovery work is required.
 
 ## Shared failure guidance
 Lifecycle- and state-related failures should expose a normalized structured failure result.
@@ -153,6 +168,7 @@ When known, also expose:
 - Similar failure modes should use stable error codes.
 - Human-readable strings may remain, but should not be the only decision surface.
 - Failure results should let agents branch without parsing prose alone.
+- Missing prior `session_id` context during resume should be represented as a structured recovery outcome, not only as a free-form validation string.
 
 ## Lifecycle tools in scope
 The following tools should be aligned with the new contract:
@@ -211,8 +227,13 @@ The following tools should be aligned with the new contract:
   - terminal vs non-terminal state,
   - follow-up requirements,
   - active transaction identity,
-  - and resume/new-ticket guidance.
+  - resume/new-ticket guidance,
+  - and resume-session context recovery guidance.
 - Ensure helpers read canonical state rather than re-deriving from ad hoc assumptions.
+- Define canonical lookup order for prior session context during resume:
+  1. materialized `tx_state`,
+  2. canonical `tx_event_log` / replay-derived state,
+  3. structured recovery failure when neither source can supply safe session context.
 
 **Deliverables**
 - Shared response-building utilities.
@@ -292,6 +313,7 @@ The following tools should be aligned with the new contract:
 - Identify common lifecycle/state failure families, such as:
   - begin required,
   - resume required,
+  - missing session context during resume,
   - event after terminal,
   - cannot verify terminal transaction,
   - file intent already exists,
@@ -305,7 +327,8 @@ The following tools should be aligned with the new contract:
   - active resumable transaction,
   - terminal transaction,
   - integrity-blocked state,
-  - and invalid ordering.
+  - invalid ordering,
+  - and missing recoverable vs unrecoverable prior session context.
 
 **Deliverables**
 - Structured failure contract across key lifecycle tools.
@@ -354,8 +377,10 @@ The following tools should be aligned with the new contract:
   - `committed` remaining non-terminal,
   - integrity-blocked guidance,
   - active transaction identity reporting,
-  - and can-start/resume-required signaling.
+  - can-start/resume-required signaling,
+  - and resume behavior after the user starts a new Zed session without the old session id in live caller context.
 - Add regression tests that fail if tools revert to ambiguous minimal lifecycle responses.
+- Add regression tests that verify prior `session_id` recovery prefers `tx_state`, falls back to canonical event history when needed, and returns structured failure when safe recovery is impossible.
 
 **Deliverables**
 - A regression suite protecting the workflow-guidance contract.

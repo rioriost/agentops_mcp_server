@@ -50,6 +50,13 @@
       "file": "v0.5.4/p2-t03.json"
     },
     {
+      "id": "p2-t04",
+      "priority": "P1",
+      "title": "Recover prior session context during resume across manual Zed session changes",
+      "status": "planned",
+      "file": "v0.5.4/p2-t04.json"
+    },
+    {
       "id": "p3-t01",
       "priority": "P1",
       "title": "Add regression tests for workflow guidance contract",

@@ -4,6 +4,43 @@ from typing import Any, Dict, Mapping, Optional
 
 TERMINAL_STATUSES = {"done", "blocked"}
 END_TASK_ACTIONS = {"tx.end.done", "tx.end.blocked"}
+DEFAULT_FAILURE_ACTIONS = {
+    "begin_required": {
+        "recoverable": True,
+        "recommended_next_tool": "ops_start_task",
+        "recommended_action": "Start or resume the canonical transaction before emitting lifecycle events.",
+    },
+    "resume_required": {
+        "recoverable": True,
+        "recommended_next_tool": "ops_update_task",
+        "recommended_action": "Resume or complete the active transaction before starting a different ticket.",
+    },
+    "terminal_transaction": {
+        "recoverable": False,
+        "recommended_next_tool": "ops_start_task",
+        "recommended_action": "Do not emit more lifecycle events for a terminal transaction; start a new ticket only when canonical state allows it.",
+    },
+    "invalid_ordering": {
+        "recoverable": True,
+        "recommended_next_tool": "ops_update_task",
+        "recommended_action": "Follow the canonical lifecycle ordering and retry from the required prerequisite step.",
+    },
+    "verify_failed": {
+        "recoverable": True,
+        "recommended_next_tool": "repo_verify",
+        "recommended_action": "Repair the verification failure and rerun verification before attempting commit.",
+    },
+    "commit_required": {
+        "recoverable": True,
+        "recommended_next_tool": "repo_commit",
+        "recommended_action": "Complete the commit workflow before attempting terminal completion.",
+    },
+    "integrity_blocked": {
+        "recoverable": False,
+        "recommended_next_tool": "tx_state_rebuild",
+        "recommended_action": "Repair or replace the invalid canonical history before treating the transaction state as healthy.",
+    },
+}
 
 
 def _clean_str(value: Any) -> str:
@@ -46,6 +83,10 @@ def _verify_state_from_active_tx(active_tx: Mapping[str, Any]) -> Dict[str, Any]
 
 def _commit_state_from_active_tx(active_tx: Mapping[str, Any]) -> Dict[str, Any]:
     return _as_dict(active_tx.get("commit_state"))
+
+
+def _failure_defaults(error_code: str) -> Dict[str, Any]:
+    return dict(DEFAULT_FAILURE_ACTIONS.get(error_code, {}))
 
 
 def _integrity_from_state(tx_state: Any) -> Dict[str, Any]:
@@ -220,20 +261,41 @@ def build_failure_response(
     include_legacy_guidance: bool = True,
     **guidance_overrides: Any,
 ) -> Dict[str, Any]:
-    if not _clean_str(error_code):
+    cleaned_error_code = _clean_str(error_code)
+    if not cleaned_error_code:
         raise ValueError("error_code is required")
-    if not _clean_str(reason):
+    cleaned_reason = _clean_str(reason)
+    if not cleaned_reason:
         raise ValueError("reason is required")
+
+    defaults = _failure_defaults(cleaned_error_code)
+    resolved_recommended_next_tool = _clean_optional_str(recommended_next_tool)
+    if resolved_recommended_next_tool is None:
+        resolved_recommended_next_tool = _clean_optional_str(
+            defaults.get("recommended_next_tool")
+        )
+
+    resolved_recommended_action = _clean_optional_str(recommended_action)
+    if resolved_recommended_action is None:
+        resolved_recommended_action = _clean_optional_str(
+            defaults.get("recommended_action")
+        )
+
+    resolved_recoverable = (
+        recoverable
+        if isinstance(recoverable, bool)
+        else bool(defaults.get("recoverable", False))
+    )
 
     guidance = derive_workflow_guidance(tx_state, **guidance_overrides)
 
     response: Dict[str, Any] = {
         "ok": False,
-        "error_code": _clean_str(error_code),
-        "reason": _clean_str(reason),
-        "recoverable": bool(recoverable),
-        "recommended_next_tool": _clean_optional_str(recommended_next_tool),
-        "recommended_action": _clean_optional_str(recommended_action),
+        "error_code": cleaned_error_code,
+        "reason": cleaned_reason,
+        "recoverable": resolved_recoverable,
+        "recommended_next_tool": resolved_recommended_next_tool,
+        "recommended_action": resolved_recommended_action,
         "canonical_status": guidance["canonical_status"],
         "canonical_phase": guidance["canonical_phase"],
         "next_action": guidance["next_action"],
@@ -267,6 +329,50 @@ def build_failure_response(
 
 def build_guidance_from_active_tx(active_tx: Mapping[str, Any]) -> Dict[str, Any]:
     return derive_workflow_guidance({"active_tx": dict(active_tx)})
+
+
+def build_structured_helper_failure(
+    *,
+    error_code: Any,
+    reason: Any,
+    tx_state: Any = None,
+    recommended_next_tool: Any = None,
+    recommended_action: Any = None,
+    recoverable: Any = None,
+    blocked: Any = None,
+    rebuild_warning: Any = None,
+    rebuild_invalid_seq: Any = None,
+    rebuild_observed_mismatch: Any = None,
+    **guidance_overrides: Any,
+) -> Dict[str, Any]:
+    cleaned_error_code = _clean_str(error_code)
+    defaults = _failure_defaults(cleaned_error_code)
+    resolved_recoverable = (
+        recoverable
+        if isinstance(recoverable, bool)
+        else defaults.get("recoverable", False)
+    )
+    return build_failure_response(
+        error_code=cleaned_error_code,
+        reason=reason,
+        tx_state=tx_state,
+        recoverable=bool(resolved_recoverable),
+        recommended_next_tool=(
+            recommended_next_tool
+            if recommended_next_tool is not None
+            else defaults.get("recommended_next_tool")
+        ),
+        recommended_action=(
+            recommended_action
+            if recommended_action is not None
+            else defaults.get("recommended_action")
+        ),
+        blocked=blocked,
+        rebuild_warning=rebuild_warning,
+        rebuild_invalid_seq=rebuild_invalid_seq,
+        rebuild_observed_mismatch=rebuild_observed_mismatch,
+        **guidance_overrides,
+    )
 
 
 def merge_response_data(

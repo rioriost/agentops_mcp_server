@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -101,6 +102,202 @@ class OpsTools:
         state = self._load_tx_state()
         active_tx = state.get("active_tx")
         return active_tx if isinstance(active_tx, dict) else {}
+
+    def _parse_iso_datetime(self, value: Any) -> Optional[datetime]:
+        if not isinstance(value, str):
+            return None
+        candidate = value.strip()
+        if not candidate:
+            return None
+        try:
+            return datetime.fromisoformat(candidate.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+    def _debug_start_time(self) -> Optional[datetime]:
+        payload = self.state_store.read_json_file(
+            self.repo_context.get_repo_root() / ".agent" / "debug_start_time.json"
+        )
+        if not isinstance(payload, dict):
+            return None
+        return self._parse_iso_datetime(payload.get("debug_start_time"))
+
+    def _iter_candidate_session_ids_from_agent_artifact(
+        self, path: Path, debug_start_time: Optional[datetime]
+    ) -> List[str]:
+        if not path.exists() or not path.is_file():
+            return []
+
+        candidates: List[str] = []
+        seen: set[str] = set()
+
+        def _collect(value: Any) -> None:
+            if isinstance(value, dict):
+                for key, nested in value.items():
+                    if key == "session_id" and isinstance(nested, str):
+                        cleaned = nested.strip()
+                        if cleaned and cleaned not in seen:
+                            seen.add(cleaned)
+                            candidates.append(cleaned)
+                    else:
+                        _collect(nested)
+            elif isinstance(value, list):
+                for item in value:
+                    _collect(item)
+
+        try:
+            if path.suffix == ".jsonl":
+                for raw_line in path.read_text(encoding="utf-8").splitlines():
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if not isinstance(record, dict):
+                        continue
+                    if debug_start_time is not None:
+                        ts = self._parse_iso_datetime(record.get("ts"))
+                        if ts is None or ts < debug_start_time:
+                            continue
+                    _collect(record)
+                return candidates
+
+            payload = self.state_store.read_json_file(path)
+            if not isinstance(payload, dict):
+                return []
+            if debug_start_time is not None:
+                ts = self._parse_iso_datetime(payload.get("ts"))
+                updated_at = self._parse_iso_datetime(payload.get("updated_at"))
+                effective_ts = updated_at or ts
+                if effective_ts is not None and effective_ts < debug_start_time:
+                    return []
+            _collect(payload)
+            return candidates
+        except OSError:
+            return []
+
+    def _recover_session_id_from_agent_artifacts(
+        self, active_tx: Dict[str, Any]
+    ) -> str:
+        active_tx_id = self._normalize_tx_identifier(active_tx.get("tx_id"))
+        active_ticket_id = self._normalize_tx_identifier(active_tx.get("ticket_id"))
+        debug_start_time = self._debug_start_time()
+        agent_dir = self.repo_context.get_repo_root() / ".agent"
+
+        candidate_paths = [
+            self.repo_context.tx_state,
+            self.repo_context.tx_event_log,
+            self.repo_context.errors,
+            self.repo_context.handoff,
+            self.repo_context.observability,
+        ]
+
+        for path in sorted(agent_dir.glob("*")):
+            if path in candidate_paths:
+                continue
+            if path.name == "debug_start_time.json":
+                continue
+            if path.is_file():
+                candidate_paths.append(path)
+
+        matching_candidates: List[str] = []
+        fallback_candidates: List[str] = []
+        matching_seen: set[str] = set()
+        fallback_seen: set[str] = set()
+
+        def _append_unique(target: List[str], seen: set[str], value: str) -> None:
+            if value and value not in seen:
+                seen.add(value)
+                target.append(value)
+
+        for path in candidate_paths:
+            sessions = self._iter_candidate_session_ids_from_agent_artifact(
+                path, debug_start_time
+            )
+            if not sessions:
+                continue
+
+            if path == self.repo_context.tx_event_log:
+                try:
+                    for raw_line in path.read_text(encoding="utf-8").splitlines():
+                        line = raw_line.strip()
+                        if not line:
+                            continue
+                        try:
+                            record = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if not isinstance(record, dict):
+                            continue
+                        if debug_start_time is not None:
+                            ts = self._parse_iso_datetime(record.get("ts"))
+                            if ts is None or ts < debug_start_time:
+                                continue
+                        record_tx_id = self._normalize_tx_identifier(
+                            record.get("tx_id")
+                        )
+                        record_ticket_id = self._normalize_tx_identifier(
+                            record.get("ticket_id")
+                        )
+                        record_session_id = record.get("session_id")
+                        if (
+                            isinstance(record_session_id, str)
+                            and record_session_id.strip()
+                            and (
+                                (active_tx_id and record_tx_id == active_tx_id)
+                                or (
+                                    active_ticket_id
+                                    and record_ticket_id == active_ticket_id
+                                )
+                            )
+                        ):
+                            _append_unique(
+                                matching_candidates,
+                                matching_seen,
+                                record_session_id.strip(),
+                            )
+                except OSError:
+                    pass
+
+            for session_id in sessions:
+                _append_unique(fallback_candidates, fallback_seen, session_id)
+
+        if len(matching_candidates) == 1:
+            return matching_candidates[0]
+        if len(matching_candidates) > 1:
+            raise ValueError(
+                "session_id is required; unable to recover a unique prior session_id "
+                "from .agent artifacts after debug_start_time"
+            )
+        if len(fallback_candidates) == 1:
+            return fallback_candidates[0]
+        raise ValueError(
+            "session_id is required; unable to recover prior session_id from .agent "
+            "artifacts after debug_start_time"
+        )
+
+    def _resolve_session_id(
+        self, session_id: Optional[str], active_tx: Optional[Dict[str, Any]] = None
+    ) -> str:
+        resolved_session_id = (
+            session_id.strip()
+            if isinstance(session_id, str) and session_id.strip()
+            else ""
+        )
+        if resolved_session_id:
+            return resolved_session_id
+
+        candidate_active_tx = active_tx if isinstance(active_tx, dict) else None
+        if candidate_active_tx is None:
+            candidate_active_tx = self._active_tx()
+
+        materialized_session_id = candidate_active_tx.get("session_id")
+        if isinstance(materialized_session_id, str) and materialized_session_id.strip():
+            return materialized_session_id.strip()
+
+        return self._recover_session_id_from_agent_artifacts(candidate_active_tx)
 
     def _workflow_success_response(
         self,
@@ -559,9 +756,8 @@ class OpsTools:
         if not tx_id:
             return None
         ticket_id = tx_id
-        if not isinstance(session_id, str) or not session_id.strip():
-            raise ValueError("session_id is required")
-        resolved_session_id = session_id.strip()
+        active_tx = self._active_tx()
+        resolved_session_id = self._resolve_session_id(session_id, active_tx)
         actor: Dict[str, Any] = {"tool": "ops_tools"}
         if isinstance(agent_id, str) and agent_id.strip():
             actor["agent_id"] = agent_id.strip()
@@ -654,13 +850,7 @@ class OpsTools:
         active_tx, active_tx_id = self._require_active_tx(resolved_task_id or None)
         if not resolved_task_id:
             resolved_task_id = active_tx_id
-        resolved_session_id = (
-            session_id.strip()
-            if isinstance(session_id, str) and session_id.strip()
-            else ""
-        )
-        if not resolved_session_id:
-            raise ValueError("session_id is required")
+        resolved_session_id = self._resolve_session_id(session_id, active_tx)
         return active_tx, active_tx_id, resolved_session_id
 
     def ops_add_file_intent(

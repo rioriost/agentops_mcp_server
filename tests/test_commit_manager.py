@@ -9,6 +9,7 @@ from agentops_mcp_server.commit_manager import CommitManager
 from agentops_mcp_server.repo_context import RepoContext
 from agentops_mcp_server.state_rebuilder import StateRebuilder
 from agentops_mcp_server.state_store import StateStore
+from agentops_mcp_server.workflow_response import build_structured_helper_failure
 
 
 class DummyGitRepo:
@@ -132,6 +133,13 @@ def test_repo_commit_no_changes():
     result = manager.repo_commit(message="msg", files="auto", run_verify=False)
     assert result["ok"] is False
     assert result["reason"] == "no changes to commit"
+    assert result["error_code"] == "invalid_ordering"
+    assert result["recoverable"] is True
+    assert result["recommended_next_tool"] == "ops_end_task"
+    assert (
+        result["recommended_action"]
+        == "If work is already verified and nothing remains to commit, close the transaction explicitly or make additional changes before retrying commit."
+    )
     assert result["terminal"] is False
     assert result["requires_followup"] is False
     assert result["followup_tool"] is None
@@ -202,6 +210,22 @@ def test_repo_commit_auto_message(monkeypatch):
     assert ("add", "-A") in git_repo.calls
 
 
+def test_repo_commit_no_files_specified_returns_structured_failure():
+    manager, *_ = _build_manager(status_lines=[" M file.txt"])
+
+    result = manager.repo_commit(message="msg", files=[], run_verify=False)
+
+    assert result["ok"] is False
+    assert result["reason"] == "no files specified"
+    assert result["error_code"] == "invalid_ordering"
+    assert result["recoverable"] is True
+    assert result["recommended_next_tool"] == "repo_commit"
+    assert (
+        result["recommended_action"]
+        == "Specify commit paths or use auto staging before retrying commit."
+    )
+
+
 def test_commit_if_verified_runs_verify(tmp_path, monkeypatch):
     repo_context = RepoContext(tmp_path)
     state_store = StateStore(repo_context)
@@ -250,6 +274,52 @@ def test_commit_if_verified_runs_verify(tmp_path, monkeypatch):
     assert result["followup_tool"] == "ops_end_task"
     assert manager.verify_runner.calls == [5]
     assert ("add", "-A") in manager.git_repo.calls
+
+
+def test_commit_if_verified_verify_failure_raises_structured_failure(tmp_path):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    state_store.tx_event_append(
+        tx_id="tx-1",
+        ticket_id="p4-t3",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="commit",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "p4-t3", "ticket_title": "p4-t3"},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+    _write_tx_state(state_store, verify_state_status="running")
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner(
+            {"ok": False, "returncode": 7, "stdout": "", "stderr": "boom"}
+        ),
+        state_store,
+        state_rebuilder,
+    )
+
+    with pytest.raises(RuntimeError) as excinfo:
+        manager.commit_if_verified("message", timeout_sec=5)
+
+    failure = eval(
+        str(excinfo.value),
+        {"__builtins__": {}},
+        {"False": False, "True": True, "None": None},
+    )
+    assert failure["ok"] is False
+    assert failure["error_code"] == "verify_failed"
+    assert failure["recoverable"] is True
+    assert failure["recommended_next_tool"] == "repo_verify"
+    assert (
+        failure["recommended_action"]
+        == "Repair the verification failure and rerun verification before attempting commit."
+    )
+    assert failure["reason"] == "verify failed (code=7): boom"
 
 
 def test_commit_if_verified_emits_tx_commit_events(tmp_path, monkeypatch):
@@ -337,6 +407,68 @@ def test_commit_if_verified_emits_tx_commit_events(tmp_path, monkeypatch):
     assert active_tx["status"] == "committed"
     assert active_tx["phase"] == "committed"
     assert active_tx["next_action"] in {"tx.end.done", "tx.begin"}
+
+
+def test_repo_commit_verify_failure_raises_structured_failure(tmp_path):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    state_store.tx_event_append(
+        tx_id="tx-1",
+        ticket_id="p4-t3",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="commit",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "p4-t3", "ticket_title": "p4-t3"},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+    _write_tx_state(state_store, verify_state_status="running")
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner(
+            {"ok": False, "returncode": 9, "stdout": "", "stderr": "verify failed"}
+        ),
+        state_store,
+        state_rebuilder,
+    )
+
+    with pytest.raises(RuntimeError) as excinfo:
+        manager.repo_commit(message="msg", files="auto", run_verify=True, timeout_sec=5)
+
+    failure = eval(
+        str(excinfo.value),
+        {"__builtins__": {}},
+        {"False": False, "True": True, "None": None},
+    )
+    assert failure["ok"] is False
+    assert failure["error_code"] == "verify_failed"
+    assert failure["recoverable"] is True
+    assert failure["recommended_next_tool"] == "repo_verify"
+    assert (
+        failure["recommended_action"]
+        == "Repair the verification failure and rerun verification before attempting commit."
+    )
+    assert failure["reason"] == "verify failed (code=9): verify failed"
+
+
+def test_build_structured_helper_failure_defaults_commit_required():
+    result = build_structured_helper_failure(
+        error_code="commit_required",
+        reason="complete commit workflow first",
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "commit_required"
+    assert result["recoverable"] is True
+    assert result["recommended_next_tool"] == "repo_commit"
+    assert (
+        result["recommended_action"]
+        == "Complete the commit workflow before attempting terminal completion."
+    )
 
 
 def test_commit_if_verified_backfills_tx_begin_when_log_empty(tmp_path, monkeypatch):
