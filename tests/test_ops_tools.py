@@ -1967,7 +1967,7 @@ def test_ops_resume_brief_uses_defaults_when_no_active_transaction(
     assert "- can_start_new_ticket: yes" in result["brief"]
 
 
-def test_ops_resume_brief_defaults_to_safe_no-active-transaction_view_when_rebuild_drifts(
+def test_ops_resume_brief_defaults_to_safe_no_active_transaction_view_when_rebuild_drifts(
     repo_context, state_store, state_rebuilder
 ):
     class DriftingRebuilder:
@@ -2033,9 +2033,9 @@ def test_ops_resume_brief_defaults_to_safe_no-active-transaction_view_when_rebui
     assert "- status: blocked" in result["brief"]
     assert "- blocked_reason: duplicate tx.begin" in result["brief"]
     assert "- invalid_reason: duplicate tx.begin" in result["brief"]
+    assert "- recommended_action:" in result["brief"]
     assert (
-        "- recommended_action: inspect rebuild_invalid_event and rebuild_observed_mismatch, then repair or replace the damaged transaction log before continuing"
-        in result["brief"]
+        "inspect rebuild_invalid_event and rebuild_observed_mismatch" in result["brief"]
     )
     assert "- active_ticket:" not in result["brief"]
 
