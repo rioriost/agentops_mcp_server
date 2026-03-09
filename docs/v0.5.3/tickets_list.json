@@ -27,7 +27,7 @@
       "id": "p3-t01",
       "priority": "P1",
       "title": "Add regression coverage for duplicate tx.begin prevention and detection",
-      "status": "planned",
+      "status": "verified",
       "file": "v0.5.3/p3-t01.json"
     }
   ]

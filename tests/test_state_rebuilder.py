@@ -651,7 +651,7 @@ def test_rebuild_tx_state_logs_observed_mismatch_for_invalid_ordering(
 def test_rebuild_tx_state_logs_observed_mismatch_for_duplicate_begin(
     repo_context, state_store, state_rebuilder
 ):
-    _append_tx_event(state_store, tx_id="tx-1", ticket_id="p2-t3")
+    _append_tx_event(state_store)
     _append_raw_tx_event(
         repo_context,
         {
@@ -675,6 +675,15 @@ def test_rebuild_tx_state_logs_observed_mismatch_for_duplicate_begin(
     assert rebuild["state"]["integrity"]["drift_detected"] is True
     assert rebuild["state"]["rebuild_warning"] == "duplicate tx.begin"
     assert rebuild["state"]["rebuild_invalid_seq"] == 1
+    assert rebuild["state"]["rebuild_invalid_event"]["seq"] == 2
+    assert rebuild["state"]["rebuild_invalid_event"]["event_type"] == "tx.begin"
+    assert rebuild["state"]["rebuild_invalid_event"]["tx_id"] == "tx-1"
+    assert rebuild["state"]["rebuild_invalid_event"]["ticket_id"] == "p2-t3"
+    assert rebuild["state"]["rebuild_invalid_event"]["session_id"] == "s1"
+    assert (
+        rebuild["state"]["rebuild_invalid_event"]["payload"]["ticket_title"]
+        == "duplicate begin"
+    )
 
     observed = rebuild["state"]["rebuild_observed_mismatch"]
     assert observed["drift_reason"] == "duplicate tx.begin"

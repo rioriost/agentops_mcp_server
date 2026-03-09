@@ -1771,7 +1771,12 @@ def test_ops_capture_state_returns_actionable_guidance_for_duplicate_begin_drift
     result = ops.ops_capture_state(session_id="s1")
 
     assert result["ok"] is False
+    assert result["blocked"] is True
+    assert result["reason"] == "rebuild integrity drift detected"
     assert result["rebuild_warning"] == "duplicate tx.begin"
+    assert result["recommended_action"].startswith(
+        "Do not capture or trust canonical state until the invalid transaction history"
+    )
     assert result["rebuild_observed_mismatch"]["invalid_reason"] == "duplicate tx.begin"
     assert result["rebuild_observed_mismatch"]["active_tx_id"] == "none"
     assert result["rebuild_observed_mismatch"]["active_ticket_id"] == "none"
@@ -1862,6 +1867,15 @@ def test_ops_handoff_export_uses_materialized_state_when_rebuild_has_duplicate_b
     assert result["handoff"]["last_action"] == "Entered step resume-step"
     assert result["handoff"]["next_step"] == "tx.verify.start"
     assert result["handoff"]["compact_context"] == "Entered step resume-step"
+    assert result["handoff"]["integrity_status"] == "blocked"
+    assert result["handoff"]["blocked_reason"] == "duplicate tx.begin"
+    assert result["handoff"]["recommended_action"].startswith(
+        "Do not treat canonical state as healthy; inspect the invalid event metadata"
+    )
+    assert (
+        result["handoff"]["rebuild_observed_mismatch"]["invalid_reason"]
+        == "duplicate tx.begin"
+    )
 
 
 def test_ops_task_summary_uses_failure_reason_and_truncates(
@@ -2015,7 +2029,14 @@ def test_ops_resume_brief_defaults_to_safe_no-active-transaction_view_when_rebui
     result = ops.ops_resume_brief(max_chars=400)
 
     assert result["ok"] is True
-    assert "- can_start_new_ticket: yes" in result["brief"]
+    assert "- can_start_new_ticket: no" in result["brief"]
+    assert "- status: blocked" in result["brief"]
+    assert "- blocked_reason: duplicate tx.begin" in result["brief"]
+    assert "- invalid_reason: duplicate tx.begin" in result["brief"]
+    assert (
+        "- recommended_action: inspect rebuild_invalid_event and rebuild_observed_mismatch, then repair or replace the damaged transaction log before continuing"
+        in result["brief"]
+    )
     assert "- active_ticket:" not in result["brief"]
 
 

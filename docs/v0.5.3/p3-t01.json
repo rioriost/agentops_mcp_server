@@ -2,7 +2,7 @@
   "id": "p3-t01",
   "title": "Add regression coverage for duplicate tx.begin prevention, replay integrity, and state-facing behavior",
   "priority": "P1",
-  "status": "planned",
+  "status": "verified",
   "summary": "Add regression coverage for the 0.5.3 transaction-log integrity work so duplicate `tx.begin` conditions are prevented during normal lifecycle writes, detected deterministically during replay, and surfaced clearly in state-facing workflows. This ticket protects the integrity contract across lifecycle start helpers, replay/state rebuild logic, and observability or capture flows that depend on canonical transaction history.",
   "inputs": [
     "docs/draft_0.5.3.md",
@@ -38,11 +38,7 @@
     "Add assertions that prevention logic does not break legitimate start, update, verify, commit, and terminal lifecycle paths.",
     "Keep the regression suite focused on machine-actionable integrity behavior rather than human-facing documentation wording."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02",
-    "p2-t01"
-  ],
+  "dependencies": ["p1-t01", "p1-t02", "p2-t01"],
   "notes": [
     "This ticket is about protecting transaction-log integrity behavior after the 0.5.3 fix, not about redesigning the transaction model.",
     "The most important regression to prevent is a duplicate `tx.begin` entering canonical history in a way that later breaks replay or state capture.",
