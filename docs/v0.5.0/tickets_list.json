@@ -71,6 +71,13 @@
       "title": "Add regression coverage for workflow alignment and protocol enforcement",
       "status": "done",
       "file": "v0.5.0/p5-t02.json"
+    },
+    {
+      "id": "p5-t03",
+      "priority": "P2",
+      "title": "Extract scaffold rules fallback into a packaged fallback file",
+      "status": "done",
+      "file": "v0.5.0/p5-t03.json"
     }
   ]
 }

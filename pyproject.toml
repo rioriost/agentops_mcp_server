@@ -36,7 +36,10 @@ markers = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentops_mcp_server"]
-include = ["src/agentops_mcp_server/zed-agentops-init.sh"]
+include = [
+  "src/agentops_mcp_server/zed-agentops-init.sh",
+  "src/agentops_mcp_server/workflow_rules_fallback.txt",
+]
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -45,6 +48,7 @@ include = [
   "README-jp.md",
   "LICENSE",
   "src/agentops_mcp_server/zed-agentops-init.sh",
+  "src/agentops_mcp_server/workflow_rules_fallback.txt",
   "docs/**"
 ]
 exclude = [

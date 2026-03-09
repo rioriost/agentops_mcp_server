@@ -106,6 +106,7 @@ def test_init_script_contains_canonical_artifacts_and_rules():
     assert '"session_id": ""' in content
     assert '"drift_detected": false' in content
     assert '"active_tx_source": "none"' in content
+    assert "workflow_rules_fallback.txt" in content
 
 
 def test_init_script_documents_convention_boundary_and_helper_contract():
@@ -139,3 +140,10 @@ def test_init_script_documents_convention_boundary_and_helper_contract():
         "- commit operations require a valid verify sequence and existing transaction context"
         in content
     )
+    assert (
+        'SOURCE_RULES_FALLBACK="${PWD}/src/agentops_mcp_server/workflow_rules_fallback.txt"'
+        in content
+    )
+    assert 'elif [ -f "$SOURCE_RULES_FALLBACK" ]; then' in content
+    assert 'cp "$SOURCE_RULES_FALLBACK" "$SOURCE_RULES"' in content
+    assert "cat <<'RULES' > \"$SOURCE_RULES\"" not in content

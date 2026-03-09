@@ -1,0 +1,51 @@
+{
+  "id": "p5-t03",
+  "title": "Extract rules fallback text into a dedicated packaged file",
+  "priority": "P2",
+  "status": "done",
+  "summary": "This ticket is complete. The long `.rules` fallback heredoc was removed from `zed-agentops-init.sh` and replaced with a dedicated packaged fallback file, `src/agentops_mcp_server/workflow_rules_fallback.txt`. The scaffold still prefers the canonical rules generated from `workflow_rules.py` when available, while the fallback path now copies the packaged fallback resource instead of duplicating the full rules text inline in the shell script.",
+  "inputs": [
+    "docs/v0.5.0/plan.md",
+    "docs/v0.5.0/tickets_list.json",
+    "docs/v0.5.0/p1-t01.json",
+    "docs/v0.5.0/p5-t01.json",
+    "docs/v0.5.0/p5-t02.json",
+    ".rules",
+    "src/agentops_mcp_server/workflow_rules.py",
+    "src/agentops_mcp_server/zed-agentops-init.sh",
+    "src/agentops_mcp_server/init.py",
+    "pyproject.toml",
+    "tests/test_init.py"
+  ],
+  "outputs": [
+    "A dedicated packaged fallback rules file used by scaffold generation instead of a long inline shell heredoc",
+    "Reduced duplication between canonical workflow rules and fallback scaffold-generation content",
+    "Regression coverage confirming fallback rules packaging and scaffold behavior remain aligned"
+  ],
+  "acceptance_criteria": [
+    "The long fallback `.rules` text previously embedded in `zed-agentops-init.sh` is extracted into a dedicated file in the packaged project resources.",
+    "The normal scaffold-generation path continues to use the canonical rules generated from `workflow_rules.py` when that source is available.",
+    "The fallback scaffold-generation path no longer duplicates the full `.rules` content inline inside `zed-agentops-init.sh`.",
+    "The fallback file is packaged and available in the installed distribution wherever `zed-agentops-init.sh` depends on it.",
+    "Scaffold generation behavior remains correct for both canonical-source and fallback-source cases.",
+    "The change reduces maintenance drift risk without weakening the existing rules canonicalization approach.",
+    "Repository verification passed after the fallback-file extraction changes were implemented."
+  ],
+  "tasks": [
+    "Identify the current fallback `.rules` heredoc in `zed-agentops-init.sh` and define the minimal file-based extraction needed to remove inline duplication.",
+    "Create a dedicated packaged fallback rules file and place it in a location consistent with the current packaging strategy.",
+    "Update `zed-agentops-init.sh` so the fallback path reads or copies the packaged fallback file instead of embedding the full rules text inline.",
+    "Preserve the existing preferred path that generates `.rules` from `workflow_rules.py` when the canonical Python source is available.",
+    "Update packaging configuration so the fallback rules file is present in distributed artifacts.",
+    "Add or extend tests that confirm the packaged fallback file exists and that scaffold generation resources remain aligned.",
+    "Run repository verification and record concise evidence that the extraction did not change the intended workflow contract."
+  ],
+  "dependencies": ["p1-t01", "p5-t01", "p5-t02"],
+  "notes": [
+    "This is a maintenance and drift-reduction follow-up, not a change to the canonical workflow contract itself.",
+    "Keep `workflow_rules.py` as the canonical source of workflow rules.",
+    "The dedicated fallback file exists only to support scaffold generation when the canonical Python source is unavailable.",
+    "The shell script now uses `workflow_rules_fallback.txt` for the fallback path and no longer embeds the full `.rules` body inline.",
+    "Packaging and regression checks were updated so the fallback file is included in distributed artifacts and the old inline heredoc does not silently return."
+  ]
+}
