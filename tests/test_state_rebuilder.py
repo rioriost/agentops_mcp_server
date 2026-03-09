@@ -674,7 +674,7 @@ def test_rebuild_tx_state_logs_observed_mismatch_for_duplicate_begin(
     assert rebuild["last_applied_seq"] == 1
     assert rebuild["state"]["integrity"]["drift_detected"] is True
     assert rebuild["state"]["rebuild_warning"] == "duplicate tx.begin"
-    assert rebuild["state"]["rebuild_invalid_seq"] == 1
+    assert rebuild["state"]["rebuild_invalid_seq"] == 2
     assert rebuild["state"]["rebuild_invalid_event"]["seq"] == 2
     assert rebuild["state"]["rebuild_invalid_event"]["event_type"] == "tx.begin"
     assert rebuild["state"]["rebuild_invalid_event"]["tx_id"] == "tx-1"
@@ -1251,7 +1251,7 @@ def test_rebuild_tx_state_falls_back_semantic_summary_for_selected_active_tx(
     assert rebuild_again["state"]["active_tx"]["semantic_summary"] == ""
 
 
-def test_rebuild_tx_state_replaces_invalid_seq_with_last_valid_seq(
+def test_rebuild_tx_state_preserves_invalid_event_seq_in_rebuild_invalid_seq(
     repo_context, state_store, state_rebuilder
 ):
     _append_tx_event(state_store)
@@ -1276,7 +1276,7 @@ def test_rebuild_tx_state_replaces_invalid_seq_with_last_valid_seq(
     assert rebuild["ok"] is True
     assert rebuild["last_applied_seq"] == 1
     assert rebuild["state"]["rebuild_invalid_event"]["seq"] == 2
-    assert rebuild["state"]["rebuild_invalid_seq"] == 1
+    assert rebuild["state"]["rebuild_invalid_seq"] == 2
     assert rebuild["state"]["rebuild_warning"] == "duplicate tx.begin"
 
 

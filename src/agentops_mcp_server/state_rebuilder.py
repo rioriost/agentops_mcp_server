@@ -925,7 +925,8 @@ class StateRebuilder:
 
         if drift_detected:
             state["rebuild_warning"] = drift_reason
-            state["rebuild_invalid_seq"] = last_valid_seq
+            if "rebuild_invalid_seq" not in state:
+                state["rebuild_invalid_seq"] = last_valid_seq
             state["rebuild_observed_mismatch"] = self._record_rebuild_drift_error(
                 resolved_event_log=resolved_event_log,
                 last_valid_seq=last_valid_seq,
