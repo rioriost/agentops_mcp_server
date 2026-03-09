@@ -39,7 +39,7 @@
       "id": "p1-t03",
       "priority": "P0",
       "title": "Define persistence, rebuild, and issuance responsibilities",
-      "status": "in-progress",
+      "status": "done",
       "file": "v0.6.0/p1-t03.json"
     },
     {
@@ -110,9 +110,9 @@
     }
   ],
   "status_context": {
-    "active_ticket": "p1-t03",
-    "canonical_sync_state": "in-progress",
-    "reason": "Phase 1 has completed the transaction model and state-machine definition work. The active focus is now p1-t03, which is refining the canonical persistence, rebuild, and issuance contract down to field-level responsibilities, invariant rules, and concrete JSON examples for durable resume behavior.",
-    "recommended_action": "Continue p1-t03 by locking the minimum JSON-facing field sets for `.agent/tx_state.json`, `.agent/tx_event_log.jsonl`, and `.agent/tx_id_counter.json`, along with `active_tx` invariants, `verify_state` and `commit_state` object shapes, sequence consistency rules, error classification, and example JSON representations before Phase 2 implementation begins."
+    "active_ticket": "p2-t01",
+    "canonical_sync_state": "ready",
+    "reason": "Phase 1 has completed the transaction model, state-machine definition, and persistence contract work. The next focus is Phase 2 implementation, starting with issued transaction IDs and removal of ticket-derived transaction identity assumptions.",
+    "recommended_action": "Start p2-t01 to implement issued transaction IDs in place of ticket-derived `tx_id` generation, using the Phase 1 contracts as the authoritative boundary for identity, continuation, and persistence behavior."
   }
 }

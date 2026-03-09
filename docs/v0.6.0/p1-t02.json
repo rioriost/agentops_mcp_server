@@ -19,7 +19,7 @@
   "outputs": [
     "A documented canonical status model for resumable transaction execution",
     "A documented meaning for each of `in-progress`, `checking`, `verified`, `committed`, `done`, and `blocked`",
-    "A documented checkpoint-event contract for transaction continuation",
+    "A documented checkpoint-event contract for transaction continuation centered on explicit step-entry and lifecycle checkpoint events",
     "A documented role for `next_action` as the primary continuation guide",
     "A documented transition model that keeps commit non-terminal and explicit end terminal",
     "A documented idempotent continuation policy for interrupted verify, commit, and end flows",
@@ -31,7 +31,7 @@
     "The contract explicitly states which statuses are terminal and which remain resumable.",
     "The contract explicitly preserves the rule that repository commit is non-terminal and explicit end remains required for terminal success.",
     "The contract defines the expected high-level transaction progression and any allowed repair or retry loops without making the state machine ambiguous.",
-    "The contract defines the canonical checkpoint events needed to understand continuation and interruption-safe resume behavior.",
+    "The contract defines the canonical checkpoint events needed to understand continuation and interruption-safe resume behavior, including `tx.step.enter` as the canonical progress-checkpoint event.",
     "The contract explicitly defines `next_action` as the primary machine-readable continuation guide for an interrupted active transaction.",
     "The contract defines the state-machine-level continuation meaning of interruption around verify, commit, and explicit end checkpoints without turning this ticket into the runtime resume-implementation ticket.",
     "The contract defines idempotent continuation expectations so repeated resume of the same interrupted state does not corrupt lifecycle state or duplicate logical completion.",
@@ -44,7 +44,7 @@
     "Define which statuses are terminal and which are resumable.",
     "Define the expected high-level transaction progression from begin through explicit terminal completion.",
     "Define any bounded repair or retry loops needed for non-terminal continuation after verify or commit failures.",
-    "Define the canonical checkpoint events that represent resumable lifecycle progress.",
+    "Define the canonical checkpoint events that represent resumable lifecycle progress, including `tx.step.enter` as the progress-checkpoint event.",
     "Define the relationship between checkpoint events and materialized transaction status.",
     "Define the role of `next_action` as the primary machine-readable continuation guide for active transaction resume.",
     "Define what `next_action` should represent for each non-terminal status and major checkpoint condition.",
@@ -91,7 +91,7 @@
     "checkpoint_events": {
       "recommended_core_events": [
         "tx.begin",
-        "tx.progress",
+        "tx.step.enter",
         "tx.verify.start",
         "tx.verify.pass",
         "tx.verify.fail",
@@ -101,7 +101,8 @@
         "tx.end.done",
         "tx.end.blocked"
       ],
-      "purpose": "These events provide a compact checkpoint history sufficient to understand continuation and interruption-safe resume behavior."
+      "purpose": "These events provide a compact checkpoint history sufficient to understand continuation and interruption-safe resume behavior.",
+      "progress_checkpoint_rule": "`tx.step.enter` is the canonical progress-checkpoint event for the state-machine contract; `tx.progress` is not part of the canonical core event set."
     },
     "continuation_contract": {
       "primary_field": "next_action",

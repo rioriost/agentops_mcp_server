@@ -24,6 +24,7 @@
     "A documented rule that repository commit is non-terminal and explicit end is required for terminal success",
     "A documented bridge from resumable transaction semantics to machine-readable continuation guidance for active non-terminal work",
     "A documented no-sentinel policy for representing the absence of an active transaction",
+    "A documented structural rule that `active_tx` is `null` when no active transaction exists",
     "Implementation-ready acceptance boundaries for downstream 0.6.0 tickets"
   ],
   "acceptance_criteria": [
@@ -39,6 +40,7 @@
     "The contract explicitly states that terminal success requires explicit end-of-transaction handling such as `tx.end.done`.",
     "The contract explicitly states that successful repository commit may be necessary for a ticket-oriented transaction but is insufficient without explicit terminal closure.",
     "The contract explicitly states that normal canonical behavior must not use sentinel transaction identifiers such as `none` to represent missing active work.",
+    "The contract explicitly states that no active transaction is represented structurally as `active_tx: null` rather than by placeholder active-transaction objects or sentinel `tx_id` values.",
     "The contract explicitly states that planning artifacts under `docs/` are derived workflow artifacts and are not the canonical source of runtime resume truth.",
     "The contract is specific enough that downstream tickets can define state-machine rules, continuation rules, persistence rules, issuance rules, and recovery behavior without inventing per-module semantics ad hoc.",
     "The ticket does not weaken canonical lifecycle ordering, replay integrity, resumability, or explicit terminal-state handling."
@@ -57,6 +59,7 @@
     "Define the rule that successful completion requires explicit terminal end handling and that `done` and `blocked` are terminal states.",
     "Define the contract-level bridge that active non-terminal transactions require machine-readable continuation guidance, with detailed `next_action` semantics deferred to downstream state-machine work.",
     "Define the normal structural representation for the absence of active work and reject sentinel transaction identifiers such as `none` from normal canonical behavior.",
+    "Define the no-active representation rule that `active_tx` is `null` when no active transaction exists.",
     "Document that planning artifacts may be synchronized with runtime progress but are not authoritative for execution or resume decisions.",
     "Leave implementation-ready notes for downstream tickets that will define the state machine, continuation semantics, persistence model, issuance semantics, runtime simplification, and interruption-focused regression coverage."
   ],
@@ -96,7 +99,7 @@
     },
     "normal_state_rules": [
       "Normal canonical behavior must not use sentinel values such as `none` as fake transaction identifiers.",
-      "Absence of active work should be represented structurally rather than through sentinel `tx_id` text.",
+      "Absence of active work should be represented structurally as `active_tx: null` rather than through sentinel `tx_id` text or placeholder active-transaction objects.",
       "Planning artifacts may reflect progress, but canonical runtime resume truth comes from transaction state and transaction event history."
     ],
     "design_bias": {

@@ -307,7 +307,7 @@ The event model should be organized around resumable checkpoints, not unnecessar
 Recommended core checkpoint events:
 
 - `tx.begin`
-- `tx.progress`
+- `tx.step.enter`
 - `tx.verify.start`
 - `tx.verify.pass`
 - `tx.verify.fail`
@@ -317,6 +317,7 @@ Recommended core checkpoint events:
 - `tx.end.done`
 - `tx.end.blocked`
 
+`tx.step.enter` is the canonical progress-checkpoint event for the 0.6.0 state-machine contract.
 Additional events such as file-intent activity may still exist, but the resumable protocol should be understandable primarily from checkpoint events and current materialized state.
 
 ## Persistence Model
@@ -328,19 +329,32 @@ Retain canonical materialized state under `.agent/tx_state.json`.
 This is the canonical resume entrypoint.
 
 It should capture at least:
-- active transaction identity
-- active ticket identity
-- current status
-- current phase if applicable
-- current `next_action`
-- terminal flag
-- semantic summary
+- `active_tx`, which is `null` when no active transaction exists
+- top-level current status
+- top-level current phase
+- top-level `next_action`
+- top-level terminal flag
+- top-level semantic summary
+- top-level verification checkpoint state
+- top-level commit checkpoint state
 - current integrity / workflow guidance fields needed for continuation
+- active transaction identity and local checkpoint context when `active_tx` is non-null
 
 ### Role
 - first source for resume
 - machine-readable continuation state
 - current canonical view of the active transaction
+- holder of the top-level continuation contract for `status`, `phase`, `next_action`, `terminal`, `semantic_summary`, `verify_state`, and `commit_state`
+
+When no active transaction exists, the canonical materialized representation is:
+- `active_tx: null`
+- `status: null`
+- `phase: null`
+- `next_action: tx.begin`
+- `terminal: false`
+- `semantic_summary: null`
+- `verify_state: null`
+- `commit_state: null`
 
 ## 2. Event log
 Retain canonical append-only history under `.agent/tx_event_log.jsonl`.
@@ -353,6 +367,8 @@ Retain canonical append-only history under `.agent/tx_event_log.jsonl`.
 
 ### Role
 The event log is authoritative for historical progression, but current resume should begin from materialized state whenever healthy.
+
+A missing `.agent/tx_event_log.jsonl` indicates an uninitialized or damaged workspace, while a present-but-empty event log is a valid zero-event baseline.
 
 ## 3. Transaction ID issuance metadata
 Introduce or stabilize `.agent/tx_id_counter.json`.
@@ -369,6 +385,10 @@ Introduce or stabilize `.agent/tx_id_counter.json`.
 ### Initialization policy
 - missing file may be treated as zero baseline for issuance metadata only
 - malformed file must fail clearly and must not be silently treated as zero
+
+### Representation policy
+- `last_issued_id` remains an integer counter value
+- issued `tx_id` values are represented as integers in JSON-facing artifacts
 
 ## 4. Session metadata
 Session-related metadata may be retained or improved where useful, but it should not be required to understand which transaction to resume.
@@ -412,17 +432,25 @@ Resume should follow this logic:
 Resume decisions should prefer:
 
 1. healthy materialized transaction state
-2. canonical event-log rebuild when materialized state is missing or incomplete
+2. canonical event-log rebuild when materialized state is missing, incomplete, or inconsistent
 3. explicit failure when integrity is ambiguous and no safe deterministic continuation exists
 
 ## Resume invariants
 Resume must:
 - never mint a new `tx_id`
+- reuse the exact existing active `tx_id`
+- rely on top-level `next_action` as the primary continuation guide
+- treat malformed canonical persistence as explicit failure rather than silent fallback
 - never replace the active transaction with a heuristic candidate
 - preserve exact active transaction identity
 - preserve the distinction between non-terminal and terminal states
 - preserve explicit end-of-transaction handling
 - avoid duplicate logical completion when work was already committed or ended
+
+## Post-terminal materialization
+After terminal completion, a terminal transaction snapshot may remain materialized briefly.
+A subsequent canonical materialized-state operation, `tx.clear_active`, clears the active slot after the terminal snapshot has been durably recorded.
+`tx.clear_active` is not a canonical event-log event.
 
 ## Idempotent continuation requirements
 Repeated resume of the same interrupted state should not corrupt the lifecycle.
@@ -447,12 +475,12 @@ The protocol should support safe repeated continuation for cases such as:
 - stored in JSON-facing artifacts in a documented stable representation
 
 ### Recommended representation
-Use monotonic positive integers for issuance semantics and serialize as strings in JSON-facing artifacts.
+Use monotonic positive integers for issuance semantics and represent them as integers in JSON-facing artifacts.
 
 Examples:
-- `"1"`
-- `"2"`
-- `"3"`
+- `1`
+- `2`
+- `3`
 
 ## `seq`
 - identifies canonical append order of transaction events
