@@ -16,6 +16,7 @@
 - Make `next_action` sufficient for deterministic continuation of interrupted work.
 - Keep repository commit distinct from terminal transaction completion.
 - Preserve compatibility for historical logs without requiring in-place rewrite.
+- Preserve bounded compatibility for terminal materialized snapshots and post-terminal active-slot clearing shapes without reinterpreting them as replacement lifecycle events.
 
 ## Background
 The current system already treats tickets as the only unit of work and requires agents to resume a non-terminal active transaction before starting new work.
@@ -219,9 +220,16 @@ Terminal blocked completion requires:
 ## 5. Resume is deterministic
 Resuming an interrupted transaction should depend on:
 - canonical materialized transaction state
+- the top-level continuation surface in materialized state:
+  - `status`
+  - `phase`
+  - `next_action`
+  - `terminal`
+  - `semantic_summary`
+  - `verify_state`
+  - `commit_state`
 - canonical event history when rebuild is needed
 - exact active transaction identity
-- exact `next_action`
 
 Resume should not depend on:
 - string-shape assumptions
