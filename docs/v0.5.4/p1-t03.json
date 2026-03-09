@@ -1,0 +1,50 @@
+{
+  "id": "p1-t03",
+  "title": "Normalize lifecycle wrapper success responses to expose canonical workflow guidance",
+  "priority": "P0",
+  "status": "planned",
+  "summary": "Update the lifecycle wrapper tools so successful operations return consistent machine-readable canonical workflow guidance instead of minimal payloads that force AI agents to infer the resulting state. This ticket focuses on success responses for wrapper-style tools, ensuring that after task start, task update, task end, file-intent operations, and state capture, the response clearly describes the resulting canonical status, phase, next action, terminality, follow-up requirements, and active transaction identity.",
+  "inputs": [
+    "docs/draft_0.5.4.md",
+    "docs/v0.5.4/plan.md",
+    "docs/v0.5.4/tickets_list.json",
+    "docs/v0.5.4/p1-t01.json",
+    "docs/v0.5.4/p1-t02.json",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "tests/test_ops_tools.py"
+  ],
+  "outputs": [
+    "Lifecycle wrapper tools whose success responses include standardized canonical workflow guidance fields",
+    "A consistent success-response shape across task lifecycle, file-intent, and state-capture operations",
+    "Regression coverage proving that wrapper success responses expose resulting canonical state without requiring client-side inference"
+  ],
+  "acceptance_criteria": [
+    "Successful `ops_start_task` responses include the resulting canonical status, canonical phase, next action, terminal flag, follow-up fields, and active transaction identity.",
+    "Successful `ops_update_task` responses include the resulting canonical status, canonical phase, next action, terminal flag, follow-up fields, and active transaction identity.",
+    "Successful `ops_end_task` responses clearly report terminal completion semantics and resulting canonical workflow state.",
+    "Successful `ops_add_file_intent`, `ops_update_file_intent`, and `ops_complete_file_intent` responses expose canonical workflow guidance consistently with lifecycle wrapper expectations.",
+    "Successful `ops_capture_state` responses expose canonical workflow guidance and relevant integrity-state information when canonical state is healthy.",
+    "Wrapper success responses no longer force agents to infer resulting lifecycle state from only `ok`, `event`, and `payload`.",
+    "Regression tests fail if wrapper success responses regress back to ambiguous minimal payloads."
+  ],
+  "tasks": [
+    "Update lifecycle wrapper success paths to build responses from the shared workflow-guidance contract defined in earlier schema work.",
+    "Ensure success responses expose the resulting canonical state after the operation completes, not a guessed or pre-operation snapshot.",
+    "Normalize success payload fields across task lifecycle wrappers and file-intent wrappers so clients can consume them uniformly.",
+    "Ensure `ops_end_task` reports terminal completion correctly and does not blur non-terminal and terminal lifecycle states.",
+    "Ensure `ops_capture_state` exposes canonical workflow guidance in healthy-state cases while remaining compatible with strict integrity behavior.",
+    "Add regression tests that assert wrapper success responses include the required guidance fields and consistent semantics."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02"
+  ],
+  "notes": [
+    "This ticket is limited to success responses for lifecycle wrapper tools. Structured failure normalization is handled separately.",
+    "The goal is to make wrapper tools as workflow-aware as helper tools, so agents can make next-step decisions from response data instead of implementation assumptions.",
+    "The resulting response contract should preserve existing useful payload fields where practical, while adding canonical workflow metadata needed for machine-driven use.",
+    "Care should be taken to ensure that the response reflects canonical state after persistence/rebuild-sensitive operations, not stale local assumptions."
+  ]
+}

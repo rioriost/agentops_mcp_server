@@ -1,0 +1,147 @@
+{
+  "id": "p1-t01",
+  "title": "Define the 0.5.4 workflow-guidance response schema and lifecycle error contract",
+  "priority": "P0",
+  "status": "in-progress",
+  "summary": "Create the authoritative 0.5.4 contract for machine-readable lifecycle guidance so AI agents can determine canonical state transitions from `.rules` plus MCP tool responses without hidden assumptions. This ticket finalizes the normalized success and failure response schema for lifecycle-relevant tools, including canonical status/phase exposure, next-action guidance, terminality, follow-up obligations, active transaction identity, structured recovery/error semantics, stable error-code families, and backward-compatibility rules for legacy payload fields. Canonical history was repaired enough to unblock new work, and this ticket is now the active canonical task for defining the schema and implementation-ready contract notes that downstream 0.5.4 tickets will follow.",
+  "inputs": [
+    "docs/draft_0.5.4.md",
+    "docs/v0.5.4/plan.md",
+    ".rules",
+    ".agent/tx_state.json",
+    ".agent/tx_event_log.jsonl",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py"
+  ],
+  "outputs": [
+    "A documented normalized success-response schema for lifecycle-relevant MCP tools",
+    "A documented normalized failure-response schema for lifecycle and state-related failures",
+    "Explicit semantic definitions for `canonical_status`, `canonical_phase`, `next_action`, terminality, follow-up requirements, and active transaction identity",
+    "A stable error-family outline for begin/resume/terminal/integrity-related failures",
+    "A ticket-level contract foundation that later implementation tickets can apply consistently across tool surfaces"
+  ],
+  "acceptance_criteria": [
+    "The ticket defines a single authoritative response contract for lifecycle-aware success responses.",
+    "The ticket defines a single authoritative response contract for lifecycle-aware failure responses.",
+    "The contract explicitly distinguishes canonical status, canonical phase, next action, terminality, and follow-up obligations.",
+    "The contract explicitly defines active transaction identity fields needed for resume-vs-begin decisions.",
+    "The contract includes structured recovery guidance fields for begin-required, resume-required, terminal, and integrity-blocked failure classes.",
+    "The contract defines stable error-code families that later implementation tickets can apply consistently across lifecycle-aware tools.",
+    "The contract defines a backward-compatibility rule for retaining or omitting legacy/minimal payload fields.",
+    "The contract is specific enough that later implementation tickets can normalize tool responses without inventing per-tool semantics ad hoc.",
+    "The ticket does not weaken canonical lifecycle strictness or hide integrity drift."
+  ],
+  "tasks": [
+    "Define the normalized success-response fields required for lifecycle-aware tools, including canonical state, next-action guidance, terminality, follow-up obligations, and active transaction identity.",
+    "Define the normalized failure-response fields required for lifecycle/state failures, including stable error codes, recovery guidance, recommended next tool/action, and integrity metadata when relevant.",
+    "Clarify semantic roles for status, phase, and next action so later implementation work can keep responses non-contradictory.",
+    "Document which fields are mandatory across all lifecycle-aware tools and which are context-dependent.",
+    "Resolve whether existing legacy/minimal fields remain alongside the new canonical response fields for compatibility.",
+    "Define stable error-code families for common lifecycle/state failures so downstream implementation work does not invent them piecemeal.",
+    "Leave implementation-ready notes for downstream tickets that will apply the schema to lifecycle wrappers, verify/commit helpers, and regression tests."
+  ],
+  "dependencies": [],
+  "notes": [
+    "This ticket is schema-definition work, not broad implementation work.",
+    "The ticket should preserve the existing strict canonical lifecycle model while making it safer for AI agents to consume.",
+    "The ticket should assume that machine-readable guidance is part of the public workflow contract, not just an implementation detail.",
+    "Canonical repair work cleared the previously blocking integrity drift enough to allow new canonical work to begin.",
+    "This ticket is now aligned with the active canonical task `p1-t01` and should be kept synchronized with canonical lifecycle progress as the schema definition advances.",
+    "The most important output of this ticket is an implementation-ready response contract that downstream tickets can apply consistently across lifecycle wrappers, helper tools, and regression coverage.",
+    "This ticket now includes the intended error-code families and the compatibility policy that should govern how legacy fields coexist with canonical workflow-guidance fields during rollout."
+  ],
+  "schema_notes": {
+    "success_fields_required": [
+      "ok",
+      "canonical_status",
+      "canonical_phase",
+      "next_action",
+      "terminal",
+      "requires_followup",
+      "followup_tool",
+      "active_tx_id",
+      "active_ticket_id"
+    ],
+    "success_fields_contextual": [
+      "current_step",
+      "verify_status",
+      "commit_status",
+      "integrity_status",
+      "can_start_new_ticket",
+      "resume_required"
+    ],
+    "failure_fields_required": [
+      "ok",
+      "error_code",
+      "reason",
+      "recoverable",
+      "recommended_next_tool",
+      "recommended_action"
+    ],
+    "failure_fields_contextual": [
+      "canonical_status",
+      "canonical_phase",
+      "next_action",
+      "terminal",
+      "active_tx_id",
+      "active_ticket_id",
+      "current_step",
+      "integrity_status",
+      "blocked",
+      "rebuild_warning",
+      "rebuild_invalid_seq",
+      "rebuild_observed_mismatch"
+    ],
+    "error_code_families": {
+      "begin_required": ["tx_begin_required", "no_active_transaction"],
+      "resume_required": [
+        "active_transaction_mismatch",
+        "resume_active_transaction"
+      ],
+      "terminal_state": [
+        "event_after_terminal",
+        "cannot_verify_terminal_transaction",
+        "cannot_modify_terminal_transaction"
+      ],
+      "file_intent_ordering": [
+        "file_intent_already_exists",
+        "file_intent_missing",
+        "file_intent_state_not_monotonic",
+        "file_intent_verified_requires_verify_pass",
+        "file_intent_complete_requires_verified"
+      ],
+      "verify_commit_preconditions": [
+        "verify_start_required",
+        "verify_result_requires_verify_start",
+        "commit_requires_verified_state",
+        "task_done_requires_commit_finished"
+      ],
+      "integrity_blocked": [
+        "rebuild_integrity_drift",
+        "invalid_transaction_history"
+      ]
+    },
+    "compatibility_policy": {
+      "legacy_fields_policy": "Preserve existing useful payload fields where practical during the 0.5.4 transition, but require canonical workflow guidance fields to be present for lifecycle-aware responses.",
+      "success_policy": "Legacy fields such as `event` and `payload` may remain, but must not be the only lifecycle decision surface.",
+      "failure_policy": "Human-readable exception text may remain, but structured failure fields become the authoritative recovery contract.",
+      "omission_rule": "Contextual fields may be omitted only when truly unknown or not applicable, not merely because the tool currently returns a minimal payload."
+    },
+    "semantic_constraints": [
+      "`done` and `blocked` must remain terminal.",
+      "`committed` must remain non-terminal until explicit lifecycle end.",
+      "`next_action` must remain the authoritative field for the next lifecycle step.",
+      "Helper success must not imply terminal completion unless canonical state is actually terminal.",
+      "Structured success responses must describe resulting canonical state after the operation completes, not a guessed pre-operation snapshot.",
+      "Structured failure responses must distinguish begin-required, resume-required, terminal, and integrity-blocked cases without relying only on prose."
+    ]
+  },
+  "canonical_alignment": {
+    "intended_canonical_task_id": "p1-t01",
+    "synchronization_intent": "Keep this ticket synchronized with active canonical lifecycle progress while schema-definition work is in progress.",
+    "current_canonical_constraint": "active canonical task started successfully and schema-definition work is now unblocked"
+  }
+}

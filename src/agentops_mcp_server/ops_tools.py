@@ -8,6 +8,7 @@ from .git_repo import GitRepo
 from .repo_context import RepoContext
 from .state_rebuilder import StateRebuilder
 from .state_store import StateStore, now_iso
+from .workflow_response import build_failure_response, build_success_response
 
 
 def truncate_text(value: Optional[str], limit: int = 2000) -> Optional[str]:
@@ -939,22 +940,26 @@ class OpsTools:
                 if isinstance(state.get("active_tx"), dict)
                 else {}
             )
-            return {
-                "ok": False,
-                "reason": "rebuild integrity drift detected",
-                "last_applied_seq": state.get("last_applied_seq"),
-                "integrity": integrity,
-                "rebuild_warning": state.get("rebuild_warning"),
-                "rebuild_invalid_seq": state.get("rebuild_invalid_seq"),
-                "rebuild_observed_mismatch": state.get("rebuild_observed_mismatch"),
-                "active_tx": active_tx,
-                "blocked": True,
-                "recommended_action": (
+            response = build_failure_response(
+                error_code="integrity_drift_detected",
+                reason="rebuild integrity drift detected",
+                tx_state=state,
+                recoverable=False,
+                recommended_next_tool="tx_state_rebuild",
+                recommended_action=(
                     "Do not capture or trust canonical state until the invalid transaction "
                     "history is repaired. Inspect rebuild_invalid_event and "
                     "rebuild_observed_mismatch to identify the offending lifecycle event."
                 ),
-            }
+                blocked=True,
+                rebuild_warning=state.get("rebuild_warning"),
+                rebuild_invalid_seq=state.get("rebuild_invalid_seq"),
+                rebuild_observed_mismatch=state.get("rebuild_observed_mismatch"),
+            )
+            response["last_applied_seq"] = state.get("last_applied_seq")
+            response["integrity"] = integrity
+            response["active_tx"] = active_tx
+            return response
 
         active_tx = (
             state.get("active_tx") if isinstance(state.get("active_tx"), dict) else {}
@@ -971,11 +976,10 @@ class OpsTools:
         last_seq = state.get("last_applied_seq")
         last_seq_value = last_seq if isinstance(last_seq, int) else 0
 
-        return {
-            "ok": True,
-            "state": save_result,
-            "last_applied_seq": last_seq_value,
-        }
+        response = build_success_response(tx_state=state)
+        response["state"] = save_result
+        response["last_applied_seq"] = last_seq_value
+        return response
 
     def ops_task_summary(
         self, session_id: Optional[str] = None, max_chars: Optional[int] = None

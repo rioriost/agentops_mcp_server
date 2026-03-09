@@ -7,6 +7,7 @@ from .git_repo import GitRepo
 from .state_rebuilder import StateRebuilder
 from .state_store import StateStore
 from .verify_runner import VerifyRunner
+from .workflow_response import build_guidance_from_active_tx
 
 
 class CommitManager:
@@ -294,37 +295,14 @@ class CommitManager:
                 "followup_tool": None,
             }
 
-        tx_status = (
-            active_tx.get("status").strip()
-            if isinstance(active_tx.get("status"), str)
-            and active_tx.get("status").strip()
-            else ""
-        )
-        tx_phase = (
-            active_tx.get("phase").strip()
-            if isinstance(active_tx.get("phase"), str)
-            and active_tx.get("phase").strip()
-            else tx_status
-        )
-        next_action = (
-            active_tx.get("next_action").strip()
-            if isinstance(active_tx.get("next_action"), str)
-            and active_tx.get("next_action").strip()
-            else ""
-        )
-        terminal = tx_status in {"done", "blocked"} or tx_phase in {"done", "blocked"}
-        requires_followup = bool(next_action) and not terminal
-        followup_tool = (
-            "ops_end_task" if next_action in {"tx.end.done", "tx.end.blocked"} else None
-        )
-
+        guidance = build_guidance_from_active_tx(active_tx)
         return {
-            "tx_status": tx_status,
-            "tx_phase": tx_phase,
-            "next_action": next_action,
-            "terminal": terminal,
-            "requires_followup": requires_followup,
-            "followup_tool": followup_tool,
+            "tx_status": guidance["canonical_status"],
+            "tx_phase": guidance["canonical_phase"],
+            "next_action": guidance["next_action"],
+            "terminal": guidance["terminal"],
+            "requires_followup": guidance["requires_followup"],
+            "followup_tool": guidance["followup_tool"],
         }
 
     def commit_if_verified(

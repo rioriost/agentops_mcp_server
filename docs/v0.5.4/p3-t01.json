@@ -1,0 +1,63 @@
+{
+  "id": "p3-t01",
+  "title": "Add regression tests for the machine-readable workflow-guidance contract",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Protect the 0.5.4 workflow-guidance improvements with regression coverage so lifecycle-relevant MCP tools continue to expose structured canonical state and structured recovery guidance in a stable, agent-safe form. This ticket ensures that future changes do not regress success responses back to ambiguous minimal payloads or failure responses back to string-only lifecycle errors that force AI agents to guess canonical status, terminality, follow-up obligations, or resume behavior.",
+  "inputs": [
+    "docs/draft_0.5.4.md",
+    "docs/v0.5.4/plan.md",
+    "docs/v0.5.4/tickets_list.json",
+    "docs/v0.5.4/p1-t01.json",
+    "docs/v0.5.4/p1-t02.json",
+    "docs/v0.5.4/p1-t03.json",
+    "docs/v0.5.4/p2-t01.json",
+    "docs/v0.5.4/p2-t02.json",
+    "docs/v0.5.4/p2-t03.json",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "tests/test_ops_tools.py",
+    "tests/test_commit_manager.py",
+    "tests/test_repo_tools.py",
+    "tests/test_state_store.py",
+    "tests/test_state_rebuilder.py"
+  ],
+  "outputs": [
+    "Regression tests that verify lifecycle wrapper success responses include structured canonical workflow guidance",
+    "Regression tests that verify helper success responses expose explicit follow-up obligations and terminal/non-terminal state correctly",
+    "Regression tests that verify lifecycle and state failures expose structured recovery guidance and stable error-code behavior",
+    "Regression tests that verify begin-required, resume-required, terminal, and integrity-blocked cases remain distinguishable by machine-readable fields"
+  ],
+  "acceptance_criteria": [
+    "Tests verify that lifecycle wrapper tools return structured canonical guidance fields such as canonical status, canonical phase, next action, terminality, follow-up requirements, and active transaction identity.",
+    "Tests verify that helper success responses clearly distinguish non-terminal `committed` from terminal `done` and expose required follow-up when terminal closure is still needed.",
+    "Tests verify that lifecycle/state failures expose structured recovery guidance instead of forcing clients to rely only on human-readable error strings.",
+    "Tests verify that begin-required, resume-required, terminal-transaction, and integrity-blocked cases remain machine-distinguishable and do not collapse into ambiguous generic failures.",
+    "Tests verify that active transaction identity and new-ticket/resume guidance remain stable enough for agent branching.",
+    "Regression coverage fails if lifecycle-aware tools regress to ambiguous minimal payloads or contradictory canonical guidance."
+  ],
+  "tasks": [
+    "Add or update tests for lifecycle wrapper success responses so they assert the presence and consistency of canonical workflow-guidance fields.",
+    "Add or update tests for verify/commit helper success responses so they assert follow-up obligations, terminal flags, and non-terminal `committed` semantics.",
+    "Add or update tests for structured lifecycle/state failures so they assert stable machine-readable fields such as reason, error code, recommended next action, and active transaction context.",
+    "Add tests that distinguish begin-required, resume-required, terminal, and integrity-blocked outcomes without depending only on string matching.",
+    "Add assertions that the guidance contract remains internally consistent across tools and does not expose contradictory status, phase, next action, or terminality."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03",
+    "p2-t01",
+    "p2-t02",
+    "p2-t03"
+  ],
+  "notes": [
+    "This ticket protects the 0.5.4 response contract rather than introducing new lifecycle semantics by itself.",
+    "The most important regression to prevent is a return to tool responses that require hidden implementation knowledge or natural-language inference for correct agent behavior.",
+    "Coverage should focus on machine-actionable contract guarantees rather than documentation wording alone.",
+    "Tests should preserve strict canonical behavior; they should not encourage weakening lifecycle validation or hiding integrity-blocked states."
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "id": "p3-t02",
+  "title": "Update docs and contract-facing guidance for machine-readable workflow responses",
+  "priority": "P2",
+  "status": "planned",
+  "summary": "Align the 0.5.4 documentation surface with the new machine-readable workflow-guidance contract so agents and clients can understand how lifecycle-aware MCP tool responses expose canonical status, next actions, terminality, follow-up requirements, and structured recovery guidance. This ticket ensures the implementation is reflected clearly in planning artifacts and contract-facing docs after the response schema, helper semantics, and structured failure behavior are finalized.",
+  "inputs": [
+    "docs/draft_0.5.4.md",
+    "docs/v0.5.4/plan.md",
+    "docs/v0.5.4/tickets_list.json",
+    "src/agentops_mcp_server/main.py",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    ".rules",
+    "README.md",
+    "README-jp.md"
+  ],
+  "outputs": [
+    "Updated 0.5.4 planning and contract-facing documentation that describes the machine-readable workflow-guidance response contract",
+    "Clear documentation of success-response fields such as canonical status, canonical phase, next action, terminality, follow-up requirements, and active transaction identity",
+    "Clear documentation of structured failure-response fields such as error code, reason, recoverability, recommended next tool or action, and integrity-blocked metadata when applicable",
+    "Explicit user-facing clarification that helper success does not necessarily imply terminal task completion, especially for non-terminal `committed` state"
+  ],
+  "acceptance_criteria": [
+    "Documentation explains the standardized lifecycle-aware success response contract in a way that matches the implemented behavior.",
+    "Documentation explains the standardized lifecycle-aware failure response contract in a way that matches the implemented behavior.",
+    "Docs explicitly distinguish non-terminal `committed` from terminal `done` and `blocked`.",
+    "Docs explain how clients or agents should interpret `status`, `phase`, and `next_action` without ambiguity.",
+    "Docs explain how to understand follow-up requirements after verify and commit helper success.",
+    "Docs do not claim healthier or simpler lifecycle semantics than canonical state actually supports."
+  ],
+  "tasks": [
+    "Review the final 0.5.4 response schema and identify which parts must be reflected in public or contract-facing documentation.",
+    "Update planning and release-facing docs to describe the standardized success-response guidance fields for lifecycle-aware tools.",
+    "Update planning and release-facing docs to describe the standardized structured failure fields for lifecycle-aware tools.",
+    "Document the meaning of `status`, `phase`, `next_action`, terminality, follow-up requirements, and active transaction identity in the 0.5.4 contract.",
+    "Document the distinction between helper completion, non-terminal `committed`, and explicit terminal lifecycle completion."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03",
+    "p2-t01",
+    "p2-t02",
+    "p2-t03",
+    "p3-t01"
+  ],
+  "notes": [
+    "This ticket is documentation and contract-alignment work, not a lifecycle-model redesign ticket.",
+    "The ticket should follow the final implemented response schema rather than inventing a parallel wording-only contract.",
+    "Public wording should remain compatible with strict canonical lifecycle semantics and should not imply that helper success automatically closes the transaction.",
+    "If field names change during implementation, this ticket should update docs to the final canonical names rather than preserving outdated draft wording.",
+    "This ticket should keep user-facing guidance concise while still being specific enough for agent/client implementers to rely on."
+  ]
+}

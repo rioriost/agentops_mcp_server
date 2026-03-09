@@ -1,0 +1,60 @@
+{
+  "id": "p2-t03",
+  "title": "Clarify and enforce lifecycle field semantics across canonical responses",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Align the implementation and response contract for canonical lifecycle fields so `status`, `phase`, `next_action`, and terminality are internally consistent, machine-readable, and safe for AI-agent branching. This ticket focuses on removing ambiguity in how lifecycle state is represented after wrapper and helper operations, especially around the distinction between non-terminal `committed` and terminal `done` or `blocked`.",
+  "inputs": [
+    "docs/draft_0.5.4.md",
+    "docs/v0.5.4/plan.md",
+    "docs/v0.5.4/tickets_list.json",
+    "docs/v0.5.4/p1-t01.json",
+    "docs/v0.5.4/p1-t02.json",
+    "docs/v0.5.4/p1-t03.json",
+    "docs/v0.5.4/p2-t01.json",
+    "docs/v0.5.4/p2-t02.json",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "tests/test_ops_tools.py",
+    "tests/test_commit_manager.py",
+    "tests/test_repo_tools.py",
+    "tests/test_state_store.py",
+    "tests/test_state_rebuilder.py"
+  ],
+  "outputs": [
+    "A clarified semantic contract for `canonical_status`, `canonical_phase`, `next_action`, and terminality across lifecycle-aware tool responses",
+    "Implementation changes that prevent contradictory or ambiguous lifecycle guidance from being returned",
+    "Regression tests that verify `done` and `blocked` remain terminal while `committed` remains non-terminal until explicit lifecycle closure"
+  ],
+  "acceptance_criteria": [
+    "The implementation defines and applies a consistent meaning for lifecycle `status`, `phase`, and `next_action` across lifecycle-aware responses.",
+    "Tool responses do not return contradictory combinations of lifecycle guidance fields.",
+    "`done` and `blocked` are always treated and reported as terminal states.",
+    "`committed` remains a non-terminal state until explicit terminal completion is recorded.",
+    "Responses after helper success accurately report whether lifecycle follow-up is still required.",
+    "Tests fail if future changes misreport terminality or return inconsistent `status` / `phase` / `next_action` combinations."
+  ],
+  "tasks": [
+    "Audit lifecycle state-setting logic in wrapper and helper paths to identify inconsistent or ambiguous use of `status`, `phase`, and `next_action`.",
+    "Document the intended semantics for canonical lifecycle status, canonical workflow phase, next required lifecycle action, and terminal detection.",
+    "Update implementation paths so response builders expose a single internally consistent view of lifecycle state.",
+    "Verify that helper flows preserve the explicit distinction between non-terminal `committed` and terminal `done` or `blocked`.",
+    "Add regression tests that cover representative success and failure flows and assert correct terminal and non-terminal reporting."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03",
+    "p2-t01",
+    "p2-t02"
+  ],
+  "notes": [
+    "This ticket is not about redesigning the transaction model; it is about making the existing model easier for agents to consume correctly.",
+    "The most important semantic distinction to preserve is that helper completion may leave canonical state at non-terminal `committed`, with explicit follow-up still required.",
+    "This work should be implemented in terms of canonical state, not client-side inference or convenience shortcuts.",
+    "If any lifecycle field is derived from another in some contexts, that relationship should be made explicit in behavior and tests rather than left implicit."
+  ]
+}

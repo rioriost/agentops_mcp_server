@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 from .git_repo import GitRepo
 from .test_suggestions import CODE_SUFFIXES, is_test_path, parse_changed_files
 from .verify_runner import VerifyRunner
+from .workflow_response import build_guidance_from_active_tx
 
 
 class RepoTools:
@@ -191,6 +192,16 @@ class RepoTools:
                 "terminal": False,
                 "requires_followup": False,
                 "followup_tool": None,
+                "canonical_status": "",
+                "canonical_phase": "",
+                "active_tx_id": None,
+                "active_ticket_id": None,
+                "current_step": None,
+                "verify_status": None,
+                "commit_status": None,
+                "integrity_status": None,
+                "can_start_new_ticket": True,
+                "resume_required": False,
             }
 
         tx_state = self.state_store.read_json_file(
@@ -204,6 +215,16 @@ class RepoTools:
                 "terminal": False,
                 "requires_followup": False,
                 "followup_tool": None,
+                "canonical_status": "",
+                "canonical_phase": "",
+                "active_tx_id": None,
+                "active_ticket_id": None,
+                "current_step": None,
+                "verify_status": None,
+                "commit_status": None,
+                "integrity_status": None,
+                "can_start_new_ticket": True,
+                "resume_required": False,
             }
 
         active_tx = tx_state.get("active_tx")
@@ -215,40 +236,22 @@ class RepoTools:
                 "terminal": False,
                 "requires_followup": False,
                 "followup_tool": None,
+                "canonical_status": "",
+                "canonical_phase": "",
+                "active_tx_id": None,
+                "active_ticket_id": None,
+                "current_step": None,
+                "verify_status": None,
+                "commit_status": None,
+                "integrity_status": None,
+                "can_start_new_ticket": True,
+                "resume_required": False,
             }
 
-        tx_status = (
-            active_tx.get("status").strip()
-            if isinstance(active_tx.get("status"), str)
-            and active_tx.get("status").strip()
-            else ""
-        )
-        tx_phase = (
-            active_tx.get("phase").strip()
-            if isinstance(active_tx.get("phase"), str)
-            and active_tx.get("phase").strip()
-            else tx_status
-        )
-        next_action = (
-            active_tx.get("next_action").strip()
-            if isinstance(active_tx.get("next_action"), str)
-            and active_tx.get("next_action").strip()
-            else ""
-        )
-        terminal = tx_status in {"done", "blocked"} or tx_phase in {"done", "blocked"}
-        requires_followup = bool(next_action) and not terminal
-        followup_tool = (
-            "ops_end_task" if next_action in {"tx.end.done", "tx.end.blocked"} else None
-        )
-
-        return {
-            "tx_status": tx_status,
-            "tx_phase": tx_phase,
-            "next_action": next_action,
-            "terminal": terminal,
-            "requires_followup": requires_followup,
-            "followup_tool": followup_tool,
-        }
+        guidance = build_guidance_from_active_tx(active_tx)
+        guidance["tx_status"] = guidance["canonical_status"]
+        guidance["tx_phase"] = guidance["canonical_phase"]
+        return guidance
 
     def repo_verify(self, timeout_sec: Optional[int] = None) -> Dict[str, Any]:
         context = self._load_tx_context()

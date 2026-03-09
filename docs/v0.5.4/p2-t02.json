@@ -1,0 +1,60 @@
+{
+  "id": "p2-t02",
+  "title": "Normalize structured lifecycle/state failures into machine-readable recovery guidance",
+  "priority": "P1",
+  "status": "planned",
+  "summary": "Define and implement a consistent structured failure contract for lifecycle- and state-related MCP tool failures so that AI agents can branch on canonical recovery guidance without relying only on human-readable error strings. This ticket focuses on begin/resume conflicts, terminal-state violations, file-intent ordering failures, verify/commit precondition failures, and integrity-blocked state outcomes, while preserving strict canonical lifecycle validation.",
+  "inputs": [
+    "docs/draft_0.5.4.md",
+    "docs/v0.5.4/plan.md",
+    "docs/v0.5.4/tickets_list.json",
+    "docs/v0.5.4/p1-t01.json",
+    "docs/v0.5.4/p1-t02.json",
+    "docs/v0.5.4/p1-t03.json",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "tests/test_ops_tools.py",
+    "tests/test_repo_tools.py",
+    "tests/test_commit_manager.py",
+    "tests/test_state_store.py",
+    "tests/test_state_rebuilder.py"
+  ],
+  "outputs": [
+    "A standardized machine-readable failure response shape for lifecycle- and state-related tool failures",
+    "Stable error-code categories for common workflow and canonical-state failure modes",
+    "Structured failure responses for begin-required, resume-required, terminal, file-intent, verify/commit precondition, and integrity-blocked cases",
+    "Regression tests that verify agents can branch on structured failure fields instead of string-only failure text"
+  ],
+  "acceptance_criteria": [
+    "Lifecycle- and state-related failures return structured failure payloads instead of relying only on human-readable exceptions or free-form strings.",
+    "Structured failures include at least `ok: false`, `error_code`, `reason`, `recoverable`, `recommended_next_tool`, and `recommended_action` when applicable.",
+    "When known, structured failures also expose canonical guidance fields such as `canonical_status`, `canonical_phase`, `next_action`, `terminal`, `active_tx_id`, and `active_ticket_id`.",
+    "Agents can distinguish begin-required, resume-required, terminal, integrity-blocked, and invalid-ordering failures from structured fields without depending only on string matching.",
+    "Integrity-related failures preserve rebuild metadata such as `blocked`, `rebuild_warning`, `rebuild_invalid_seq`, and `rebuild_observed_mismatch` where applicable.",
+    "The implementation preserves strict lifecycle validation and does not weaken canonical invariants merely to produce friendlier failure results."
+  ],
+  "tasks": [
+    "Catalog the main lifecycle/state failure families currently exposed by wrapper tools, helper tools, state store validation, and replay/integrity handling.",
+    "Define stable error-code names for begin-required, resume-required, event-after-terminal, terminal-verification, duplicate-file-intent, missing-file-intent, verify-pass prerequisite, commit prerequisite, and integrity-blocked failure categories.",
+    "Add or refactor shared helpers so structured failure responses can be built consistently from canonical state and known recovery semantics.",
+    "Update lifecycle wrapper tools and helper tools so they return structured failure payloads with machine-readable guidance where canonical state is known.",
+    "Ensure integrity-blocked failures preserve diagnostic metadata and clearly indicate that unsafe canonical progression is blocked until repair or replacement of invalid history.",
+    "Add regression tests that assert the presence and semantics of structured failure fields across representative lifecycle/state failure paths."
+  ],
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03",
+    "p2-t01"
+  ],
+  "notes": [
+    "This ticket should preserve existing strictness while making failure semantics more operable for AI agents and client workflows.",
+    "Where backward compatibility matters, legacy human-readable error text may remain, but structured fields should become the authoritative branching surface for agent behavior.",
+    "Failure normalization should be driven from canonical state whenever possible rather than from ad hoc local inference.",
+    "The ticket should explicitly cover the difference between `tx.begin required`, `resume the active transaction`, and `event after terminal`, because those are common agent decision points.",
+    "Integrity-blocked failures should remain explicit and should never be represented as healthy resumable state."
+  ]
+}

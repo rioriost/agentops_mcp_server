@@ -1,0 +1,48 @@
+{
+  "id": "p1-t02",
+  "title": "Add shared response-building utilities for canonical workflow guidance",
+  "priority": "P0",
+  "status": "in-progress",
+  "summary": "Introduce shared internal utilities that build standardized machine-readable success and failure responses for lifecycle-relevant MCP tools. This ticket establishes the implementation foundation for 0.5.4 by centralizing canonical workflow guidance generation so that lifecycle wrappers, verify/commit helpers, and state-facing tools can return consistent fields such as canonical status, canonical phase, next action, terminality, follow-up requirements, active transaction identity, and structured recovery guidance without duplicating logic across the codebase.",
+  "inputs": [
+    "docs/draft_0.5.4.md",
+    "docs/v0.5.4/plan.md",
+    "docs/v0.5.4/tickets_list.json",
+    "docs/v0.5.4/p1-t01.json",
+    "src/agentops_mcp_server/ops_tools.py",
+    "src/agentops_mcp_server/repo_tools.py",
+    "src/agentops_mcp_server/commit_manager.py",
+    "src/agentops_mcp_server/state_store.py",
+    "src/agentops_mcp_server/state_rebuilder.py",
+    "src/agentops_mcp_server/main.py",
+    "tests/"
+  ],
+  "outputs": [
+    "Shared internal helpers for building standardized lifecycle success responses",
+    "Shared internal helpers for building standardized lifecycle failure responses",
+    "A single implementation path for deriving canonical workflow guidance fields from canonical state",
+    "A reusable contract foundation that later tickets can apply to lifecycle wrappers and helper tools"
+  ],
+  "acceptance_criteria": [
+    "A shared implementation exists for constructing standardized workflow-guidance success responses.",
+    "A shared implementation exists for constructing standardized workflow-guidance failure responses.",
+    "The shared helpers can derive canonical guidance fields from canonical state rather than ad hoc caller-specific inference.",
+    "The shared helpers support terminality, next-action, follow-up, and active-transaction identity reporting in a consistent way.",
+    "The implementation reduces or eliminates duplicated response-shaping logic across lifecycle-aware tools.",
+    "The shared helpers are suitable for use by later tickets that normalize lifecycle wrapper and helper tool responses."
+  ],
+  "tasks": [
+    "Design internal helper interfaces for standardized success and failure response construction based on the schema defined in p1-t01.",
+    "Centralize derivation of core workflow fields such as canonical status, canonical phase, next action, terminal flag, follow-up requirement, follow-up tool, active transaction id, and active ticket id.",
+    "Decide how contextual fields such as current step, verify status, commit status, integrity status, can-start-new-ticket, and resume-required should be incorporated into reusable builders.",
+    "Add or refactor implementation code so lifecycle-aware tools can call the shared builders instead of constructing workflow guidance ad hoc.",
+    "Preserve compatibility with existing payload fields where practical so later response normalization work can layer new canonical guidance onto current responses safely."
+  ],
+  "dependencies": ["p1-t01"],
+  "notes": [
+    "This ticket is implementation-enabling infrastructure for 0.5.4 rather than a user-visible normalization pass by itself.",
+    "The goal is to make workflow guidance generation consistent before updating each lifecycle-aware tool to expose the full response contract.",
+    "The helpers should be built from canonical state and validated workflow semantics, not from client-side assumptions.",
+    "Where backward compatibility matters, the shared builders should make it easier to include both legacy fields and new canonical guidance fields during the transition."
+  ]
+}
