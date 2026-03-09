@@ -10,6 +10,7 @@ from agentops_mcp_server.ops_tools import (
     summarize_result,
     truncate_text,
 )
+from agentops_mcp_server.workflow_response import derive_workflow_guidance
 
 
 class DummyGitRepo:
@@ -115,6 +116,24 @@ def _set_active_tx(
         encoding="utf-8",
     )
     return tx_state
+
+
+def _assert_workflow_guidance_fields(result, *, expected_status, expected_phase):
+    assert result["ok"] is True
+    assert result["canonical_status"] == expected_status
+    assert result["canonical_phase"] == expected_phase
+    assert "next_action" in result
+    assert "terminal" in result
+    assert "requires_followup" in result
+    assert "followup_tool" in result
+    assert "active_tx_id" in result
+    assert "active_ticket_id" in result
+    assert "current_step" in result
+    assert "verify_status" in result
+    assert "commit_status" in result
+    assert "integrity_status" in result
+    assert "active_tx" in result
+    assert isinstance(result["active_tx"], dict)
 
 
 def test_ops_compact_context_updates_journal(
@@ -405,6 +424,21 @@ def test_ops_start_task_bootstraps_tx_on_zero_event_baseline(
     result = ops.ops_start_task(title="Build", task_id="t-1", session_id="s1")
 
     assert result["ok"] is True
+    assert result["canonical_status"] == "in-progress"
+    assert result["canonical_phase"] == "in-progress"
+    assert result["tx_status"] == "in-progress"
+    assert result["tx_phase"] == "in-progress"
+    assert result["next_action"] == "tx.verify.start"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
+    assert result["active_tx_id"] == "t-1"
+    assert result["active_ticket_id"] == "t-1"
+    assert result["current_step"] == "t-1"
+    assert result["verify_status"] == "not_started"
+    assert result["commit_status"] == "not_started"
+    assert result["can_start_new_ticket"] is False
+    assert result["resume_required"] is True
     events = _read_tx_events(repo_context)
     event_types = [event["event_type"] for event in events]
     assert event_types == ["tx.begin", "tx.step.enter"]
@@ -644,6 +678,23 @@ def test_ops_update_task_falls_back_to_active_tx_id(
     assert active_tx["current_step"] == "blocked"
     assert active_tx["next_action"] == "tx.verify.start"
 
+    assert result["ok"] is True
+    assert result["canonical_status"] == "in-progress"
+    assert result["canonical_phase"] == "in-progress"
+    assert result["tx_status"] == "in-progress"
+    assert result["tx_phase"] == "in-progress"
+    assert result["next_action"] == "tx.verify.start"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
+    assert result["active_tx_id"] == "t-1"
+    assert result["active_ticket_id"] == "t-1"
+    assert result["current_step"] == "blocked"
+    assert result["verify_status"] == "not_started"
+    assert result["commit_status"] == "not_started"
+    assert result["can_start_new_ticket"] is False
+    assert result["resume_required"] is True
+
 
 def test_ops_update_task_prefers_materialized_state_over_rebuild(
     repo_context, state_store, state_rebuilder
@@ -726,6 +777,23 @@ def test_ops_end_task_prefers_materialized_state_over_rebuild(
     assert active_tx["session_id"] == "s1"
     assert active_tx["next_action"] == "tx.end.done"
     assert tx_state["last_applied_seq"] == events[-1]["seq"]
+
+    assert result["ok"] is True
+    assert result["canonical_status"] == "done"
+    assert result["canonical_phase"] == "done"
+    assert result["tx_status"] == "done"
+    assert result["tx_phase"] == "done"
+    assert result["next_action"] == "tx.end.done"
+    assert result["terminal"] is True
+    assert result["requires_followup"] is False
+    assert result["followup_tool"] == "ops_end_task"
+    assert result["active_tx_id"] == "t-1"
+    assert result["active_ticket_id"] == "t-1"
+    assert result["current_step"] == "t-1"
+    assert result["verify_status"] == "not_started"
+    assert result["commit_status"] == "passed"
+    assert result["can_start_new_ticket"] is True
+    assert result["resume_required"] is False
 
 
 def test_ops_update_task_rejects_mismatched_task_id(
@@ -1131,6 +1199,21 @@ def test_ops_add_file_intent_emits_add_event_and_updates_state(
     )
 
     assert result["ok"] is True
+    assert result["canonical_status"] == "in-progress"
+    assert result["canonical_phase"] == "in-progress"
+    assert result["tx_status"] == "in-progress"
+    assert result["tx_phase"] == "in-progress"
+    assert result["next_action"] == "tx.verify.start"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
+    assert result["active_tx_id"] == "t-1"
+    assert result["active_ticket_id"] == "t-1"
+    assert result["current_step"] == "t-1"
+    assert result["verify_status"] == "not_started"
+    assert result["commit_status"] == "not_started"
+    assert result["can_start_new_ticket"] is False
+    assert result["resume_required"] is True
     events = _read_tx_events(repo_context)
     assert [event["event_type"] for event in events] == [
         "tx.begin",
@@ -1206,6 +1289,21 @@ def test_ops_update_file_intent_emits_update_event_and_advances_state(
     )
 
     assert result["ok"] is True
+    assert result["canonical_status"] == "in-progress"
+    assert result["canonical_phase"] == "in-progress"
+    assert result["tx_status"] == "in-progress"
+    assert result["tx_phase"] == "in-progress"
+    assert result["next_action"] == "tx.verify.start"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
+    assert result["active_tx_id"] == "t-1"
+    assert result["active_ticket_id"] == "t-1"
+    assert result["current_step"] == "t-1"
+    assert result["verify_status"] == "not_started"
+    assert result["commit_status"] == "not_started"
+    assert result["can_start_new_ticket"] is False
+    assert result["resume_required"] is True
     events = _read_tx_events(repo_context)
     assert events[-1]["event_type"] == "tx.file_intent.update"
     assert events[-1]["payload"]["path"] == "src/file.py"
@@ -1327,6 +1425,21 @@ def test_ops_complete_file_intent_emits_complete_after_verify_pass(
     )
 
     assert result["ok"] is True
+    assert result["canonical_status"] == "in-progress"
+    assert result["canonical_phase"] == "in-progress"
+    assert result["tx_status"] == "in-progress"
+    assert result["tx_phase"] == "in-progress"
+    assert result["next_action"] == "tx.verify.start"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
+    assert result["active_tx_id"] == "t-1"
+    assert result["active_ticket_id"] == "t-1"
+    assert result["current_step"] == "t-1"
+    assert result["verify_status"] == "passed"
+    assert result["commit_status"] == "not_started"
+    assert result["can_start_new_ticket"] is False
+    assert result["resume_required"] is True
     events = _read_tx_events(repo_context)
     assert events[-1]["event_type"] == "tx.file_intent.complete"
     assert events[-1]["payload"]["path"] == "src/file.py"
@@ -1413,6 +1526,44 @@ def test_ops_end_task_rejects_mismatch_against_active_ticket_id_when_tx_id_is_no
         ),
     ):
         ops.ops_end_task(summary="done", task_id="t-2", session_id="s1")
+
+
+def test_ops_capture_state_success_exposes_workflow_guidance(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _set_active_tx(
+        repo_context,
+        tx_id="t-1",
+        ticket_id="t-1",
+        status="checking",
+        phase="checking",
+        current_step="verify-step",
+        session_id="s1",
+    )
+
+    result = ops.ops_capture_state(session_id="s1")
+
+    assert result["ok"] is True
+    assert result["canonical_status"] == "checking"
+    assert result["canonical_phase"] == "checking"
+    assert result["tx_status"] == "checking"
+    assert result["tx_phase"] == "checking"
+    assert result["next_action"] == "tx.verify.start"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] is None
+    assert result["active_tx_id"] == "t-1"
+    assert result["active_ticket_id"] == "t-1"
+    assert result["current_step"] == "verify-step"
+    assert result["verify_status"] == "not_started"
+    assert result["commit_status"] == "not_started"
+    assert result["integrity_status"] == "ok"
+    assert result["can_start_new_ticket"] is False
+    assert result["resume_required"] is True
+    assert result["last_applied_seq"] >= 0
+    assert result["state"]["ok"] is True
+    assert result["integrity"]["drift_detected"] is False
 
 
 def test_ops_task_summary_emits_journal(repo_context, state_store, state_rebuilder):

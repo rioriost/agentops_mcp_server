@@ -8,7 +8,11 @@ from .git_repo import GitRepo
 from .repo_context import RepoContext
 from .state_rebuilder import StateRebuilder
 from .state_store import StateStore, now_iso
-from .workflow_response import build_failure_response, build_success_response
+from .workflow_response import (
+    build_failure_response,
+    build_success_response,
+    derive_workflow_guidance,
+)
 
 
 def truncate_text(value: Optional[str], limit: int = 2000) -> Optional[str]:
@@ -97,6 +101,69 @@ class OpsTools:
         state = self._load_tx_state()
         active_tx = state.get("active_tx")
         return active_tx if isinstance(active_tx, dict) else {}
+
+    def _workflow_success_response(
+        self,
+        *,
+        payload: Optional[Dict[str, Any]] = None,
+        event: Optional[Dict[str, Any]] = None,
+        tx_state: Optional[Dict[str, Any]] = None,
+        **guidance_overrides: Any,
+    ) -> Dict[str, Any]:
+        resolved_state = (
+            tx_state if isinstance(tx_state, dict) else self._load_tx_state()
+        )
+        response = build_success_response(
+            tx_state=resolved_state,
+            payload=payload,
+            event=event,
+            **guidance_overrides,
+        )
+        if (
+            not response.get("canonical_status")
+            and not response.get("canonical_phase")
+            and not response.get("next_action")
+        ):
+            guidance = derive_workflow_guidance(
+                {"active_tx": self._active_tx()},
+                **guidance_overrides,
+            )
+            response.update(guidance)
+            response["tx_status"] = guidance["canonical_status"]
+            response["tx_phase"] = guidance["canonical_phase"]
+
+        active_tx = (
+            resolved_state.get("active_tx")
+            if isinstance(resolved_state.get("active_tx"), dict)
+            else {}
+        )
+        verify_state = (
+            active_tx.get("verify_state")
+            if isinstance(active_tx.get("verify_state"), dict)
+            else {}
+        )
+        commit_state = (
+            active_tx.get("commit_state")
+            if isinstance(active_tx.get("commit_state"), dict)
+            else {}
+        )
+        integrity = (
+            resolved_state.get("integrity")
+            if isinstance(resolved_state.get("integrity"), dict)
+            else {}
+        )
+
+        response["active_tx"] = active_tx
+        response["active_tx_id"] = active_tx.get("tx_id")
+        response["active_ticket_id"] = active_tx.get("ticket_id")
+        response["current_step"] = active_tx.get("current_step")
+        response["verify_status"] = verify_state.get("status")
+        response["commit_status"] = commit_state.get("status")
+        response["integrity_status"] = (
+            "blocked" if integrity.get("drift_detected") is True else "healthy"
+        )
+
+        return response
 
     def _canonical_begin_conflict(
         self, requested_task_id: Optional[str]
@@ -650,7 +717,10 @@ class OpsTools:
             agent_id=agent_id,
         )
 
-        return {"ok": True, "payload": payload}
+        return self._workflow_success_response(
+            payload=payload,
+            tx_state=self._load_tx_state(),
+        )
 
     def ops_update_file_intent(
         self,
@@ -695,7 +765,10 @@ class OpsTools:
             agent_id=agent_id,
         )
 
-        return {"ok": True, "payload": payload}
+        return self._workflow_success_response(
+            payload=payload,
+            tx_state=self._load_tx_state(),
+        )
 
     def ops_complete_file_intent(
         self,
@@ -734,7 +807,10 @@ class OpsTools:
             agent_id=agent_id,
         )
 
-        return {"ok": True, "payload": payload}
+        return self._workflow_success_response(
+            payload=payload,
+            tx_state=self._load_tx_state(),
+        )
 
     def ops_start_task(
         self,
@@ -791,7 +867,7 @@ class OpsTools:
                 resolved_task_id, allow_resume=True
             )
 
-        self._emit_tx_event(
+        event = self._emit_tx_event(
             event_type="tx.step.enter",
             payload={"step_id": tx_step_id, "description": "task started"},
             title=resolved_tx_id,
@@ -802,7 +878,11 @@ class OpsTools:
             agent_id=agent_id,
         )
 
-        return {"ok": True, "event": event, "payload": payload}
+        return self._workflow_success_response(
+            payload=payload,
+            event=event,
+            tx_state=self._load_tx_state(),
+        )
 
     def ops_update_task(
         self,
@@ -842,7 +922,7 @@ class OpsTools:
             else (resolved_status if resolved_status else "task")
         )
         description = payload.get("note") or "task updated"
-        self._emit_tx_event(
+        event = self._emit_tx_event(
             event_type="tx.step.enter",
             payload={"step_id": tx_step_id, "description": description},
             title=resolved_task_id or "task",
@@ -864,7 +944,11 @@ class OpsTools:
                 agent_id=agent_id,
             )
 
-        return {"ok": True, "event": event, "payload": payload}
+        return self._workflow_success_response(
+            payload=payload,
+            event=event,
+            tx_state=self._load_tx_state(),
+        )
 
     def ops_end_task(
         self,
@@ -912,7 +996,7 @@ class OpsTools:
             end_payload["next_action"] = payload.get("next_action")
         if end_type == "tx.end.blocked":
             end_payload["reason"] = payload.get("summary", "")
-        self._emit_tx_event(
+        event = self._emit_tx_event(
             event_type=end_type,
             payload=end_payload,
             title=resolved_task_id or "task",
@@ -923,7 +1007,11 @@ class OpsTools:
             agent_id=agent_id,
         )
 
-        return {"ok": True, "event": event, "payload": payload}
+        return self._workflow_success_response(
+            payload=payload,
+            event=event,
+            tx_state=self._load_tx_state(),
+        )
 
     def ops_capture_state(self, session_id: Optional[str] = None) -> Dict[str, Any]:
         rebuild = self.state_rebuilder.rebuild_tx_state()
@@ -976,9 +1064,12 @@ class OpsTools:
         last_seq = state.get("last_applied_seq")
         last_seq_value = last_seq if isinstance(last_seq, int) else 0
 
-        response = build_success_response(tx_state=state)
+        response = self._workflow_success_response(tx_state=state)
         response["state"] = save_result
         response["last_applied_seq"] = last_seq_value
+        response["integrity"] = integrity
+        response["can_start_new_ticket"] = response.get("can_start_new_ticket")
+        response["resume_required"] = response.get("resume_required")
         return response
 
     def ops_task_summary(
