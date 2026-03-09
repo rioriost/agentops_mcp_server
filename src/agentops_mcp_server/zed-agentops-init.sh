@@ -155,7 +155,16 @@ from pathlib import Path
 
 namespace = {}
 exec(Path(r"$SOURCE_RULES_PY").read_text(), namespace)
-print(namespace["canonical_workflow_rules"](), end="")
+rules = namespace["canonical_workflow_rules"]()
+rules = rules.replace(
+    "- Agents must use canonical transaction status/phase and `next_action` to determine whether follow-up lifecycle completion is still required after verify or commit helpers succeed.\n- Client ticket-document status, when maintained, is derived workflow bookkeeping and may be synchronized by the client as a convention.\n",
+    "- Agents must use canonical transaction status/phase and `next_action` to determine whether follow-up lifecycle completion is still required after verify or commit helpers succeed.\n- Lifecycle-aware success responses should be treated as machine-readable workflow guidance, not prose-only hints.\n- When present, agents should branch primarily on fields such as:\n  - `canonical_status`\n  - `canonical_phase`\n  - `next_action`\n  - `terminal`\n  - `requires_followup`\n  - `followup_tool`\n  - `active_tx_id`\n  - `active_ticket_id`\n- Lifecycle- and state-related failure responses should remain machine-distinguishable when possible.\n- When present, agents should use fields such as:\n  - `error_code`\n  - `reason`\n  - `recoverable`\n  - `recommended_next_tool`\n  - `recommended_action`\n  - `integrity_status`\n  - `blocked`\n- Helper success does not by itself imply terminal completion; non-terminal `committed` must remain distinguishable from terminal `done` and `blocked`.\n- Client ticket-document status, when maintained, is derived workflow bookkeeping and may be synchronized by the client as a convention.\n",
+)
+rules = rules.replace(
+    "  - task lifecycle tools\n    - do not call task start/update/end before `tx.begin`\n  - time lookup\n",
+    "  - task lifecycle tools\n    - do not call task start/update/end before `tx.begin`\n    - `session_id` is required and must be non-empty when the lifecycle tool contract requires it\n    - preserve or recover the canonical active transaction session context before attempting lifecycle continuation\n  - time lookup\n",
+)
+print(rules, end="")
 PY
 elif [ -f "$SOURCE_RULES_FALLBACK" ]; then
   cp "$SOURCE_RULES_FALLBACK" "$SOURCE_RULES"
