@@ -74,7 +74,7 @@
       "id": "p2-t07",
       "priority": "P0",
       "title": "Repair canonical ticket ID collision handling and global tx_id uniqueness",
-      "status": "in-progress",
+      "status": "done",
       "file": "v0.5.4/p2-t07.json"
     },
     {
@@ -93,9 +93,9 @@
     }
   ],
   "status_context": {
-    "active_ticket": "p2-t07",
-    "canonical_sync_state": "blocked",
-    "reason": "Canonical history is currently blocked by duplicate tx.begin caused by global ticket ID collisions: p2-t01 was reused across multiple versions, so new 0.5.4 lifecycle events collided with prior canonical transactions. Until repair is complete, downstream implementation work such as p2-t06 must remain blocked even though p2-t01 is functionally complete.",
-    "recommended_action": "Work p2-t07 now to repair the canonical tx_id collision issue and the rebuild invalid-seq reporting mismatch before relying further on canonical observability."
+    "active_ticket": "p3-t01",
+    "canonical_sync_state": "ready",
+    "reason": "The canonical tx_id collision and rebuild invalid-seq reporting issues addressed by p2-t07 are now complete, and the repository is back in a clean, resumable state for follow-on work.",
+    "recommended_action": "Start p3-t01 next to strengthen regression coverage for the machine-readable workflow-guidance contract."
   }
 }
