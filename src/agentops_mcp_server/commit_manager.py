@@ -123,11 +123,7 @@ class CommitManager:
             return None, rebuilt_state, integrity
 
         requested_tx_id = requested_context["tx_id"]
-        requested_ticket_id = requested_context["ticket_id"].strip()
-        if (
-            rebuilt_context["tx_id"] != requested_tx_id
-            and rebuilt_context["ticket_id"] != requested_ticket_id
-        ):
+        if rebuilt_context["tx_id"] != requested_tx_id:
             return None, rebuilt_state, integrity
 
         terminal = rebuilt_context["phase"] in {"done", "blocked"}

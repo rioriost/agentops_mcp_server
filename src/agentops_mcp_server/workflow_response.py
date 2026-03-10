@@ -203,7 +203,7 @@ def derive_workflow_guidance(
         elif integrity:
             resolved_integrity_status = "ok"
 
-    has_active_tx = bool(resolved_active_tx_id or resolved_active_ticket_id)
+    has_active_tx = bool(resolved_active_tx_id)
 
     resolved_resume_required = _clean_bool(resume_required)
     if resolved_resume_required is None:

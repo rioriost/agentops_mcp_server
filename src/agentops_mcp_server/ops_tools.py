@@ -319,13 +319,18 @@ class OpsTools:
             candidate_active_tx = self._active_tx()
 
         if allow_recovery:
-            return self._recover_session_id_from_agent_artifacts(candidate_active_tx)
+            try:
+                return self._recover_session_id_from_agent_artifacts(
+                    candidate_active_tx
+                )
+            except ValueError:
+                pass
 
         materialized_session_id = candidate_active_tx.get("session_id")
         if isinstance(materialized_session_id, str) and materialized_session_id.strip():
             return materialized_session_id.strip()
 
-        raise ValueError("session_id is required")
+        return ""
 
     def _workflow_success_response(
         self,
@@ -857,6 +862,8 @@ class OpsTools:
         actor: Dict[str, Any] = {"tool": "ops_tools"}
         if isinstance(agent_id, str) and agent_id.strip():
             actor["agent_id"] = agent_id.strip()
+        if resolved_session_id:
+            actor["session_id"] = resolved_session_id
 
         tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
         if isinstance(tx_state, dict):

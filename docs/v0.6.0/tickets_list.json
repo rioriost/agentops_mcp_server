@@ -45,7 +45,7 @@
         {
           "ticket_id": "p1-t01",
           "title": "Define and enforce the identity boundary between ticket_id, tx_id, task_id, and session_id",
-          "status": "planned",
+          "status": "done",
           "path": "docs/v0.6.0/p1-t01.json"
         },
         {
@@ -206,7 +206,7 @@
       "ticket_id": "p1-t01",
       "phase_id": "p1",
       "title": "Define and enforce the identity boundary between ticket_id, tx_id, task_id, and session_id",
-      "status": "planned",
+      "status": "done",
       "path": "docs/v0.6.0/p1-t01.json",
       "plan_sections": [
         "Canonical Runtime Model",

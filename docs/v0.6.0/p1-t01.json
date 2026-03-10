@@ -2,7 +2,7 @@
   "ticket_id": "p1-t01",
   "phase_id": "p1",
   "title": "Define and enforce the identity boundary between ticket_id, tx_id, task_id, and session_id",
-  "status": "planned",
+  "status": "done",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Canonical Runtime Model",
@@ -47,18 +47,8 @@
     "ticket_id remains a planning/work-item identifier and is not promoted into canonical runtime identity",
     "Any retained compatibility handling is explicitly bounded to historical data and does not weaken strict new-write semantics"
   ],
-  "dependencies": [
-    "p0-t01",
-    "p0-t02",
-    "p0-t03"
-  ],
-  "blocks": [
-    "p1-t02",
-    "p2-t01",
-    "p2-t02",
-    "p2-t07",
-    "p2-t08"
-  ],
+  "dependencies": ["p0-t01", "p0-t02", "p0-t03"],
+  "blocks": ["p1-t02", "p2-t01", "p2-t02", "p2-t07", "p2-t08"],
   "notes": [
     "This ticket establishes the identity boundary that later runtime, resume, and compatibility tickets must preserve.",
     "All implementation choices in this ticket must follow the plan's distinction between server-owned canonical protocol state and client-managed inputs.",
