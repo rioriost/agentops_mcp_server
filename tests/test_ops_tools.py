@@ -557,6 +557,57 @@ def test_ops_start_task_ignores_non_in_progress_requested_status_for_phase(
     assert result["payload"]["requested_status"] == "checking"
 
 
+def test_ops_start_task_allows_stringified_tx_id_for_exact_active_transaction_resume(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id=12, session_id="s1")
+
+    result = ops.ops_start_task(title="Build", task_id="12", session_id="s1")
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert [event["event_type"] for event in events] == ["tx.begin", "tx.step.enter"]
+    assert events[-1]["tx_id"] == 12
+    assert events[-1]["ticket_id"] == "t-12"
+
+
+def test_ops_start_task_does_not_reverse_map_prefixed_string_to_tx_id(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id=12, session_id="s1")
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: active_tx=unknown, "
+            "requested_task=tx-12, active_ticket=t-12, status=in-progress, "
+            "next_action=tx.verify.start. Resume or complete the active "
+            "transaction before starting a new ticket."
+        ),
+    ):
+        ops.ops_start_task(title="Build", task_id="tx-12", session_id="s1")
+
+
+def test_ops_start_task_does_not_treat_substring_like_active_tx_id(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id=1207, session_id="s1")
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: active_tx=unknown, "
+            "requested_task=207, active_ticket=t-1207, status=in-progress, "
+            "next_action=tx.verify.start. Resume or complete the active "
+            "transaction before starting a new ticket."
+        ),
+    ):
+        ops.ops_start_task(title="Build", task_id="207", session_id="s1")
+
+
 def test_ops_start_task_rejects_mismatched_task_id(
     repo_context, state_store, state_rebuilder
 ):
@@ -885,6 +936,49 @@ def test_ops_update_task_falls_back_to_active_tx_id(
     assert result["current_step"] == "t-1"
     assert result["verify_status"] == "not_started"
     assert result["commit_status"] == "not_started"
+
+
+def test_ops_update_task_allows_stringified_tx_id_for_exact_active_transaction(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id=12, session_id="s1")
+
+    result = ops.ops_update_task(
+        status="checking",
+        note="waiting",
+        task_id="12",
+        session_id="s1",
+    )
+
+    assert result["ok"] is True
+    events = _read_tx_events(repo_context)
+    assert events[-1]["event_type"] == "tx.step.enter"
+    assert events[-1]["tx_id"] == 12
+    assert events[-1]["ticket_id"] == "t-12"
+
+
+def test_ops_update_task_rejects_prefixed_string_as_reverse_mapping_to_tx_id(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+    _begin_tx(state_store, state_rebuilder, tx_id=12, session_id="s1")
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "tx_id does not match active transaction: active_tx=unknown, "
+            "requested_task=tx-12, active_ticket=t-12, status=in-progress, "
+            "next_action=tx.verify.start. Resume or complete the active "
+            "transaction before starting a new ticket."
+        ),
+    ):
+        ops.ops_update_task(
+            status="checking",
+            note="waiting",
+            task_id="tx-12",
+            session_id="s1",
+        )
 
 
 def test_ops_update_task_prefers_materialized_state_over_rebuild(
@@ -1967,7 +2061,7 @@ def test_canonical_begin_conflict_rejects_matching_materialized_ticket_id(
     )
 
 
-def test_canonical_begin_conflict_rejects_matching_materialized_comparable_tx_id(
+def test_canonical_begin_conflict_does_not_reverse_map_materialized_tx_string_shapes(
     repo_context, state_store, state_rebuilder
 ):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
@@ -1983,11 +2077,7 @@ def test_canonical_begin_conflict_rejects_matching_materialized_comparable_tx_id
 
     conflict = ops._canonical_begin_conflict("123")
 
-    assert isinstance(conflict, ValueError)
-    assert str(conflict) == (
-        "cannot emit tx.begin for an already-active non-terminal transaction; "
-        "resume it with task update semantics instead"
-    )
+    assert conflict is None
 
 
 def test_emit_tx_event_uses_rebuild_state_when_materialized_state_is_not_dict(
@@ -4049,7 +4139,7 @@ def test_require_active_tx_rejects_matching_ticket_without_resume_permission(
         ops._require_active_tx("t-1", allow_resume=False)
 
 
-def test_require_active_tx_rejects_matching_comparable_tx_without_resume_semantics(
+def test_require_active_tx_treats_non_exact_tx_string_shapes_as_mismatch(
     repo_context, state_store, state_rebuilder
 ):
     ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
@@ -4066,8 +4156,10 @@ def test_require_active_tx_rejects_matching_comparable_tx_without_resume_semanti
     with pytest.raises(
         ValueError,
         match=(
-            "cannot emit tx.begin for an already-active non-terminal transaction; "
-            "resume it with task update semantics instead"
+            "tx_id does not match active transaction: active_tx=tx-123, "
+            "requested_task=123, active_ticket=ticket-x, status=checking, "
+            "next_action=tx.verify.start. Resume or complete the active "
+            "transaction before starting a new ticket."
         ),
     ):
         ops._require_active_tx("123")

@@ -427,13 +427,7 @@ class OpsTools:
             and rebuilt_active_tx
             and not self._is_terminal_active_tx(rebuilt_active_tx)
         ):
-            comparable_tx_id = rebuilt_tx_id.removeprefix("tx-")
             if requested_id == rebuilt_ticket_id:
-                return ValueError(
-                    "cannot emit tx.begin for an already-active non-terminal transaction; "
-                    "resume it with task update semantics instead"
-                )
-            if requested_id == comparable_tx_id or requested_id in comparable_tx_id:
                 return ValueError(
                     "cannot emit tx.begin for an already-active non-terminal transaction; "
                     "resume it with task update semantics instead"
@@ -454,15 +448,6 @@ class OpsTools:
                     return self._active_tx_mismatch_error(
                         requested_task_id, rebuilt_active_tx
                     )
-                comparable_tx_id = rebuilt_tx_id.removeprefix("tx-")
-                if (
-                    requested_id == rebuilt_tx_id
-                    or requested_id == comparable_tx_id
-                    or requested_id in comparable_tx_id
-                ):
-                    return self._active_tx_mismatch_error(
-                        requested_task_id, rebuilt_active_tx
-                    )
             return None
 
         materialized_tx_id = self._normalize_tx_identifier(
@@ -474,13 +459,7 @@ class OpsTools:
 
         if not materialized_tx_id:
             return None
-        comparable_tx_id = materialized_tx_id.removeprefix("tx-")
         if requested_id == materialized_ticket_id:
-            return ValueError(
-                "cannot emit tx.begin for an already-active non-terminal transaction; "
-                "resume it with task update semantics instead"
-            )
-        if requested_id == comparable_tx_id or requested_id in comparable_tx_id:
             return ValueError(
                 "cannot emit tx.begin for an already-active non-terminal transaction; "
                 "resume it with task update semantics instead"
@@ -553,12 +532,6 @@ class OpsTools:
             )
 
         if requested_id:
-            comparable_tx_id = canonical_id.removeprefix("tx-")
-            if requested_id == comparable_tx_id or requested_id in comparable_tx_id:
-                raise ValueError(
-                    "cannot emit tx.begin for an already-active non-terminal transaction; "
-                    "resume it with task update semantics instead"
-                )
             raise self._active_tx_mismatch_error(requested_id, active_tx)
 
         return active_tx, canonical_id

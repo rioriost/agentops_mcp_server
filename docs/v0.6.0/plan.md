@@ -158,6 +158,157 @@ For `0.6.0`, the design should prioritize:
 
 over a more elaborate session hierarchy.
 
+## Server-owned transaction variables vs client-managed inputs
+
+The runtime implementation under `src/` needs a stricter boundary between:
+- **server-owned transaction variables**
+- **client-managed inputs**
+
+This distinction is necessary because `0.6.0` is defining a resumable transaction protocol, not a client-managed ticket database.
+
+### 1. Server-owned transaction variables
+These values are part of the canonical transaction protocol.
+They may be written into artifacts and exposed in responses, but clients should treat them as **read only** unless the protocol explicitly defines a server tool that owns their update path.
+
+#### Canonical transaction identity and ordering
+- `tx_id`
+  - canonical runtime transaction identity
+  - server-issued
+  - integer-valued
+  - not derived from `ticket_id`, `task_id`, or any other client label
+- `seq`
+  - canonical append order for transaction events
+- `event_id`
+  - event record identifier when present
+- `last_issued_id`
+  - issuance counter state for new canonical transaction IDs
+- `last_applied_seq`
+  - last event sequence materialized into transaction state
+- `rebuilt_from_seq`
+  - rebuild checkpoint origin for current materialized state
+
+#### Canonical active transaction state
+- `active_tx`
+- `status`
+- `phase`
+- `current_step`
+- `last_completed_step`
+- `next_action`
+- `terminal`
+- `_terminal`
+- `_last_event_seq`
+- `schema_version`
+- `updated_at`
+
+#### Canonical verification and commit state
+- `verify_state`
+- `verify_state.status`
+- `verify_state.last_result`
+- `commit_state`
+- `commit_state.status`
+- `commit_state.last_result`
+
+#### Canonical file-intent state
+- `file_intents`
+- `planned_step`
+- file-intent `state`
+- `last_event_seq` within file-intent records
+
+#### Canonical integrity and rebuild state
+- `integrity`
+- `state_hash`
+- `drift_detected`
+- `active_tx_source`
+- `rebuild_warning`
+- `rebuild_invalid_seq`
+- `rebuild_observed_mismatch`
+- `drift_reason`
+- `invalid_reason`
+- `invalid_event`
+
+#### Server-generated diagnostics and derived workflow guidance
+These may be returned to the client, but they are still server-authored protocol outputs rather than client-owned state:
+- `integrity_status`
+- `canonical_status`
+- `canonical_phase`
+- `requires_followup`
+- `followup_tool`
+- `can_start_new_ticket`
+- `resume_required`
+- `active_tx_id`
+- `active_ticket_id`
+- `current_step`
+- `verify_status`
+- `commit_status`
+- `recommended_next_tool`
+- `recommended_action`
+- `recoverable`
+- `blocked`
+- `error_code`
+- `validation_point`
+- `event_sequence`
+- `active_tx_context`
+- `session_context`
+- `expected_state`
+- `observed_state`
+- `observed_mismatch`
+
+### 2. Client-managed inputs
+These values may be supplied by the client and may be persisted by the server as part of transaction history or metadata, but they are not the canonical runtime transaction identity.
+
+#### Planning and human-facing identifiers
+- `ticket_id`
+  - planning/work-item identifier
+  - client-managed
+  - may be stored in canonical history as transaction metadata
+  - not the canonical runtime execution identifier
+- `task_id`
+  - currently used by helper-style APIs
+  - not part of the core `0.6.0` transaction definition
+  - should be treated as a client-managed label unless and until the protocol defines a stricter role
+- `title`
+  - human-facing task title
+
+#### Client-provided runtime context
+- `session_id`
+  - client may provide it
+  - server may recover it from artifacts when needed
+  - useful runtime context, but not the primary correctness anchor
+- `agent_id`
+- `user_intent`
+
+#### Client-provided lifecycle and helper inputs
+- `status` as an API input
+- `note`
+- `summary`
+- `next_action` as an API input where allowed
+- `path`
+- `operation`
+- `purpose`
+- file-intent update `state`
+- helper controls such as `timeout_sec`, `max_chars`, `max_events`, `include_diff`, `log`, `diff`, `failures`, `files`, and similar request parameters
+
+### 3. Design consequence for `ops_tools`
+The current implementation exposes signs that transaction management and client-side helper semantics are still too intermingled.
+
+In particular:
+- `tx_id` is server-owned canonical execution identity
+- `ticket_id` is client-managed planning identity
+- `task_id` is not part of the core canonical transaction model and should not be allowed to blur the boundary between planning identity and runtime transaction identity
+
+The intended `0.6.0` direction is therefore:
+1. transaction correctness is anchored on server-owned canonical transaction state
+2. new transaction creation may accept client-managed planning inputs such as `ticket_id` and `title`
+3. once a transaction exists, continuation should be anchored on the exact canonical transaction identity and canonical materialized state
+4. helper-style client labels must not be allowed to redefine, infer, or reverse-map canonical transaction identity
+
+### 4. Practical rule for future implementation work
+When reviewing or changing runtime code, use this boundary:
+
+- If a value determines canonical transaction identity, lifecycle ordering, replay integrity, materialized resumability, or issuance state, it is **server-owned**.
+- If a value is provided for planning, naming, operator intent, or client-side workflow convenience, it is **client-managed**.
+- Client-managed identifiers must not be promoted into canonical runtime identity by string-shape heuristics, reverse mapping, or replacement-ID synthesis.
+
 ## Transaction Semantics
 
 ## 1. Transaction meaning
