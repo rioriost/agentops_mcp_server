@@ -2,7 +2,6 @@
   "ticket_id": "p3-t03",
   "phase_id": "p3",
   "title": "Add regression coverage for terminal re-entry, no-change completion, and idempotent resume",
-  "status": "planned",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Transaction Semantics",

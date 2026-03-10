@@ -2,7 +2,6 @@
   "ticket_id": "p2-t03",
   "phase_id": "p2",
   "title": "Remove sentinel active-transaction semantics and adopt structural no-active state",
-  "status": "planned",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Canonical Invariants",

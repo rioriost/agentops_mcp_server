@@ -2,7 +2,6 @@
   "ticket_id": "p3-t01",
   "phase_id": "p3",
   "title": "Add regression coverage for interrupted in-progress and checking flows",
-  "status": "planned",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Transaction Semantics",

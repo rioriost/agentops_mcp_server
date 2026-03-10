@@ -1,6 +1,6 @@
 {
   "version": "0.6.0",
-  "description": "Regenerated ticket index for implementing the resumable transactional protocol redesign.",
+  "description": "Regenerated ticket index for implementing the resumable transactional protocol redesign; this file is the single source of truth for ticket statuses.",
   "source_plan": "docs/v0.6.0/plan.md",
   "status_model": [
     "planned",
@@ -45,19 +45,19 @@
         {
           "ticket_id": "p1-t01",
           "title": "Define and enforce the identity boundary between ticket_id, tx_id, task_id, and session_id",
-          "status": "done",
+          "status": "planned",
           "path": "docs/v0.6.0/p1-t01.json"
         },
         {
           "ticket_id": "p1-t02",
           "title": "Define the minimal canonical continuation contract in code",
-          "status": "in-progress",
+          "status": "planned",
           "path": "docs/v0.6.0/p1-t02.json"
         },
         {
           "ticket_id": "p1-t03",
           "title": "Separate status classification from next_action dispatch semantics",
-          "status": "done",
+          "status": "planned",
           "path": "docs/v0.6.0/p1-t03.json"
         },
         {
@@ -206,7 +206,7 @@
       "ticket_id": "p1-t01",
       "phase_id": "p1",
       "title": "Define and enforce the identity boundary between ticket_id, tx_id, task_id, and session_id",
-      "status": "done",
+      "status": "planned",
       "path": "docs/v0.6.0/p1-t01.json",
       "plan_sections": [
         "Canonical Runtime Model",
@@ -218,7 +218,7 @@
       "ticket_id": "p1-t02",
       "phase_id": "p1",
       "title": "Define the minimal canonical continuation contract in code",
-      "status": "in-progress",
+      "status": "planned",
       "path": "docs/v0.6.0/p1-t02.json",
       "plan_sections": [
         "Server-owned transaction variables vs client-managed inputs",
@@ -231,7 +231,7 @@
       "ticket_id": "p1-t03",
       "phase_id": "p1",
       "title": "Separate status classification from next_action dispatch semantics",
-      "status": "done",
+      "status": "planned",
       "path": "docs/v0.6.0/p1-t03.json",
       "plan_sections": [
         "Canonical State Machine",
@@ -411,5 +411,8 @@
         "Compatibility Policy"
       ]
     }
+  ],
+  "notes": [
+    "Ticket status is tracked only in this index; per-ticket JSON files intentionally omit status to avoid drift."
   ]
 }

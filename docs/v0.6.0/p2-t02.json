@@ -2,7 +2,6 @@
   "ticket_id": "p2-t02",
   "phase_id": "p2",
   "title": "Unify active transaction selection around exact active_tx identity",
-  "status": "planned",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Canonical Invariants",
@@ -40,7 +39,13 @@
     ".agent/tx_state.json handling",
     ".agent/tx_event_log.jsonl handling"
   ],
-  "dependencies": ["p0-t01", "p0-t02", "p0-t03", "p1-t01", "p1-t02"],
+  "dependencies": [
+    "p0-t01",
+    "p0-t02",
+    "p0-t03",
+    "p1-t01",
+    "p1-t02"
+  ],
   "enables": [
     "p2-t03",
     "p2-t04",

@@ -2,7 +2,6 @@
   "ticket_id": "p2-t04",
   "phase_id": "p2",
   "title": "Align materialized state with the minimal continuation contract",
-  "status": "planned",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Server-owned transaction variables vs client-managed inputs",
@@ -43,7 +42,14 @@
     ".agent/tx_state.json handling code",
     "Any transaction-state serializers, validators, and rebuild logic under src"
   ],
-  "dependencies": ["p0-t01", "p0-t02", "p0-t03", "p1-t01", "p1-t02", "p1-t03"],
+  "dependencies": [
+    "p0-t01",
+    "p0-t02",
+    "p0-t03",
+    "p1-t01",
+    "p1-t02",
+    "p1-t03"
+  ],
   "enables": [
     "p2-t05",
     "p2-t06",

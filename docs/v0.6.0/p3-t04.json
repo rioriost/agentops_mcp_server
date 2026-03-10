@@ -2,7 +2,6 @@
   "ticket_id": "p3-t04",
   "phase_id": "p3",
   "title": "Add regression coverage for historical compatibility and malformed persistence",
-  "status": "planned",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Persistence Model",

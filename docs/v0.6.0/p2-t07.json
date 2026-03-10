@@ -2,7 +2,6 @@
   "ticket_id": "p2-t07",
   "phase_id": "p2",
   "title": "Bound session context to a secondary runtime role",
-  "status": "planned",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Canonical Runtime Model",
@@ -45,7 +44,13 @@
     "p2-t02",
     "p2-t05"
   ],
-  "enables": ["p2-t08", "p3-t01", "p3-t02", "p3-t04", "p3-t05"],
+  "enables": [
+    "p2-t08",
+    "p3-t01",
+    "p3-t02",
+    "p3-t04",
+    "p3-t05"
+  ],
   "rules": [
     "session_id is secondary runtime context and not part of canonical runtime identity.",
     "session_id must not determine active transaction identity.",

@@ -2,7 +2,6 @@
   "ticket_id": "p1-t02",
   "phase_id": "p1",
   "title": "Define the minimal canonical continuation contract in code",
-  "status": "checking",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Server-owned transaction variables vs client-managed inputs",
@@ -27,8 +26,15 @@
     "Adding or removing regression tests beyond what is needed to validate the contract shape.",
     "Making session context part of the continuation contract."
   ],
-  "inputs": ["docs/v0.6.0/plan.md", "src/**/*.py"],
-  "dependencies": ["p0-t01", "p0-t02", "p1-t01"],
+  "inputs": [
+    "docs/v0.6.0/plan.md",
+    "src/**/*.py"
+  ],
+  "dependencies": [
+    "p0-t01",
+    "p0-t02",
+    "p1-t01"
+  ],
   "expected_outputs": [
     "A clear code-level definition of the minimal continuation contract.",
     "A list of runtime structures or modules that own the continuation contract.",

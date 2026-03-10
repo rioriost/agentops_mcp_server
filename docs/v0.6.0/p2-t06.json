@@ -2,7 +2,6 @@
   "ticket_id": "p2-t06",
   "phase_id": "p2",
   "title": "Normalize post-terminal handling into the canonical no-active baseline",
-  "status": "planned",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Transaction Semantics",

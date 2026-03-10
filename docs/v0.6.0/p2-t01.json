@@ -2,7 +2,6 @@
   "ticket_id": "p2-t01",
   "phase_id": "p2",
   "title": "Replace ticket-derived tx_id generation with issued transaction IDs",
-  "status": "planned",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Objectives",
@@ -42,8 +41,20 @@
     ".agent/tx_state.json handling",
     ".agent/tx_event_log.jsonl handling"
   ],
-  "dependencies": ["p0-t01", "p0-t02", "p0-t03", "p1-t01"],
-  "enables": ["p2-t02", "p2-t03", "p2-t04", "p2-t05", "p2-t08", "p3-t04"],
+  "dependencies": [
+    "p0-t01",
+    "p0-t02",
+    "p0-t03",
+    "p1-t01"
+  ],
+  "enables": [
+    "p2-t02",
+    "p2-t03",
+    "p2-t04",
+    "p2-t05",
+    "p2-t08",
+    "p3-t04"
+  ],
   "expected_outputs": [
     "A runtime implementation where all new tx_id allocation uses a single canonical issuance path.",
     "Removal or neutralization of any code path that derives tx_id from ticket_id or other client-managed labels.",

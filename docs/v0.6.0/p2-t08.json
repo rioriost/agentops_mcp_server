@@ -2,7 +2,6 @@
   "ticket_id": "p2-t08",
   "phase_id": "p2",
   "title": "Implement bounded historical compatibility and malformed persistence failure behavior",
-  "status": "planned",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Persistence Model",
