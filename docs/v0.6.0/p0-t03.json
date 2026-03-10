@@ -2,7 +2,7 @@
   "ticket_id": "p0-t03",
   "phase_id": "p0",
   "title": "Map begin, resume, and active-transaction selection code paths",
-  "status": "planned",
+  "status": "done",
   "goal": "Review the current runtime implementation and identify every code path involved in starting a transaction, resuming a transaction, selecting the active transaction, and deciding whether new work may begin.",
   "why_this_ticket_exists": "The 0.6.0 redesign depends on exact active-transaction continuation, structural no-active handling, and elimination of heuristic recovery behavior. Before changing runtime behavior, the code paths responsible for begin and resume decisions must be mapped precisely so later tickets can target the correct files and functions without drifting from the plan.",
   "plan_sections": [
