@@ -1,0 +1,82 @@
+{
+  "ticket_id": "p0-t02",
+  "phase_id": "p0",
+  "title": "Map persistence artifacts and their read/write code paths",
+  "status": "planned",
+  "source_plan": "docs/v0.6.0/plan.md",
+  "plan_sections": [
+    "Persistence Model",
+    "Canonical Ordering and Durability",
+    "Identity Model",
+    "Compatibility Policy",
+    "Implementation Strategy"
+  ],
+  "goal": "Document the current persistence model in the codebase by identifying every canonical artifact involved in transaction state, event history, and transaction ID issuance, along with the Python code paths that read, write, validate, rebuild, or normalize those artifacts.",
+  "why_now": "The 0.6.0 redesign depends on a precise understanding of how materialized state, event history, and issuance metadata are currently persisted. This ticket creates that map before any behavior changes so later tickets can modify the correct code paths without introducing schema drift or replay regressions.",
+  "scope": [
+    "Review all Python code paths under src that read or write .agent persistence artifacts relevant to the transaction protocol.",
+    "Identify current handling of .agent/tx_state.json, .agent/tx_event_log.jsonl, and .agent/tx_id_counter.json.",
+    "Identify any additional persistence artifacts that materially affect resume, rebuild, verification, commit, or compatibility behavior.",
+    "Document serialization, deserialization, validation, defaulting, rebuild, and normalization behavior for each artifact.",
+    "Identify current schema assumptions and any mismatches with the 0.6.0 plan.",
+    "Identify which files and functions will likely be modified by later persistence, resume, and compatibility tickets."
+  ],
+  "out_of_scope": [
+    "Changing persistence behavior.",
+    "Refactoring runtime logic.",
+    "Changing ticket, session, or lifecycle semantics in code.",
+    "Adding tests.",
+    "Rewriting historical artifacts."
+  ],
+  "inputs": [
+    "docs/v0.6.0/plan.md",
+    "src/**/*.py",
+    ".agent artifact usage in runtime code"
+  ],
+  "expected_outputs": [
+    "A persistence artifact map covering canonical files and any related supporting artifacts.",
+    "A per-artifact list of reader, writer, validator, and rebuild code paths.",
+    "A summary of current schema fields and defaulting behavior.",
+    "A list of persistence-related mismatches or risks relative to the 0.6.0 plan.",
+    "A shortlist of high-impact files for follow-on implementation tickets."
+  ],
+  "deliverables": [
+    {
+      "name": "Persistence artifact inventory",
+      "description": "A document or structured section that lists each persistence artifact relevant to the resumable transaction protocol and explains its current role."
+    },
+    {
+      "name": "Read/write code-path map",
+      "description": "A mapping from each persistence artifact to the Python files, functions, and classes that read, write, validate, or rebuild it."
+    },
+    {
+      "name": "Plan-alignment notes",
+      "description": "A concise comparison between current persistence behavior and the target 0.6.0 persistence model."
+    }
+  ],
+  "acceptance_criteria": [
+    "Every canonical persistence artifact referenced by the 0.6.0 plan is accounted for.",
+    "For each artifact, the relevant Python reader, writer, validator, and rebuild paths are identified.",
+    "Current write ordering and rebuild behavior are described where implemented.",
+    "Current schema assumptions and default values are documented.",
+    "Known mismatches between current persistence behavior and the 0.6.0 plan are called out explicitly.",
+    "The output is detailed enough that later tickets can identify which files to change without redoing the persistence survey."
+  ],
+  "dependencies": [
+    "p0-t01"
+  ],
+  "enables": [
+    "p1-t02",
+    "p2-t01",
+    "p2-t03",
+    "p2-t04",
+    "p2-t08",
+    "p3-t04"
+  ],
+  "notes": [
+    "Treat materialized state, event history, and issuance metadata as distinct concerns even when handled in the same module.",
+    "Pay special attention to defaulting behavior for missing versus malformed artifacts.",
+    "Record whether historical compatibility logic is implemented at read time, rebuild time, or response-construction time.",
+    "Do not propose code changes in this ticket; this is analysis and mapping only."
+  ]
+}

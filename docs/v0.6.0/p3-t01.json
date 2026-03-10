@@ -1,0 +1,117 @@
+{
+  "ticket_id": "p3-t01",
+  "phase_id": "p3",
+  "title": "Add regression coverage for interrupted in-progress and checking flows",
+  "status": "planned",
+  "source_plan": "docs/v0.6.0/plan.md",
+  "plan_sections": [
+    "Transaction Semantics",
+    "Canonical Invariants",
+    "Canonical State Machine",
+    "State-machine constraints",
+    "Persistence Model",
+    "Materialized state",
+    "Resume Model",
+    "Resume entrypoint",
+    "Resume invariants",
+    "Idempotent continuation requirements",
+    "Implementation Strategy"
+  ],
+  "goal": "Add regression coverage proving that interrupted in-progress and checking states resume deterministically from the minimal canonical continuation contract without relying on optional metadata, heuristic selection, or session-led recovery.",
+  "why_this_ticket": "The 0.6.0 redesign is only complete if interrupted non-terminal work resumes correctly in practice. This ticket validates the earliest non-terminal lifecycle states, where implementation work and checking work are most likely to be interrupted before verify or commit completes.",
+  "scope": [
+    "Add regression tests for interrupted `in-progress` transactions.",
+    "Add regression tests for interrupted `checking` transactions.",
+    "Test resume behavior when materialized state is healthy and complete.",
+    "Test resume behavior when materialized state must be consulted before deciding whether to continue work.",
+    "Test that continuation is driven by canonical `next_action` rather than by status-derived heuristics alone.",
+    "Test that no-active baseline behavior is not confused with interrupted non-terminal work.",
+    "Test that optional phase-style or step-style metadata is not required for successful continuation."
+  ],
+  "out_of_scope": [
+    "Interrupted verify-pass, verify-fail, commit, or post-commit flows.",
+    "Historical compatibility and malformed persistence coverage beyond what is minimally needed to support these tests.",
+    "Changing runtime semantics unrelated to test enablement.",
+    "Operator documentation updates.",
+    "Planning artifact format changes."
+  ],
+  "inputs": [
+    "docs/v0.6.0/plan.md",
+    "docs/v0.6.0/tickets_list.json",
+    "Outputs and implementation changes from p1-t02, p1-t03, p2-t02, p2-t03, p2-t04, and p2-t05",
+    "The runtime test suite and any existing transaction or resume test helpers"
+  ],
+  "dependencies": [
+    "p1-t02",
+    "p1-t03",
+    "p2-t02",
+    "p2-t03",
+    "p2-t04",
+    "p2-t05"
+  ],
+  "enables": [
+    "p3-t02",
+    "p3-t03",
+    "p3-t05"
+  ],
+  "expected_outputs": [
+    "Automated regression tests covering interrupted in-progress resume behavior.",
+    "Automated regression tests covering interrupted checking resume behavior.",
+    "Fixtures or helpers, if needed, for constructing canonical interrupted states using the minimal continuation contract.",
+    "A short note in test code or adjacent comments describing what each interruption scenario is asserting."
+  ],
+  "scenarios": [
+    {
+      "name": "interrupted_in_progress_with_healthy_materialized_state",
+      "description": "A transaction is interrupted while `status` is `in-progress`, `active_tx` is present, and canonical materialized state is healthy. Resume must continue the exact active transaction using canonical `next_action`."
+    },
+    {
+      "name": "interrupted_checking_with_healthy_materialized_state",
+      "description": "A transaction is interrupted while `status` is `checking`, `active_tx` is present, and canonical materialized state is healthy. Resume must continue the exact active transaction using canonical `next_action`."
+    },
+    {
+      "name": "in_progress_does_not_fall_back_to_begin",
+      "description": "A non-terminal interrupted in-progress transaction must not be treated as no-active work and must not trigger `tx.begin`."
+    },
+    {
+      "name": "checking_does_not_fall_back_to_begin",
+      "description": "A non-terminal interrupted checking transaction must not be treated as no-active work and must not trigger `tx.begin`."
+    },
+    {
+      "name": "continuation_does_not_require_optional_metadata",
+      "description": "Resume succeeds when phase-style or step-style metadata is absent, as long as the minimal canonical continuation contract is present and valid."
+    },
+    {
+      "name": "exact_active_identity_is_preserved",
+      "description": "Resume continues the exact active transaction identity and does not mint or infer a replacement transaction."
+    }
+  ],
+  "assertions": [
+    "Resume selects the exact `active_tx` from the canonical materialized continuation contract.",
+    "Resume does not start a new transaction when interrupted non-terminal work exists.",
+    "Resume uses canonical `next_action` as the continuation dispatcher.",
+    "Resume does not require phase-style or step-style metadata.",
+    "Resume does not rely on sentinel transaction identifiers.",
+    "Resume does not rely on timestamp-first or heuristic active transaction selection.",
+    "The no-active baseline is not confused with interrupted non-terminal work."
+  ],
+  "acceptance_criteria": [
+    "The automated test suite contains regression cases for interrupted `in-progress` and `checking` states.",
+    "Each test proves that resume continues the same active transaction rather than creating or selecting a substitute transaction.",
+    "Each test proves that canonical `next_action` drives continuation behavior.",
+    "At least one test proves that optional phase-style or step-style metadata is unnecessary for continuation correctness.",
+    "At least one test proves that interrupted non-terminal work is not treated as a no-active baseline.",
+    "The added tests fail against behavior that uses begin-fallback, heuristic selection, or non-canonical dispatch, and pass with the 0.6.0 runtime behavior."
+  ],
+  "review_checkpoints": [
+    "Verify that each test constructs or reaches an actually interrupted non-terminal state rather than a synthetic terminal or no-active baseline.",
+    "Verify that assertions check exact active transaction continuity, not just generic success.",
+    "Verify that tests exercise canonical top-level fields from the minimal continuation contract.",
+    "Verify that test names and comments distinguish lifecycle classification (`status`) from continuation dispatch (`next_action`)."
+  ],
+  "notes": [
+    "This ticket should validate the earliest interruption points in the redesigned work loop before later tickets expand coverage to verify, commit, and terminal flows.",
+    "Prefer scenario-based tests that expose protocol regressions clearly over broad end-to-end cases with ambiguous failure causes.",
+    "If existing helpers assume phase-style, step-style, session-primary, or heuristic recovery behavior, they should be bypassed or updated so these tests reflect the 0.6.0 protocol directly."
+  ]
+}

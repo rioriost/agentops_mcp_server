@@ -1,0 +1,126 @@
+{
+  "ticket_id": "p3-t02",
+  "phase_id": "p3",
+  "title": "Add regression coverage for verify, commit, and post-commit interruption paths",
+  "status": "planned",
+  "source_plan": "docs/v0.6.0/plan.md",
+  "plan_sections": [
+    "Transaction Semantics",
+    "Commit is non-terminal",
+    "Canonical State Machine",
+    "Canonical Checkpoints and Events",
+    "Persistence Model",
+    "Resume Model",
+    "Post-terminal materialization",
+    "Idempotent continuation requirements",
+    "Implementation Strategy"
+  ],
+  "goal": "Add regression coverage proving that interrupted verify, commit, and post-commit flows resume deterministically using the canonical continuation contract and do not corrupt lifecycle state.",
+  "why_this_ticket": "The 0.6.0 redesign treats verify and commit as resumable checkpoints and requires commit to remain non-terminal until explicit terminal completion. This ticket verifies that interruption during those stages does not create duplicate logical completion, replacement transaction identities, or ambiguous continuation behavior.",
+  "scope": [
+    "Add tests for interruption during verify-started but not yet completed flows.",
+    "Add tests for interruption after verify failure where the transaction remains resumable.",
+    "Add tests for interruption after verify success and before any required commit action completes.",
+    "Add tests for interruption during commit-started but not yet completed flows.",
+    "Add tests for interruption after successful commit and before explicit terminal completion.",
+    "Add tests for repeated resume of already-verified or already-committed states.",
+    "Validate that canonical next_action remains the continuation dispatcher across these interrupted states.",
+    "Validate that exact active transaction identity is preserved throughout verify and commit resumption."
+  ],
+  "out_of_scope": [
+    "Redesigning verify or commit business logic itself.",
+    "Changing transaction identity issuance semantics.",
+    "Changing the canonical status set.",
+    "Broad compatibility testing for malformed persistence artifacts beyond what is needed for these interruption scenarios.",
+    "Operator-facing documentation updates outside minimal test descriptions."
+  ],
+  "inputs": [
+    "docs/v0.6.0/plan.md",
+    "docs/v0.6.0/tickets_list.json",
+    "Outputs from p0-t01, p0-t02, and p0-t03",
+    "Outputs from p1-t02, p1-t03, p1-t04, p2-t02, p2-t04, p2-t05, and p2-t06",
+    "Runtime test suite and any transaction lifecycle test helpers"
+  ],
+  "dependencies": [
+    "p0-t01",
+    "p0-t02",
+    "p0-t03",
+    "p1-t02",
+    "p1-t03",
+    "p1-t04",
+    "p2-t02",
+    "p2-t04",
+    "p2-t05",
+    "p2-t06"
+  ],
+  "enables": [
+    "p3-t03",
+    "p3-t05"
+  ],
+  "expected_outputs": [
+    "Regression tests covering interrupted verify flows.",
+    "Regression tests covering interrupted commit flows.",
+    "Regression tests covering interrupted post-commit, pre-terminal flows.",
+    "Assertions proving deterministic continuation from canonical next_action and exact active transaction identity.",
+    "A concise note describing which interruption checkpoints are now covered."
+  ],
+  "required_test_scenarios": [
+    {
+      "name": "interrupted_verify_in_progress",
+      "description": "A transaction interrupted after verify has started but before verify has resolved resumes the same active transaction and continues from canonical next_action without minting a new tx_id."
+    },
+    {
+      "name": "interrupted_verify_failure_repair_loop",
+      "description": "A transaction interrupted after verify failure remains non-terminal, preserves exact tx_id, and resumes as further action rather than silently ending or restarting."
+    },
+    {
+      "name": "interrupted_verified_pre_commit",
+      "description": "A transaction interrupted after verify success but before commit continues according to canonical next_action and does not require heuristic reconstruction."
+    },
+    {
+      "name": "interrupted_commit_in_progress",
+      "description": "A transaction interrupted after commit start but before commit completion resumes the same active transaction and does not duplicate commit lifecycle behavior."
+    },
+    {
+      "name": "interrupted_post_commit_pre_terminal",
+      "description": "A transaction interrupted after successful commit but before explicit terminal completion remains non-terminal committed work and resumes toward explicit end rather than being treated as already done."
+    },
+    {
+      "name": "repeated_resume_already_verified",
+      "description": "Repeated resume of an already-verified transaction does not corrupt state, change tx_id, or bypass canonical next_action."
+    },
+    {
+      "name": "repeated_resume_already_committed",
+      "description": "Repeated resume of an already-committed transaction does not reopen commit, mint a new transaction, or skip explicit terminal handling."
+    }
+  ],
+  "continuation_invariants_under_test": [
+    "Resume reuses the exact existing tx_id.",
+    "Resume does not mint a replacement transaction identity.",
+    "Valid canonical next_action is preferred over status-derived heuristics.",
+    "Commit remains non-terminal until explicit terminal completion.",
+    "Interrupted verify or commit does not cause duplicate logical completion.",
+    "Repeated resume of the same interrupted state does not corrupt lifecycle state.",
+    "Active transaction identity remains exact across interruption and continuation."
+  ],
+  "acceptance_criteria": [
+    "Regression coverage exists for interrupted verify-started, verify-failed, verified-pre-commit, commit-started, and post-commit pre-terminal states.",
+    "Tests demonstrate that the same active transaction is resumed in each interrupted scenario.",
+    "Tests demonstrate that canonical next_action drives continuation rather than reconstructed status heuristics.",
+    "Tests demonstrate that successful commit does not by itself imply terminal success.",
+    "Tests demonstrate that repeated resume of already-verified and already-committed states does not corrupt transaction state or duplicate logical completion.",
+    "Tests remain consistent with the minimal canonical continuation contract and the canonical checkpoint event model."
+  ],
+  "review_checkpoints": [
+    "Confirm that each interruption test asserts exact tx_id continuity.",
+    "Confirm that each interruption test distinguishes committed from done.",
+    "Confirm that verify and commit checkpoint state are treated as resumable non-terminal states where the plan requires it.",
+    "Confirm that no test depends on phase-style or step-style metadata for correctness.",
+    "Confirm that canonical next_action is asserted as part of continuation behavior where applicable."
+  ],
+  "notes": [
+    "This ticket focuses on interruption behavior around verify and commit because those checkpoints are the most likely place for lifecycle ambiguity to leak back into the runtime.",
+    "Tests should model real resumable states rather than only happy-path full runs.",
+    "Where possible, each scenario should validate both machine-readable continuation state and resulting behavioral correctness."
+  ]
+}

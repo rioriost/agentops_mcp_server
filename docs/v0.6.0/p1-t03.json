@@ -1,0 +1,81 @@
+{
+  "ticket_id": "p1-t03",
+  "phase_id": "p1",
+  "title": "Separate status classification from next_action dispatch semantics",
+  "status": "planned",
+  "source_plan": "docs/v0.6.0/plan.md",
+  "plan_sections": [
+    "Canonical State Machine",
+    "Status set",
+    "Meaning of each status",
+    "Canonical Checkpoints and Events",
+    "Resume Model",
+    "Resume invariants",
+    "Implementation Strategy"
+  ],
+  "goal": "Ensure the runtime implementation treats `status` as lifecycle classification and `next_action` as the sole canonical continuation dispatcher, without allowing status-derived heuristics or optional metadata to control continuation.",
+  "scope": [
+    "Review all code paths that derive continuation behavior from transaction status.",
+    "Identify any places where `status` is used as an implicit dispatcher rather than a classifier.",
+    "Identify any dependencies on phase-style, step-style, or similarly optional metadata for deciding what to do next.",
+    "Define the target code-level contract so `next_action` drives continuation and `status` remains descriptive lifecycle state.",
+    "Update code paths as needed so valid canonical `next_action` takes precedence over status-derived branching.",
+    "Preserve explanatory uses of status for reporting, diagnostics, and operator understanding."
+  ],
+  "out_of_scope": [
+    "Redesigning the canonical status set itself.",
+    "Changing transaction identity issuance semantics.",
+    "Rewriting persistence artifacts beyond what is required to preserve the `status` versus `next_action` contract.",
+    "Introducing new optional progress metadata."
+  ],
+  "inputs": [
+    "docs/v0.6.0/plan.md",
+    "docs/v0.6.0/tickets_list.json",
+    "Outputs from p0-t01, p0-t02, and p0-t03",
+    "Any runtime modules that compute or branch on transaction lifecycle state",
+    "Any helper or orchestration code that chooses follow-up actions"
+  ],
+  "expected_outputs": [
+    "A code-level mapping of all status-driven continuation branches.",
+    "A list of places where `next_action` already controls continuation correctly.",
+    "A list of places where `status` is incorrectly used as a dispatcher and must be corrected.",
+    "An implementation update that makes canonical `next_action` the authoritative continuation driver.",
+    "A short note describing the enforced division of responsibility between `status` and `next_action`."
+  ],
+  "implementation_notes": [
+    "`status` must remain the canonical lifecycle classification field.",
+    "`next_action` must remain the canonical machine-readable continuation directive.",
+    "When valid canonical `next_action` is present, implementations must not override it with status-derived heuristics.",
+    "Status-specific 'typical next action' meanings in the plan are explanatory, not dispatch rules.",
+    "Optional phase-style or step-style metadata must not be required for continuation correctness."
+  ],
+  "dependencies": [
+    "p0-t01",
+    "p0-t02",
+    "p0-t03",
+    "p1-t02"
+  ],
+  "enables": [
+    "p1-t04",
+    "p2-t05",
+    "p3-t01",
+    "p3-t02",
+    "p3-t03"
+  ],
+  "acceptance_criteria": [
+    "Every continuation code path that acts on transaction lifecycle has been reviewed for `status` versus `next_action` usage.",
+    "The implementation does not use `status` as the primary continuation dispatcher when valid canonical `next_action` is available.",
+    "The implementation does not require phase-style or step-style metadata to choose the next continuation step.",
+    "`status` remains available for lifecycle reporting and validation without redefining continuation control.",
+    "The resulting behavior matches the plan's model: `status` classifies, `next_action` dispatches."
+  ],
+  "review_checkpoints": [
+    "Confirm that no valid `next_action` path is bypassed by a status-derived branch.",
+    "Confirm that status-based reporting still works after dispatcher cleanup.",
+    "Confirm that no checkpoint-state subfield is being used to silently replace top-level continuation control."
+  ],
+  "notes": [
+    "This ticket is conceptually small but high leverage because ambiguous control flow here would propagate into resume, verify, commit, and terminal handling.",
+    "When reviewing code, prefer removal of status-driven dispatch heuristics over adding more explanatory metadata."
+  ]
+}

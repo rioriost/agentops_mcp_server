@@ -1,0 +1,60 @@
+{
+  "ticket_id": "p1-t04",
+  "phase_id": "p1",
+  "title": "Align checkpoint events with the minimal canonical core event set",
+  "status": "planned",
+  "source_plan": "docs/v0.6.0/plan.md",
+  "plan_sections": [
+    "Canonical Checkpoints and Events",
+    "Transaction Semantics",
+    "Canonical Invariants",
+    "Canonical State Machine",
+    "Implementation Strategy"
+  ],
+  "goal": "Align the runtime event model with the minimal canonical checkpoint set defined in the plan so deterministic continuation depends on begin, verify, commit, and end checkpoints only.",
+  "scope": [
+    "Identify the current checkpoint and progress event shapes emitted by runtime code",
+    "Define the minimal canonical event set required for deterministic continuation",
+    "Remove or demote non-essential progress-style events from the protocol core",
+    "Ensure no-change verified completion can proceed without commit checkpoint events",
+    "Document which events remain canonical and which are optional observability events"
+  ],
+  "out_of_scope": [
+    "Changing transaction ID issuance behavior",
+    "Changing materialized state schema beyond what is required to align event semantics",
+    "Implementing regression tests beyond minimal validation needed to support this ticket",
+    "Redesigning client planning artifacts"
+  ],
+  "inputs": [
+    "docs/v0.6.0/plan.md",
+    "src/**/*.py",
+    ".agent/tx_event_log.jsonl handling code",
+    "runtime event append and replay code paths"
+  ],
+  "dependencies": [
+    "p0-t01",
+    "p0-t02",
+    "p0-t03",
+    "p1-t01",
+    "p1-t02",
+    "p1-t03"
+  ],
+  "expected_outputs": [
+    "A runtime event model aligned to the minimal canonical core checkpoint set",
+    "A clear distinction between canonical checkpoint events and optional observability events",
+    "Updated code comments or documentation where the event contract is defined",
+    "A list of any legacy or optional events that remain supported but are no longer protocol-defining"
+  ],
+  "acceptance_criteria": [
+    "The canonical core checkpoint set is limited to tx.begin, tx.verify.start, tx.verify.pass, tx.verify.fail, tx.commit.start, tx.commit.done, tx.commit.fail, tx.end.done, and tx.end.blocked",
+    "Deterministic continuation no longer depends on generic progress-style events",
+    "Optional observability events, if retained, are explicitly non-canonical for resumable continuation",
+    "A verified transaction with no repository changes can proceed directly to explicit terminal completion without tx.commit.start or tx.commit.done",
+    "The resulting event model is consistent with the minimal canonical continuation contract and the next_action-driven resume model"
+  ],
+  "notes": [
+    "This ticket should be implemented only after the identity boundary and minimal continuation contract are already explicit in code.",
+    "If legacy event shapes remain readable for compatibility, they must not be allowed to redefine the new canonical event contract.",
+    "This ticket is about protocol-defining checkpoint events, not about removing all auxiliary logging or observability events."
+  ]
+}

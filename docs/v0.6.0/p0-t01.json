@@ -1,0 +1,134 @@
+{
+  "ticket_id": "p0-t01",
+  "phase_id": "p0",
+  "title": "Review all Python files under src and build an implementation map",
+  "status": "planned",
+  "goal": "Review every Python file under `src/` and create a codebase map that explains each file's role, major symbols, protocol responsibilities, and likely impact on the 0.6.0 redesign.",
+  "why_this_ticket_exists": "The 0.6.0 redesign changes transaction identity, continuation semantics, persistence behavior, and resume logic across multiple parts of the runtime. A complete implementation map is needed before later tickets can safely identify exact modification targets without drifting from the plan.",
+  "scope": [
+    "Review all Python files under `src/`.",
+    "Identify each file's primary responsibility.",
+    "List major classes, functions, and modules exposed by each file.",
+    "Map each file to one or more protocol concerns such as identity, state, resume, persistence, verification, commit, compatibility, diagnostics, or tooling.",
+    "Identify files that are likely to be affected by the 0.6.0 redesign.",
+    "Produce a reusable implementation map artifact for later tickets."
+  ],
+  "out_of_scope": [
+    "Changing runtime behavior.",
+    "Refactoring code.",
+    "Renaming modules.",
+    "Changing persistence formats.",
+    "Implementing any 0.6.0 protocol changes.",
+    "Adding or removing tests except where needed to understand current file responsibility."
+  ],
+  "plan_sections": [
+    "Objectives",
+    "Core Design Goal",
+    "Canonical Runtime Model",
+    "Server-owned transaction variables vs client-managed inputs",
+    "Transaction Semantics",
+    "Canonical Invariants",
+    "Persistence Model",
+    "Resume Model",
+    "Identity Model",
+    "Compatibility Policy",
+    "Implementation Strategy"
+  ],
+  "inputs": [
+    "docs/v0.6.0/plan.md",
+    "src/**/*.py"
+  ],
+  "tasks": [
+    "Enumerate all Python files under `src/`.",
+    "Read each file and summarize its responsibility in 1-3 lines.",
+    "Extract major public or structurally important functions, classes, and data structures.",
+    "Tag each file with the protocol concerns it participates in.",
+    "Identify high-impact files for identity, resume, materialized state, event log, issuance metadata, compatibility, and task lifecycle behavior.",
+    "Record likely future touch points for later tickets.",
+    "Produce a single implementation map document that later tickets can reference."
+  ],
+  "expected_outputs": [
+    {
+      "name": "implementation_map",
+      "description": "A document that maps every Python file under `src/` to its responsibilities and 0.6.0 relevance."
+    },
+    {
+      "name": "high_impact_file_list",
+      "description": "A shortlist of files most likely to require modification during 0.6.0 implementation."
+    },
+    {
+      "name": "concern_to_file_matrix",
+      "description": "A matrix linking protocol concerns to files and major symbols."
+    }
+  ],
+  "required_file_coverage": {
+    "rule": "Every Python file under `src/` must appear in the implementation map exactly once.",
+    "minimum_fields_per_file": [
+      "path",
+      "responsibility_summary",
+      "major_symbols",
+      "protocol_concerns",
+      "expected_0_6_0_impact"
+    ]
+  },
+  "protocol_concern_taxonomy": [
+    "transaction_identity",
+    "ticket_identity",
+    "task_identity",
+    "session_context",
+    "materialized_state",
+    "event_log",
+    "issuance_metadata",
+    "resume_dispatch",
+    "active_transaction_selection",
+    "status_classification",
+    "next_action_dispatch",
+    "verify_flow",
+    "commit_flow",
+    "terminal_completion",
+    "compatibility",
+    "integrity_validation",
+    "tooling_or_helpers",
+    "diagnostics_or_guidance"
+  ],
+  "acceptance_criteria": [
+    "Every Python file under `src/` is reviewed and included in the implementation map.",
+    "Each file entry explains what the file does and why it matters to the 0.6.0 redesign.",
+    "Each file entry lists the major classes, functions, or structurally important symbols found there.",
+    "The map explicitly distinguishes files involved in transaction identity, materialized state, event history, issuance metadata, resume logic, and compatibility behavior.",
+    "The map identifies high-impact files likely to be modified by later tickets.",
+    "The map is detailed enough that later tickets can use it to choose exact edit targets without redoing repository-wide discovery."
+  ],
+  "handoff_to_future_tickets": {
+    "used_by": [
+      "p0-t02",
+      "p0-t03",
+      "p1-t01",
+      "p1-t02",
+      "p1-t03",
+      "p1-t04",
+      "p2-t01",
+      "p2-t02",
+      "p2-t03",
+      "p2-t04",
+      "p2-t05",
+      "p2-t06",
+      "p2-t07",
+      "p2-t08"
+    ],
+    "required_handoff_fields": [
+      "file_path",
+      "responsibility_summary",
+      "major_symbols",
+      "protocol_concerns",
+      "high_impact_reason",
+      "related_future_tickets"
+    ]
+  },
+  "notes": [
+    "This ticket is analysis-only and should not change runtime semantics.",
+    "If a file mixes multiple concerns, the map should say so explicitly rather than forcing a single category.",
+    "If a file appears low-impact, that should be recorded explicitly rather than omitted.",
+    "The output of this ticket becomes the primary codebase orientation reference for the rest of the 0.6.0 ticket set."
+  ]
+}
