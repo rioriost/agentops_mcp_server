@@ -578,64 +578,129 @@ class StateStore:
         if not isinstance(state.get("updated_at"), str):
             raise ValueError("updated_at is required")
 
+        status = state.get("status")
+        next_action = state.get("next_action")
+        semantic_summary = state.get("semantic_summary")
+        verify_state = state.get("verify_state")
+        commit_state = state.get("commit_state")
         active_tx = state.get("active_tx")
-        if not isinstance(active_tx, dict):
-            raise ValueError("active_tx is required")
 
-        tx_id = active_tx.get("tx_id")
-        try:
-            canonical_tx_id(tx_id)
-        except ValueError as exc:
-            raise ValueError("active_tx.tx_id must be an integer") from exc
-        ticket_id = active_tx.get("ticket_id")
-        if not isinstance(ticket_id, str) or not ticket_id.strip():
-            raise ValueError("active_tx.ticket_id is required")
-        status = active_tx.get("status")
-        if not isinstance(status, str) or status not in TX_STATUS_VALUES:
-            raise ValueError("active_tx.status is invalid")
-        phase = active_tx.get("phase")
-        if not isinstance(phase, str) or phase not in TX_STATUS_VALUES:
-            raise ValueError("active_tx.phase is invalid")
-        if status != phase:
-            raise ValueError("active_tx.phase must match status")
-        current_step = active_tx.get("current_step")
-        if not isinstance(current_step, str) or not current_step.strip():
-            raise ValueError("active_tx.current_step is required")
-        next_action = active_tx.get("next_action")
-        if not isinstance(next_action, str) or not next_action.strip():
-            raise ValueError("active_tx.next_action is required")
-        if not isinstance(active_tx.get("file_intents"), list):
-            raise ValueError("active_tx.file_intents is required")
+        if active_tx is None:
+            if status is not None:
+                raise ValueError("status must be null when active_tx is null")
+            if next_action != "tx.begin":
+                raise ValueError("next_action must be tx.begin when active_tx is null")
+            if semantic_summary is not None:
+                raise ValueError("semantic_summary must be null when active_tx is null")
+            if verify_state is not None:
+                raise ValueError("verify_state must be null when active_tx is null")
+            if commit_state is not None:
+                raise ValueError("commit_state must be null when active_tx is null")
+        else:
+            if not isinstance(active_tx, dict):
+                raise ValueError("active_tx must be an object or null")
 
-        semantic_summary = active_tx.get("semantic_summary")
-        if not isinstance(semantic_summary, str) or not semantic_summary.strip():
-            raise ValueError("active_tx.semantic_summary is required")
+            tx_id = active_tx.get("tx_id")
+            try:
+                canonical_tx_id(tx_id)
+            except ValueError as exc:
+                raise ValueError("active_tx.tx_id must be an integer") from exc
+            ticket_id = active_tx.get("ticket_id")
+            if not isinstance(ticket_id, str) or not ticket_id.strip():
+                raise ValueError("active_tx.ticket_id is required")
 
-        if "user_intent" not in active_tx:
-            raise ValueError("active_tx.user_intent is required")
-        user_intent = active_tx.get("user_intent")
-        if user_intent is not None and not isinstance(user_intent, str):
-            raise ValueError("active_tx.user_intent must be string or null")
+            active_status = active_tx.get("status")
+            if (
+                not isinstance(active_status, str)
+                or active_status not in TX_STATUS_VALUES
+            ):
+                raise ValueError("active_tx.status is invalid")
+            phase = active_tx.get("phase")
+            if not isinstance(phase, str) or phase not in TX_STATUS_VALUES:
+                raise ValueError("active_tx.phase is invalid")
+            if active_status != phase:
+                raise ValueError("active_tx.phase must match status")
 
-        verify_state = active_tx.get("verify_state")
-        if not isinstance(verify_state, dict):
-            raise ValueError("active_tx.verify_state is required")
-        verify_status = verify_state.get("status")
-        if (
-            not isinstance(verify_status, str)
-            or verify_status not in VERIFY_STATUS_VALUES
-        ):
-            raise ValueError("active_tx.verify_state.status is invalid")
+            if not isinstance(status, str) or status not in TX_STATUS_VALUES:
+                raise ValueError("status is invalid")
+            if status != active_status:
+                raise ValueError("status must match active_tx.status")
 
-        commit_state = active_tx.get("commit_state")
-        if not isinstance(commit_state, dict):
-            raise ValueError("active_tx.commit_state is required")
-        commit_status = commit_state.get("status")
-        if (
-            not isinstance(commit_status, str)
-            or commit_status not in COMMIT_STATUS_VALUES
-        ):
-            raise ValueError("active_tx.commit_state.status is invalid")
+            current_step = active_tx.get("current_step")
+            if not isinstance(current_step, str) or not current_step.strip():
+                raise ValueError("active_tx.current_step is required")
+            if not isinstance(active_tx.get("file_intents"), list):
+                raise ValueError("active_tx.file_intents is required")
+
+            if not isinstance(next_action, str) or not next_action.strip():
+                raise ValueError("next_action is required")
+            active_next_action = active_tx.get("next_action")
+            if (
+                not isinstance(active_next_action, str)
+                or not active_next_action.strip()
+            ):
+                raise ValueError("active_tx.next_action is required")
+            if next_action != active_next_action:
+                raise ValueError("next_action must match active_tx.next_action")
+
+            if not isinstance(semantic_summary, str) or not semantic_summary.strip():
+                raise ValueError("semantic_summary is required")
+            active_semantic_summary = active_tx.get("semantic_summary")
+            if (
+                not isinstance(active_semantic_summary, str)
+                or not active_semantic_summary.strip()
+            ):
+                raise ValueError("active_tx.semantic_summary is required")
+            if semantic_summary != active_semantic_summary:
+                raise ValueError(
+                    "semantic_summary must match active_tx.semantic_summary"
+                )
+
+            if "user_intent" not in active_tx:
+                raise ValueError("active_tx.user_intent is required")
+            user_intent = active_tx.get("user_intent")
+            if user_intent is not None and not isinstance(user_intent, str):
+                raise ValueError("active_tx.user_intent must be string or null")
+
+            if not isinstance(verify_state, dict):
+                raise ValueError("verify_state is required")
+            verify_status = verify_state.get("status")
+            if (
+                not isinstance(verify_status, str)
+                or verify_status not in VERIFY_STATUS_VALUES
+            ):
+                raise ValueError("verify_state.status is invalid")
+            active_verify_state = active_tx.get("verify_state")
+            if not isinstance(active_verify_state, dict):
+                raise ValueError("active_tx.verify_state is required")
+            active_verify_status = active_verify_state.get("status")
+            if (
+                not isinstance(active_verify_status, str)
+                or active_verify_status not in VERIFY_STATUS_VALUES
+            ):
+                raise ValueError("active_tx.verify_state.status is invalid")
+            if verify_state != active_verify_state:
+                raise ValueError("verify_state must match active_tx.verify_state")
+
+            if not isinstance(commit_state, dict):
+                raise ValueError("commit_state is required")
+            commit_status = commit_state.get("status")
+            if (
+                not isinstance(commit_status, str)
+                or commit_status not in COMMIT_STATUS_VALUES
+            ):
+                raise ValueError("commit_state.status is invalid")
+            active_commit_state = active_tx.get("commit_state")
+            if not isinstance(active_commit_state, dict):
+                raise ValueError("active_tx.commit_state is required")
+            active_commit_status = active_commit_state.get("status")
+            if (
+                not isinstance(active_commit_status, str)
+                or active_commit_status not in COMMIT_STATUS_VALUES
+            ):
+                raise ValueError("active_tx.commit_state.status is invalid")
+            if commit_state != active_commit_state:
+                raise ValueError("commit_state must match active_tx.commit_state")
 
         integrity = state.get("integrity")
         if not isinstance(integrity, dict):
@@ -674,126 +739,172 @@ class StateStore:
     ) -> Dict[str, Any]:
         next_state = json.loads(json.dumps(state, ensure_ascii=False))
         active_tx = next_state.get("active_tx")
-        if not isinstance(active_tx, dict):
-            raise ValueError("state.active_tx is required")
-        active_tx["tx_id"] = tx_id
-        active_tx["ticket_id"] = ticket_id
-        active_tx["status"] = phase
-        active_tx["phase"] = phase
-        active_tx["current_step"] = step_id
-        active_tx["session_id"] = session_id
-
         if event_type == "tx.begin":
-            active_tx["last_completed_step"] = ""
-            active_tx["user_intent"] = None
-            active_tx["verify_state"] = {
-                "status": "not_started",
-                "last_result": None,
-            }
-            active_tx["commit_state"] = {
-                "status": "not_started",
-                "last_result": None,
-            }
-            if not isinstance(active_tx.get("file_intents"), list):
-                active_tx["file_intents"] = []
-            active_tx["next_action"] = "tx.verify.start"
-        elif event_type == "tx.step.enter":
-            description = payload.get("description")
-            if isinstance(description, str) and description.strip():
-                active_tx["semantic_summary"] = f"Entered step {step_id}"
-            if phase == "checking":
+            if not isinstance(active_tx, dict):
+                active_tx = {
+                    "tx_id": tx_id,
+                    "ticket_id": ticket_id,
+                    "status": phase,
+                    "phase": phase,
+                    "current_step": step_id,
+                    "last_completed_step": "",
+                    "next_action": "",
+                    "semantic_summary": "",
+                    "user_intent": None,
+                    "session_id": session_id,
+                    "verify_state": {
+                        "status": "not_started",
+                        "last_result": None,
+                    },
+                    "commit_state": {
+                        "status": "not_started",
+                        "last_result": None,
+                    },
+                    "file_intents": [],
+                }
+                next_state["active_tx"] = active_tx
+        elif not isinstance(active_tx, dict):
+            raise ValueError("state.active_tx is required")
+
+        if isinstance(active_tx, dict):
+            active_tx["tx_id"] = tx_id
+            active_tx["ticket_id"] = ticket_id
+            active_tx["status"] = phase
+            active_tx["phase"] = phase
+            active_tx["current_step"] = step_id
+            active_tx["session_id"] = session_id
+
+            if event_type == "tx.begin":
+                active_tx["last_completed_step"] = ""
+                active_tx["user_intent"] = None
+                active_tx["verify_state"] = {
+                    "status": "not_started",
+                    "last_result": None,
+                }
+                active_tx["commit_state"] = {
+                    "status": "not_started",
+                    "last_result": None,
+                }
+                if not isinstance(active_tx.get("file_intents"), list):
+                    active_tx["file_intents"] = []
                 active_tx["next_action"] = "tx.verify.start"
-            elif phase == "verified":
+            elif event_type == "tx.step.enter":
+                description = payload.get("description")
+                if isinstance(description, str) and description.strip():
+                    active_tx["semantic_summary"] = f"Entered step {step_id}"
+                if phase == "checking":
+                    active_tx["next_action"] = "tx.verify.start"
+                elif phase == "verified":
+                    active_tx["next_action"] = "tx.commit.start"
+                elif phase == "committed":
+                    active_tx["next_action"] = "tx.end.done"
+                elif phase == "blocked":
+                    active_tx["next_action"] = "tx.end.blocked"
+                elif phase == "done":
+                    active_tx["next_action"] = "tx.end.done"
+                else:
+                    active_tx["next_action"] = "tx.verify.start"
+            elif event_type == "tx.verify.start":
+                active_tx["verify_state"] = {
+                    "status": "running",
+                    "last_result": payload,
+                }
+                active_tx["next_action"] = "tx.verify.pass"
+            elif event_type == "tx.verify.pass":
+                active_tx["verify_state"] = {
+                    "status": "passed",
+                    "last_result": payload,
+                }
+                active_tx["semantic_summary"] = "Verification passed"
                 active_tx["next_action"] = "tx.commit.start"
-            elif phase == "committed":
+            elif event_type == "tx.verify.fail":
+                active_tx["verify_state"] = {
+                    "status": "failed",
+                    "last_result": payload,
+                }
+                active_tx["semantic_summary"] = "Verification failed"
+                active_tx["next_action"] = "fix and re-verify"
+            elif event_type == "tx.commit.start":
+                active_tx["commit_state"] = {
+                    "status": "running",
+                    "last_result": payload,
+                }
+                active_tx["next_action"] = "tx.commit.done"
+            elif event_type == "tx.commit.done":
+                active_tx["commit_state"] = {
+                    "status": "passed",
+                    "last_result": payload,
+                }
+                active_tx["semantic_summary"] = "Commit completed"
                 active_tx["next_action"] = "tx.end.done"
-            elif phase == "blocked":
+            elif event_type == "tx.commit.fail":
+                active_tx["commit_state"] = {
+                    "status": "failed",
+                    "last_result": payload,
+                }
+                active_tx["semantic_summary"] = "Commit failed"
+                active_tx["next_action"] = "tx.commit.start"
+            elif event_type == "tx.user_intent.set":
+                user_intent = payload.get("user_intent")
+                if isinstance(user_intent, str):
+                    active_tx["user_intent"] = user_intent
+                if not isinstance(
+                    active_tx.get("next_action"), str
+                ) or not active_tx.get("next_action"):
+                    active_tx["next_action"] = "tx.verify.start"
+            elif event_type and event_type.startswith("tx.file_intent."):
+                file_intents = active_tx.get("file_intents")
+                if not isinstance(file_intents, list):
+                    file_intents = []
+                    active_tx["file_intents"] = file_intents
+                path = (
+                    payload.get("path") if isinstance(payload.get("path"), str) else ""
+                )
+                intent = None
+                for item in file_intents:
+                    if isinstance(item, dict) and item.get("path") == path:
+                        intent = item
+                        break
+                if event_type == "tx.file_intent.add":
+                    if intent is None:
+                        intent = {
+                            "path": path,
+                            "operation": payload.get("operation")
+                            if isinstance(payload.get("operation"), str)
+                            else "",
+                            "purpose": payload.get("purpose")
+                            if isinstance(payload.get("purpose"), str)
+                            else "",
+                            "planned_step": payload.get("planned_step")
+                            if isinstance(payload.get("planned_step"), str)
+                            else "",
+                            "state": payload.get("state")
+                            if isinstance(payload.get("state"), str)
+                            else "planned",
+                            "last_event_seq": 0,
+                        }
+                        file_intents.append(intent)
+                elif intent is not None and isinstance(payload.get("state"), str):
+                    intent["state"] = payload.get("state")
+                if intent is not None and isinstance(payload.get("state"), str):
+                    intent["state"] = payload.get("state")
+            elif event_type == "tx.end.done":
+                active_tx["semantic_summary"] = "Transaction ended"
+                active_tx["next_action"] = "tx.end.done"
+            elif event_type == "tx.end.blocked":
+                active_tx["semantic_summary"] = "Transaction ended"
                 active_tx["next_action"] = "tx.end.blocked"
-            elif phase == "done":
-                active_tx["next_action"] = "tx.end.done"
-            else:
-                active_tx["next_action"] = "tx.verify.start"
-        elif event_type == "tx.verify.start":
-            active_tx["verify_state"] = {"status": "running", "last_result": payload}
-            active_tx["next_action"] = "tx.verify.pass"
-        elif event_type == "tx.verify.pass":
-            active_tx["verify_state"] = {"status": "passed", "last_result": payload}
-            active_tx["semantic_summary"] = "Verification passed"
-            active_tx["next_action"] = "tx.commit.start"
-        elif event_type == "tx.verify.fail":
-            active_tx["verify_state"] = {"status": "failed", "last_result": payload}
-            active_tx["semantic_summary"] = "Verification failed"
-            active_tx["next_action"] = "fix and re-verify"
-        elif event_type == "tx.commit.start":
-            active_tx["commit_state"] = {"status": "running", "last_result": payload}
-            active_tx["next_action"] = "tx.commit.done"
-        elif event_type == "tx.commit.done":
-            active_tx["commit_state"] = {"status": "passed", "last_result": payload}
-            active_tx["semantic_summary"] = "Commit completed"
-            active_tx["next_action"] = "tx.end.done"
-        elif event_type == "tx.commit.fail":
-            active_tx["commit_state"] = {"status": "failed", "last_result": payload}
-            active_tx["semantic_summary"] = "Commit failed"
-            active_tx["next_action"] = "tx.commit.start"
-        elif event_type == "tx.user_intent.set":
-            user_intent = payload.get("user_intent")
-            if isinstance(user_intent, str):
-                active_tx["user_intent"] = user_intent
+
+            if not isinstance(
+                active_tx.get("semantic_summary"), str
+            ) or not active_tx.get("semantic_summary"):
+                active_tx["semantic_summary"] = f"Updated transaction {ticket_id}"
             if not isinstance(active_tx.get("next_action"), str) or not active_tx.get(
                 "next_action"
             ):
                 active_tx["next_action"] = "tx.verify.start"
-        elif event_type and event_type.startswith("tx.file_intent."):
-            file_intents = active_tx.get("file_intents")
-            if not isinstance(file_intents, list):
-                file_intents = []
-                active_tx["file_intents"] = file_intents
-            path = payload.get("path") if isinstance(payload.get("path"), str) else ""
-            intent = None
-            for item in file_intents:
-                if isinstance(item, dict) and item.get("path") == path:
-                    intent = item
-                    break
-            if event_type == "tx.file_intent.add":
-                if intent is None:
-                    intent = {
-                        "path": path,
-                        "operation": payload.get("operation")
-                        if isinstance(payload.get("operation"), str)
-                        else "",
-                        "purpose": payload.get("purpose")
-                        if isinstance(payload.get("purpose"), str)
-                        else "",
-                        "planned_step": payload.get("planned_step")
-                        if isinstance(payload.get("planned_step"), str)
-                        else "",
-                        "state": payload.get("state")
-                        if isinstance(payload.get("state"), str)
-                        else "planned",
-                        "last_event_seq": 0,
-                    }
-                    file_intents.append(intent)
-            elif intent is not None and isinstance(payload.get("state"), str):
-                intent["state"] = payload.get("state")
-            if intent is not None and isinstance(payload.get("state"), str):
-                intent["state"] = payload.get("state")
-        elif event_type == "tx.end.done":
-            active_tx["semantic_summary"] = "Transaction ended"
-            active_tx["next_action"] = "tx.end.done"
-        elif event_type == "tx.end.blocked":
-            active_tx["semantic_summary"] = "Transaction ended"
-            active_tx["next_action"] = "tx.end.blocked"
-
-        if not isinstance(active_tx.get("semantic_summary"), str) or not active_tx.get(
-            "semantic_summary"
-        ):
-            active_tx["semantic_summary"] = f"Updated transaction {ticket_id}"
-        if not isinstance(active_tx.get("next_action"), str) or not active_tx.get(
-            "next_action"
-        ):
-            active_tx["next_action"] = "tx.verify.start"
-        if not isinstance(active_tx.get("file_intents"), list):
-            active_tx["file_intents"] = []
+            if not isinstance(active_tx.get("file_intents"), list):
+                active_tx["file_intents"] = []
 
         event_result = self.tx_event_append(
             tx_id=tx_id,
@@ -807,7 +918,11 @@ class StateStore:
             event_id=event_id,
         )
         event_seq = event_result["seq"]
-        if event_type and event_type.startswith("tx.file_intent."):
+        if (
+            isinstance(active_tx, dict)
+            and event_type
+            and event_type.startswith("tx.file_intent.")
+        ):
             file_intents = active_tx.get("file_intents")
             if isinstance(file_intents, list):
                 path = (
@@ -817,6 +932,30 @@ class StateStore:
                     if isinstance(intent, dict) and intent.get("path") == path:
                         intent["last_event_seq"] = event_seq
                         break
+
+        if isinstance(active_tx, dict):
+            next_state["active_tx"] = active_tx
+            next_state["status"] = active_tx.get("status")
+            next_state["next_action"] = active_tx.get("next_action")
+            next_state["semantic_summary"] = active_tx.get("semantic_summary")
+            next_state["verify_state"] = active_tx.get("verify_state")
+            next_state["commit_state"] = active_tx.get("commit_state")
+        else:
+            next_state["active_tx"] = None
+            next_state["status"] = None
+            next_state["next_action"] = "tx.begin"
+            next_state["semantic_summary"] = None
+            next_state["verify_state"] = None
+            next_state["commit_state"] = None
+
+        if event_type in {"tx.end.done", "tx.end.blocked"}:
+            next_state["active_tx"] = None
+            next_state["status"] = None
+            next_state["next_action"] = "tx.begin"
+            next_state["semantic_summary"] = None
+            next_state["verify_state"] = None
+            next_state["commit_state"] = None
+
         next_state["last_applied_seq"] = event_seq
         integrity = next_state.get("integrity")
         if not isinstance(integrity, dict):
@@ -828,6 +967,8 @@ class StateStore:
             "active_tx_source"
         ):
             integrity["active_tx_source"] = "materialized"
+        if next_state.get("active_tx") is None:
+            integrity["active_tx_source"] = "none"
 
         try:
             self.tx_state_save(next_state)
@@ -856,9 +997,8 @@ class StateStore:
                         "rebuilt_from_seq": event_seq,
                         "tx_id": tx_id,
                         "ticket_id": ticket_id,
-                        "status": phase,
-                        "phase": phase,
-                        "current_step": step_id,
+                        "status": next_state.get("status"),
+                        "next_action": next_state.get("next_action"),
                     },
                     "observed_state": {
                         "tx_state_path": str(self.repo_context.tx_state),
@@ -894,9 +1034,8 @@ class StateStore:
                         "rebuilt_from_seq": event_seq,
                         "tx_id": tx_id,
                         "ticket_id": ticket_id,
-                        "status": phase,
-                        "phase": phase,
-                        "current_step": step_id,
+                        "status": next_state.get("status"),
+                        "next_action": next_state.get("next_action"),
                     },
                     "observed_state": {
                         "tx_state_path": str(self.repo_context.tx_state),
@@ -907,11 +1046,7 @@ class StateStore:
                 "canonical event appended but tx_state synchronization could not be verified"
             )
 
-        saved_active_tx = (
-            saved_state.get("active_tx")
-            if isinstance(saved_state.get("active_tx"), dict)
-            else {}
-        )
+        saved_active_tx = saved_state.get("active_tx")
         saved_integrity = (
             saved_state.get("integrity")
             if isinstance(saved_state.get("integrity"), dict)
@@ -921,11 +1056,12 @@ class StateStore:
         if (
             saved_state.get("last_applied_seq") != event_seq
             or saved_integrity.get("rebuilt_from_seq") != event_seq
-            or saved_active_tx.get("tx_id") != tx_id
-            or saved_active_tx.get("ticket_id") != ticket_id
-            or saved_active_tx.get("status") != phase
-            or saved_active_tx.get("phase") != phase
-            or saved_active_tx.get("current_step") != step_id
+            or saved_state.get("status") != next_state.get("status")
+            or saved_state.get("next_action") != next_state.get("next_action")
+            or saved_state.get("semantic_summary") != next_state.get("semantic_summary")
+            or saved_state.get("verify_state") != next_state.get("verify_state")
+            or saved_state.get("commit_state") != next_state.get("commit_state")
+            or saved_active_tx != next_state.get("active_tx")
         ):
             self.log_tool_error(
                 tool_name="tx_event_append_and_state_save",
@@ -948,20 +1084,22 @@ class StateStore:
                     "expected_state": {
                         "last_applied_seq": event_seq,
                         "rebuilt_from_seq": event_seq,
-                        "tx_id": tx_id,
-                        "ticket_id": ticket_id,
-                        "status": phase,
-                        "phase": phase,
-                        "current_step": step_id,
+                        "status": next_state.get("status"),
+                        "next_action": next_state.get("next_action"),
+                        "semantic_summary": next_state.get("semantic_summary"),
+                        "verify_state": next_state.get("verify_state"),
+                        "commit_state": next_state.get("commit_state"),
+                        "active_tx": next_state.get("active_tx"),
                     },
                     "observed_state": {
                         "last_applied_seq": saved_state.get("last_applied_seq"),
                         "rebuilt_from_seq": saved_integrity.get("rebuilt_from_seq"),
-                        "tx_id": saved_active_tx.get("tx_id"),
-                        "ticket_id": saved_active_tx.get("ticket_id"),
-                        "status": saved_active_tx.get("status"),
-                        "phase": saved_active_tx.get("phase"),
-                        "current_step": saved_active_tx.get("current_step"),
+                        "status": saved_state.get("status"),
+                        "next_action": saved_state.get("next_action"),
+                        "semantic_summary": saved_state.get("semantic_summary"),
+                        "verify_state": saved_state.get("verify_state"),
+                        "commit_state": saved_state.get("commit_state"),
+                        "active_tx": saved_active_tx,
                     },
                 },
             )

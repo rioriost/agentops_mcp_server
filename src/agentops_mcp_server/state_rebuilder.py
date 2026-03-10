@@ -144,7 +144,12 @@ class StateRebuilder:
     def _init_tx_state(self) -> Dict[str, Any]:
         return {
             "schema_version": "0.4.0",
-            "active_tx": self._init_active_tx(0, "none", "planned", "none"),
+            "active_tx": None,
+            "status": None,
+            "next_action": "tx.begin",
+            "verify_state": None,
+            "commit_state": None,
+            "semantic_summary": None,
             "last_applied_seq": 0,
             "integrity": {
                 "state_hash": "",
@@ -165,6 +170,11 @@ class StateRebuilder:
         if isinstance(active_tx, dict):
             active_tx.pop("_last_event_seq", None)
             active_tx.pop("_terminal", None)
+            active_tx.pop("status", None)
+            active_tx.pop("next_action", None)
+            active_tx.pop("verify_state", None)
+            active_tx.pop("commit_state", None)
+            active_tx.pop("semantic_summary", None)
         payload = json.dumps(
             sanitized, ensure_ascii=False, sort_keys=True, separators=(",", ":")
         )
@@ -504,7 +514,10 @@ class StateRebuilder:
         if summary:
             active_tx["semantic_summary"] = summary
 
-    def _derive_next_action(self, active_tx: Dict[str, Any]) -> str:
+    def _derive_next_action(self, active_tx: Optional[Dict[str, Any]]) -> str:
+        if not isinstance(active_tx, dict):
+            return "tx.begin"
+
         status = active_tx.get("status")
         file_intents = active_tx.get("file_intents")
         semantic_summary = (
@@ -592,25 +605,48 @@ class StateRebuilder:
             return False
         if state.get("last_applied_seq") < rebuilt_from_seq:
             return False
+
+        status = state.get("status")
+        next_action = state.get("next_action")
+        semantic_summary = state.get("semantic_summary")
+        verify_state = state.get("verify_state")
+        commit_state = state.get("commit_state")
         active_tx = state.get("active_tx")
-        if not isinstance(active_tx, dict):
-            return False
-        active_tx_id = active_tx.get("tx_id")
-        active_status = active_tx.get("status")
-        if isinstance(active_tx_id, bool) or not isinstance(active_tx_id, int):
-            return False
-        if not isinstance(active_status, str) or not active_status.strip():
-            return False
-        if active_tx_id == 0:
-            if active_status != "planned":
+
+        if active_tx is None:
+            if status is not None:
+                return False
+            if next_action != "tx.begin":
+                return False
+            if semantic_summary is not None:
+                return False
+            if verify_state is not None:
+                return False
+            if commit_state is not None:
                 return False
             if active_tx_source != "none":
                 return False
             if drift_detected and "rebuild_warning" not in state:
                 return False
         else:
+            if not isinstance(active_tx, dict):
+                return False
+            active_tx_id = active_tx.get("tx_id")
+            if isinstance(active_tx_id, bool) or not isinstance(active_tx_id, int):
+                return False
+            if not isinstance(status, str) or not status.strip():
+                return False
+            if not isinstance(next_action, str) or not next_action.strip():
+                return False
+            if not isinstance(semantic_summary, str) or not semantic_summary.strip():
+                return False
+            if not isinstance(verify_state, dict):
+                return False
+            if not isinstance(commit_state, dict):
+                return False
             if active_tx_source not in {"materialized", "active_candidate"}:
                 return False
+
         if not drift_detected and "rebuild_warning" in state:
             return False
         return integrity.get("state_hash") == self._compute_state_hash(state)
@@ -726,20 +762,29 @@ class StateRebuilder:
             existing_state, last_seq
         ):
             active_tx = existing_state.get("active_tx")
-            if isinstance(active_tx, dict):
-                active_tx["next_action"] = self._derive_next_action(active_tx)
+            existing_state["status"] = (
+                active_tx.get("status") if isinstance(active_tx, dict) else None
+            )
+            existing_state["next_action"] = self._derive_next_action(active_tx)
+            existing_state["semantic_summary"] = (
+                active_tx.get("semantic_summary")
+                if isinstance(active_tx, dict)
+                else None
+            )
+            existing_state["verify_state"] = (
+                active_tx.get("verify_state") if isinstance(active_tx, dict) else None
+            )
+            existing_state["commit_state"] = (
+                active_tx.get("commit_state") if isinstance(active_tx, dict) else None
+            )
             integrity = existing_state.get("integrity")
             if isinstance(integrity, dict):
                 integrity["rebuilt_from_seq"] = existing_state.get(
                     "last_applied_seq", 0
                 )
-                integrity["active_tx_source"] = "materialized"
-                if (
-                    isinstance(active_tx, dict)
-                    and active_tx.get("tx_id") == 0
-                    and active_tx.get("status") == "planned"
-                ):
-                    integrity["active_tx_source"] = "none"
+                integrity["active_tx_source"] = (
+                    "materialized" if isinstance(active_tx, dict) else "none"
+                )
                 existing_state["updated_at"] = datetime.now(timezone.utc).isoformat()
                 integrity["state_hash"] = self._compute_state_hash(existing_state)
             return {
@@ -912,12 +957,18 @@ class StateRebuilder:
                 active_tx["semantic_summary"] = "Rebuilt state from tx event log."
             active_tx["next_action"] = self._derive_next_action(active_tx)
             state["active_tx"] = active_tx
+            state["status"] = active_tx.get("status")
+            state["next_action"] = active_tx.get("next_action")
+            state["semantic_summary"] = active_tx.get("semantic_summary")
+            state["verify_state"] = active_tx.get("verify_state")
+            state["commit_state"] = active_tx.get("commit_state")
         else:
-            if not state["active_tx"].get("semantic_summary"):
-                state["active_tx"]["semantic_summary"] = "No active transaction."
-            state["active_tx"]["next_action"] = self._derive_next_action(
-                state["active_tx"]
-            )
+            state["active_tx"] = None
+            state["status"] = None
+            state["next_action"] = "tx.begin"
+            state["semantic_summary"] = None
+            state["verify_state"] = None
+            state["commit_state"] = None
 
         if invalid_reason:
             drift_detected = True
