@@ -111,7 +111,7 @@ _RPC_SERVER = JsonRpcServer(_TOOL_ROUTER, _STATE_STORE)
 
 
 def tx_event_append(
-    tx_id: str,
+    tx_id: int,
     ticket_id: str,
     event_type: str,
     phase: str,

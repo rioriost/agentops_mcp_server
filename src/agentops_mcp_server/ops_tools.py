@@ -492,12 +492,16 @@ class OpsTools:
 
     def _active_tx_identity(self, active_tx: Dict[str, Any]) -> Dict[str, str]:
         tx_id = self._normalize_tx_identifier(active_tx.get("tx_id"))
-        ticket_id = self._normalize_tx_identifier(active_tx.get("ticket_id"))
-        canonical_id = tx_id or ticket_id
+        ticket_id = (
+            active_tx.get("ticket_id").strip()
+            if isinstance(active_tx.get("ticket_id"), str)
+            and active_tx.get("ticket_id").strip()
+            else ""
+        )
         return {
             "tx_id": tx_id,
             "ticket_id": ticket_id,
-            "canonical_id": canonical_id,
+            "canonical_id": tx_id,
             "has_canonical_tx": bool(tx_id),
         }
 
@@ -511,11 +515,7 @@ class OpsTools:
         requested_id = self._normalize_tx_identifier(requested_task_id)
         has_canonical_tx = identity["has_canonical_tx"]
 
-        if not has_canonical_tx:
-            if requested_id:
-                if requested_id == ticket_id:
-                    raise ValueError("tx.begin required before other events")
-                raise self._active_tx_mismatch_error(requested_id, active_tx)
+        if not has_canonical_tx or not canonical_id:
             raise ValueError("tx.begin required before other events")
         if self._is_terminal_active_tx(active_tx):
             raise ValueError("tx.begin required before other events")
@@ -523,7 +523,7 @@ class OpsTools:
         if requested_id and requested_id == canonical_id:
             return active_tx, canonical_id
 
-        if requested_id and requested_id == ticket_id:
+        if requested_task_id and requested_task_id == ticket_id:
             if allow_resume:
                 return active_tx, canonical_id
             raise ValueError(
@@ -531,8 +531,8 @@ class OpsTools:
                 "resume it with task update semantics instead"
             )
 
-        if requested_id:
-            raise self._active_tx_mismatch_error(requested_id, active_tx)
+        if requested_task_id:
+            raise self._active_tx_mismatch_error(requested_task_id, active_tx)
 
         return active_tx, canonical_id
 
@@ -782,13 +782,7 @@ class OpsTools:
         active_status = active_tx.get("status")
         next_action = active_tx.get("next_action")
 
-        active_value = (
-            active_tx_id.strip()
-            if isinstance(active_tx_id, str)
-            and active_tx_id.strip()
-            and active_tx_id.strip() != "none"
-            else "unknown"
-        )
+        active_value = self._normalize_tx_identifier(active_tx_id) or "unknown"
         requested_value = (
             requested_task_id.strip()
             if isinstance(requested_task_id, str) and requested_task_id.strip()
@@ -797,7 +791,7 @@ class OpsTools:
         active_ticket_value = (
             active_ticket_id.strip()
             if isinstance(active_ticket_id, str) and active_ticket_id.strip()
-            else active_value
+            else "unknown"
         )
         active_status_value = (
             active_status.strip()
@@ -839,7 +833,12 @@ class OpsTools:
             tx_id = self.state_store.issue_tx_id() if ticket_id else None
         else:
             active_tx_id = active_tx.get("tx_id")
-            active_ticket_id = self._normalize_tx_identifier(active_tx.get("ticket_id"))
+            active_ticket_id = (
+                active_tx.get("ticket_id").strip()
+                if isinstance(active_tx.get("ticket_id"), str)
+                and active_tx.get("ticket_id").strip()
+                else ""
+            )
             tx_id = active_tx_id if isinstance(active_tx_id, int) else None
             ticket_id = active_ticket_id or resolved_task_id or resolved_title
 
@@ -942,7 +941,7 @@ class OpsTools:
         session_id: Optional[str],
     ) -> Tuple[Dict[str, Any], str, str]:
         resolved_task_id = self._normalize_tx_identifier(task_id)
-        active_tx, active_tx_id = self._require_active_tx(resolved_task_id or None)
+        active_tx, active_tx_id = self._require_active_tx(task_id, allow_resume=True)
         if not resolved_task_id:
             resolved_task_id = active_tx_id
         resolved_session_id = self._resolve_session_id(session_id, active_tx)
@@ -986,13 +985,16 @@ class OpsTools:
             "purpose": resolved_purpose,
             "planned_step": planned_step.strip(),
             "state": "planned",
-            "task_id": active_tx_id,
+            "task_id": task_id.strip()
+            if isinstance(task_id, str) and task_id.strip()
+            else active_tx.get("ticket_id") or "",
+            "tx_id": active_tx_id,
         }
 
         self._emit_tx_event(
             event_type="tx.file_intent.add",
             payload=payload,
-            title=active_tx_id,
+            title=active_tx.get("ticket_id") or active_tx_id,
             task_id=active_tx_id,
             phase=active_tx.get("phase")
             if isinstance(active_tx.get("phase"), str)
@@ -1034,13 +1036,16 @@ class OpsTools:
         payload = {
             "path": resolved_path,
             "state": resolved_state,
-            "task_id": active_tx_id,
+            "task_id": task_id.strip()
+            if isinstance(task_id, str) and task_id.strip()
+            else active_tx.get("ticket_id") or "",
+            "tx_id": active_tx_id,
         }
 
         self._emit_tx_event(
             event_type="tx.file_intent.update",
             payload=payload,
-            title=active_tx_id,
+            title=active_tx.get("ticket_id") or active_tx_id,
             task_id=active_tx_id,
             phase=active_tx.get("phase")
             if isinstance(active_tx.get("phase"), str)
@@ -1076,13 +1081,16 @@ class OpsTools:
         payload = {
             "path": resolved_path,
             "state": "verified",
-            "task_id": active_tx_id,
+            "task_id": task_id.strip()
+            if isinstance(task_id, str) and task_id.strip()
+            else active_tx.get("ticket_id") or "",
+            "tx_id": active_tx_id,
         }
 
         self._emit_tx_event(
             event_type="tx.file_intent.complete",
             payload=payload,
-            title=active_tx_id,
+            title=active_tx.get("ticket_id") or active_tx_id,
             task_id=active_tx_id,
             phase=active_tx.get("phase")
             if isinstance(active_tx.get("phase"), str)
@@ -1151,8 +1159,10 @@ class OpsTools:
             )
             if not resolved_task_id:
                 resolved_task_id = (
-                    self._normalize_tx_identifier(active_tx.get("ticket_id"))
-                    or resolved_tx_id
+                    active_tx.get("ticket_id").strip()
+                    if isinstance(active_tx.get("ticket_id"), str)
+                    and active_tx.get("ticket_id").strip()
+                    else resolved_tx_id
                 )
                 payload["task_id"] = resolved_task_id
             tx_step_id = resolved_task_id or tx_step_id
@@ -1198,8 +1208,13 @@ class OpsTools:
         event = None
 
         resolved_task_id = self._normalize_tx_identifier(task_id)
-        active_tx, active_tx_id = self._require_active_tx(resolved_task_id or None)
-        active_ticket_id = self._normalize_tx_identifier(active_tx.get("ticket_id"))
+        active_tx, active_tx_id = self._require_active_tx(task_id, allow_resume=True)
+        active_ticket_id = (
+            active_tx.get("ticket_id").strip()
+            if isinstance(active_tx.get("ticket_id"), str)
+            and active_tx.get("ticket_id").strip()
+            else ""
+        )
         if not resolved_task_id:
             resolved_task_id = active_ticket_id or active_tx_id
         if resolved_task_id and "task_id" not in payload:
@@ -1274,10 +1289,13 @@ class OpsTools:
         event = None
 
         resolved_task_id = self._normalize_tx_identifier(task_id)
-        active_tx, active_tx_id = self._require_active_tx(
-            resolved_task_id or None, allow_resume=True
+        active_tx, active_tx_id = self._require_active_tx(task_id, allow_resume=True)
+        active_ticket_id = (
+            active_tx.get("ticket_id").strip()
+            if isinstance(active_tx.get("ticket_id"), str)
+            and active_tx.get("ticket_id").strip()
+            else ""
         )
-        active_ticket_id = self._normalize_tx_identifier(active_tx.get("ticket_id"))
         if not resolved_task_id:
             resolved_task_id = active_ticket_id or active_tx_id
         if resolved_task_id and "task_id" not in payload:

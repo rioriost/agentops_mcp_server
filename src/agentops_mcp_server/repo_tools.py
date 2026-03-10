@@ -21,7 +21,7 @@ class RepoTools:
         self.state_store = state_store
         self.state_rebuilder = state_rebuilder
 
-    def _load_tx_context(self) -> Optional[Dict[str, str]]:
+    def _load_tx_context(self) -> Optional[Dict[str, Any]]:
         if self.state_store is None:
             return None
         tx_state = self.state_store.read_json_file(
@@ -39,7 +39,7 @@ class RepoTools:
         phase = active_tx.get("phase") or active_tx.get("status") or "in-progress"
         step_id = active_tx.get("current_step") or "verify"
 
-        if not isinstance(tx_id, str) or not tx_id.strip() or tx_id.strip() == "none":
+        if isinstance(tx_id, bool) or not isinstance(tx_id, int):
             return None
         if (
             not isinstance(ticket_id, str)
@@ -55,7 +55,7 @@ class RepoTools:
             step_id = "verify"
 
         return {
-            "tx_id": tx_id.strip(),
+            "tx_id": tx_id,
             "ticket_id": ticket_id.strip(),
             "session_id": session_id.strip(),
             "phase": phase.strip(),

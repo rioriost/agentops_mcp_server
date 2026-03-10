@@ -76,6 +76,13 @@ def _clean_int(value: Any) -> Optional[int]:
     return None
 
 
+def _clean_optional_tx_id(value: Any) -> Optional[int]:
+    cleaned = _clean_int(value)
+    if cleaned is None or cleaned == 0:
+        return None
+    return cleaned
+
+
 def _as_dict(value: Any) -> Dict[str, Any]:
     if isinstance(value, dict):
         return dict(value)
@@ -167,11 +174,9 @@ def derive_workflow_guidance(
             bool(resolved_next_action) and not resolved_terminal
         )
 
-    resolved_active_tx_id = _clean_optional_str(active_tx_id)
+    resolved_active_tx_id = _clean_optional_tx_id(active_tx_id)
     if resolved_active_tx_id is None:
-        candidate = _clean_str(active_tx.get("tx_id"))
-        if candidate and candidate != "none":
-            resolved_active_tx_id = candidate
+        resolved_active_tx_id = _clean_optional_tx_id(active_tx.get("tx_id"))
 
     resolved_active_ticket_id = _clean_optional_str(active_ticket_id)
     if resolved_active_ticket_id is None:
