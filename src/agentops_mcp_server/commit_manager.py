@@ -8,10 +8,7 @@ from .git_repo import GitRepo
 from .state_rebuilder import StateRebuilder
 from .state_store import StateStore
 from .verify_runner import VerifyRunner
-from .workflow_response import (
-    build_guidance_from_active_tx,
-    build_structured_helper_failure,
-)
+from .workflow_response import build_structured_helper_failure, build_success_response
 
 
 class CommitManager:
@@ -44,8 +41,6 @@ class CommitManager:
             return None
         phase = active_tx.get("phase")
         if not isinstance(phase, str) or not phase.strip():
-            phase = active_tx.get("status")
-        if not isinstance(phase, str) or not phase.strip():
             phase = "in-progress"
         step_id = active_tx.get("current_step")
         if not isinstance(step_id, str) or not step_id.strip():
@@ -75,15 +70,9 @@ class CommitManager:
         ticket_id = active_tx.get("ticket_id")
         if isinstance(tx_id, bool) or not isinstance(tx_id, int):
             return None
-        if (
-            not isinstance(ticket_id, str)
-            or not ticket_id.strip()
-            or ticket_id.strip() == "none"
-        ):
+        if not isinstance(ticket_id, str) or not ticket_id.strip():
             return None
         phase = active_tx.get("phase")
-        if not isinstance(phase, str) or not phase.strip():
-            phase = active_tx.get("status")
         if not isinstance(phase, str) or not phase.strip():
             phase = "in-progress"
         step_id = active_tx.get("current_step")
@@ -150,7 +139,6 @@ class CommitManager:
             if isinstance(active_tx, dict):
                 active_tx["tx_id"] = context["tx_id"]
                 active_tx["ticket_id"] = context["ticket_id"]
-                active_tx["status"] = context["phase"]
                 active_tx["phase"] = context["phase"]
                 active_tx["current_step"] = "none"
                 active_tx["session_id"] = context["session_id"]
@@ -205,7 +193,6 @@ class CommitManager:
                     tx_state["active_tx"] = active_tx
                 active_tx["tx_id"] = rebuild_context["tx_id"]
                 active_tx["ticket_id"] = rebuild_context["ticket_id"]
-                active_tx["status"] = rebuild_context["phase"]
                 active_tx["phase"] = rebuild_context["phase"]
                 active_tx["current_step"] = rebuild_context["step_id"]
                 active_tx["session_id"] = rebuild_context["session_id"]
@@ -268,8 +255,8 @@ class CommitManager:
                 )["reason"]
             )
         verify_state = (
-            active_tx.get("verify_state")
-            if isinstance(active_tx.get("verify_state"), dict)
+            tx_state.get("verify_state")
+            if isinstance(tx_state.get("verify_state"), dict)
             else {}
         )
         if verify_state.get("status") == "running":
@@ -287,8 +274,8 @@ class CommitManager:
                     refreshed_active_tx = rebuilt_state.get("active_tx")
                     if isinstance(refreshed_active_tx, dict):
                         refreshed_verify_state = (
-                            refreshed_active_tx.get("verify_state")
-                            if isinstance(refreshed_active_tx.get("verify_state"), dict)
+                            rebuilt_state.get("verify_state")
+                            if isinstance(rebuilt_state.get("verify_state"), dict)
                             else {}
                         )
                         if refreshed_verify_state.get("status") == "running":
@@ -333,7 +320,6 @@ class CommitManager:
             if isinstance(active_tx, dict):
                 active_tx["tx_id"] = context["tx_id"]
                 active_tx["ticket_id"] = context["ticket_id"]
-                active_tx["status"] = phase
                 active_tx["phase"] = phase
                 active_tx["current_step"] = step_id
                 if isinstance(context.get("session_id"), str):
@@ -365,7 +351,6 @@ class CommitManager:
                     if isinstance(active_tx, dict):
                         active_tx["tx_id"] = context["tx_id"]
                         active_tx["ticket_id"] = context["ticket_id"]
-                        active_tx["status"] = phase
                         active_tx["phase"] = phase
                         active_tx["current_step"] = step_id
                         if isinstance(context.get("session_id"), str):
@@ -470,67 +455,39 @@ class CommitManager:
     def _workflow_guidance(self) -> Dict[str, Any]:
         tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
         if not isinstance(tx_state, dict):
-            return {
-                "tx_status": "",
-                "tx_phase": "",
-                "next_action": "",
-                "terminal": False,
-                "requires_followup": False,
-                "followup_tool": None,
-                "canonical_status": "",
-                "canonical_phase": "",
-                "active_tx_id": None,
-                "active_ticket_id": None,
-                "current_step": None,
-                "verify_status": None,
-                "commit_status": None,
-                "integrity_status": None,
-                "can_start_new_ticket": True,
-                "resume_required": False,
-                "active_tx": {},
+            tx_state = {
+                "active_tx": None,
+                "status": None,
+                "next_action": "tx.begin",
+                "verify_state": None,
+                "commit_state": None,
+                "semantic_summary": None,
+                "integrity": {},
             }
 
-        active_tx = tx_state.get("active_tx")
+        response = build_success_response(tx_state=tx_state)
+        active_tx = response.get("active_tx")
         if not isinstance(active_tx, dict):
-            return {
-                "tx_status": "",
-                "tx_phase": "",
-                "next_action": "",
-                "terminal": False,
-                "requires_followup": False,
-                "followup_tool": None,
-                "canonical_status": "",
-                "canonical_phase": "",
-                "active_tx_id": None,
-                "active_ticket_id": None,
-                "current_step": None,
-                "verify_status": None,
-                "commit_status": None,
-                "integrity_status": None,
-                "can_start_new_ticket": True,
-                "resume_required": False,
-                "active_tx": {},
-            }
+            active_tx = {}
 
-        guidance = build_guidance_from_active_tx(active_tx)
         return {
-            "tx_status": guidance["canonical_status"],
-            "tx_phase": guidance["canonical_phase"],
-            "next_action": guidance["next_action"],
-            "terminal": guidance["terminal"],
-            "requires_followup": guidance["requires_followup"],
-            "followup_tool": guidance["followup_tool"],
-            "canonical_status": guidance["canonical_status"],
-            "canonical_phase": guidance["canonical_phase"],
-            "active_tx_id": guidance["active_tx_id"],
-            "active_ticket_id": guidance["active_ticket_id"],
-            "current_step": guidance["current_step"],
-            "verify_status": guidance["verify_status"],
-            "commit_status": guidance["commit_status"],
-            "integrity_status": guidance["integrity_status"],
-            "can_start_new_ticket": guidance["can_start_new_ticket"],
-            "resume_required": guidance["resume_required"],
-            "active_tx": dict(active_tx),
+            "tx_status": response["canonical_status"],
+            "tx_phase": response["canonical_phase"],
+            "next_action": response["next_action"],
+            "terminal": response["terminal"],
+            "requires_followup": response["requires_followup"],
+            "followup_tool": response["followup_tool"],
+            "canonical_status": response["canonical_status"],
+            "canonical_phase": response["canonical_phase"],
+            "active_tx_id": response["active_tx_id"],
+            "active_ticket_id": response["active_ticket_id"],
+            "current_step": response["current_step"],
+            "verify_status": response["verify_status"],
+            "commit_status": response["commit_status"],
+            "integrity_status": response["integrity_status"],
+            "can_start_new_ticket": response["can_start_new_ticket"],
+            "resume_required": response["resume_required"],
+            "active_tx": active_tx,
         }
 
     def commit_if_verified(

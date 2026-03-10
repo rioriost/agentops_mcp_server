@@ -349,18 +349,33 @@ class OpsTools:
             event=event,
             **guidance_overrides,
         )
-        if (
-            not response.get("canonical_status")
-            and not response.get("canonical_phase")
-            and not response.get("next_action")
-        ):
+        if not response.get("canonical_status") and not response.get("next_action"):
+            baseline_state = resolved_state if isinstance(resolved_state, dict) else {}
+            if not baseline_state:
+                baseline_state = {
+                    "active_tx": None,
+                    "status": None,
+                    "next_action": "tx.begin",
+                    "verify_state": None,
+                    "commit_state": None,
+                    "semantic_summary": None,
+                    "integrity": {},
+                }
             guidance = derive_workflow_guidance(
-                {"active_tx": self._active_tx()},
+                baseline_state,
                 **guidance_overrides,
             )
             response.update(guidance)
             response["tx_status"] = guidance["canonical_status"]
             response["tx_phase"] = guidance["canonical_phase"]
+            response["canonical_status"] = guidance["canonical_status"]
+            response["canonical_phase"] = guidance["canonical_phase"]
+            response["next_action"] = guidance["next_action"]
+            response["terminal"] = guidance["terminal"]
+            response["requires_followup"] = guidance["requires_followup"]
+            response["followup_tool"] = guidance["followup_tool"]
+            response["can_start_new_ticket"] = guidance["can_start_new_ticket"]
+            response["resume_required"] = guidance["resume_required"]
 
         active_tx = (
             resolved_state.get("active_tx")
@@ -368,14 +383,22 @@ class OpsTools:
             else {}
         )
         verify_state = (
-            active_tx.get("verify_state")
-            if isinstance(active_tx.get("verify_state"), dict)
-            else {}
+            resolved_state.get("verify_state")
+            if isinstance(resolved_state.get("verify_state"), dict)
+            else (
+                active_tx.get("verify_state")
+                if isinstance(active_tx.get("verify_state"), dict)
+                else {}
+            )
         )
         commit_state = (
-            active_tx.get("commit_state")
-            if isinstance(active_tx.get("commit_state"), dict)
-            else {}
+            resolved_state.get("commit_state")
+            if isinstance(resolved_state.get("commit_state"), dict)
+            else (
+                active_tx.get("commit_state")
+                if isinstance(active_tx.get("commit_state"), dict)
+                else {}
+            )
         )
         integrity = (
             resolved_state.get("integrity")
@@ -384,9 +407,15 @@ class OpsTools:
         )
 
         response["active_tx"] = active_tx
-        response["active_tx_id"] = active_tx.get("tx_id")
-        response["active_ticket_id"] = active_tx.get("ticket_id")
-        response["current_step"] = active_tx.get("current_step")
+        response["active_tx_id"] = (
+            active_tx.get("tx_id") if isinstance(active_tx, dict) else None
+        )
+        response["active_ticket_id"] = (
+            active_tx.get("ticket_id") if isinstance(active_tx, dict) else None
+        )
+        response["current_step"] = (
+            active_tx.get("current_step") if isinstance(active_tx, dict) else None
+        )
         response["verify_status"] = verify_state.get("status")
         response["commit_status"] = commit_state.get("status")
         response["integrity_status"] = (
@@ -873,7 +902,6 @@ class OpsTools:
                 if event_type == "tx.begin" or isinstance(existing_tx_id, int):
                     materialized_active_tx["tx_id"] = tx_id
                     materialized_active_tx["ticket_id"] = ticket_id
-                    materialized_active_tx["status"] = phase
                     materialized_active_tx["phase"] = phase
                     materialized_active_tx["current_step"] = step_id
                     materialized_active_tx["session_id"] = resolved_session_id
@@ -899,15 +927,12 @@ class OpsTools:
             )
             if integrity.get("drift_detected") is not True:
                 rebuilt_active_tx = state.get("active_tx")
-                if not isinstance(rebuilt_active_tx, dict):
-                    rebuilt_active_tx = {}
-                    state["active_tx"] = rebuilt_active_tx
-                rebuilt_active_tx["tx_id"] = tx_id
-                rebuilt_active_tx["ticket_id"] = ticket_id
-                rebuilt_active_tx["status"] = phase
-                rebuilt_active_tx["phase"] = phase
-                rebuilt_active_tx["current_step"] = step_id
-                rebuilt_active_tx["session_id"] = resolved_session_id
+                if isinstance(rebuilt_active_tx, dict):
+                    rebuilt_active_tx["tx_id"] = tx_id
+                    rebuilt_active_tx["ticket_id"] = ticket_id
+                    rebuilt_active_tx["phase"] = phase
+                    rebuilt_active_tx["current_step"] = step_id
+                    rebuilt_active_tx["session_id"] = resolved_session_id
                 return self.state_store.tx_event_append_and_state_save(
                     tx_id=tx_id,
                     ticket_id=ticket_id,

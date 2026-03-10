@@ -2,7 +2,7 @@
   "ticket_id": "p1-t02",
   "phase_id": "p1",
   "title": "Define the minimal canonical continuation contract in code",
-  "status": "planned",
+  "status": "done",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Server-owned transaction variables vs client-managed inputs",

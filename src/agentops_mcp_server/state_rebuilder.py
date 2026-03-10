@@ -125,17 +125,11 @@ class StateRebuilder:
     ) -> Dict[str, Any]:
         return {
             "tx_id": tx_id,
-            "ticket_id": ticket_id or "none",
-            "status": phase,
-            "phase": phase,
+            "ticket_id": ticket_id,
             "current_step": step_id,
             "last_completed_step": "",
-            "next_action": "",
-            "semantic_summary": "",
             "user_intent": None,
             "session_id": "",
-            "verify_state": {"status": "not_started", "last_result": None},
-            "commit_state": {"status": "not_started", "last_result": None},
             "file_intents": [],
             "_last_event_seq": -1,
             "_terminal": False,
@@ -170,11 +164,6 @@ class StateRebuilder:
         if isinstance(active_tx, dict):
             active_tx.pop("_last_event_seq", None)
             active_tx.pop("_terminal", None)
-            active_tx.pop("status", None)
-            active_tx.pop("next_action", None)
-            active_tx.pop("verify_state", None)
-            active_tx.pop("commit_state", None)
-            active_tx.pop("semantic_summary", None)
         payload = json.dumps(
             sanitized, ensure_ascii=False, sort_keys=True, separators=(",", ":")
         )
@@ -435,19 +424,14 @@ class StateRebuilder:
     ) -> None:
         event_type = event.get("event_type")
         payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
-        phase = event.get("phase")
         step_id = event.get("step_id")
         seq = event.get("seq")
         session_id = event.get("session_id")
 
-        if isinstance(phase, str):
-            active_tx["status"] = phase
-            active_tx["phase"] = phase
-
         if isinstance(session_id, str) and session_id.strip():
             active_tx["session_id"] = session_id.strip()
 
-        if isinstance(step_id, str) and event_type == "tx.step.enter":
+        if isinstance(step_id, str) and event_type in {"tx.begin", "tx.step.enter"}:
             active_tx["current_step"] = step_id
 
         if event_type == "tx.begin":
@@ -489,66 +473,46 @@ class StateRebuilder:
                 if isinstance(seq, int):
                     intent["last_event_seq"] = seq
 
-        if event_type == "tx.verify.start":
-            active_tx["verify_state"] = {"status": "running", "last_result": payload}
-        if event_type == "tx.verify.pass":
-            active_tx["verify_state"] = {"status": "passed", "last_result": payload}
-        if event_type == "tx.verify.fail":
-            active_tx["verify_state"] = {"status": "failed", "last_result": payload}
-
-        if event_type == "tx.commit.start":
-            active_tx["commit_state"] = {"status": "running", "last_result": payload}
-        if event_type == "tx.commit.done":
-            active_tx["commit_state"] = {"status": "passed", "last_result": payload}
-        if event_type == "tx.commit.fail":
-            active_tx["commit_state"] = {"status": "failed", "last_result": payload}
-
         if event_type == "tx.user_intent.set":
             user_intent = payload.get("user_intent")
             if isinstance(user_intent, str):
                 active_tx["user_intent"] = user_intent
 
-        summary = self._update_semantic_summary(
-            event_type, payload, step_id if isinstance(step_id, str) else ""
-        )
-        if summary:
-            active_tx["semantic_summary"] = summary
-
-    def _derive_next_action(self, active_tx: Optional[Dict[str, Any]]) -> str:
-        if not isinstance(active_tx, dict):
+    def _derive_next_action(
+        self,
+        *,
+        status: Optional[str],
+        verify_state: Optional[Dict[str, Any]],
+        commit_state: Optional[Dict[str, Any]],
+        active_tx: Optional[Dict[str, Any]],
+        semantic_summary: Optional[str],
+    ) -> str:
+        if status is None:
             return "tx.begin"
 
-        status = active_tx.get("status")
-        file_intents = active_tx.get("file_intents")
-        semantic_summary = (
-            active_tx.get("semantic_summary")
-            if isinstance(active_tx.get("semantic_summary"), str)
-            else ""
+        file_intents = (
+            active_tx.get("file_intents")
+            if isinstance(active_tx, dict)
+            and isinstance(active_tx.get("file_intents"), list)
+            else []
         )
         user_intent = (
             active_tx.get("user_intent")
-            if isinstance(active_tx.get("user_intent"), str)
+            if isinstance(active_tx, dict)
+            and isinstance(active_tx.get("user_intent"), str)
             else ""
         )
         intent_value = user_intent.strip().lower()
         intent_continue = intent_value in {"continue", "resume", "proceed"}
-        summary_lower = semantic_summary.lower()
-
-        verify_state = (
-            active_tx.get("verify_state")
-            if isinstance(active_tx.get("verify_state"), dict)
-            else {}
-        )
-        commit_state = (
-            active_tx.get("commit_state")
-            if isinstance(active_tx.get("commit_state"), dict)
-            else {}
+        summary_lower = (
+            semantic_summary.lower() if isinstance(semantic_summary, str) else ""
         )
 
-        if status == "planned":
-            return "tx.begin"
+        resolved_verify_state = verify_state if isinstance(verify_state, dict) else {}
+        resolved_commit_state = commit_state if isinstance(commit_state, dict) else {}
+
         if status == "in-progress":
-            if isinstance(file_intents, list) and file_intents:
+            if file_intents:
                 if any(
                     intent.get("state") in {"planned", "started"}
                     for intent in file_intents
@@ -567,13 +531,15 @@ class StateRebuilder:
                 return "tx.verify.start"
             return "tx.verify.start"
         if status == "checking":
-            if verify_state.get("status") == "not_started":
+            if resolved_verify_state.get("status") == "not_started":
                 return "tx.verify.start"
-            if verify_state.get("status") == "failed":
+            if resolved_verify_state.get("status") == "failed":
                 return "fix and re-verify"
+            return "continue checking"
         if status == "verified":
-            if commit_state.get("status") == "not_started":
+            if resolved_commit_state.get("status") == "not_started":
                 return "tx.commit.start"
+            return "tx.end.done"
         if status == "committed":
             return "tx.end.done"
         if status == "blocked":
@@ -953,15 +919,76 @@ class StateRebuilder:
             active_tx = json.loads(json.dumps(selected_active_tx, ensure_ascii=False))
             active_tx.pop("_last_event_seq", None)
             active_tx.pop("_terminal", None)
-            if not active_tx.get("semantic_summary"):
-                active_tx["semantic_summary"] = "Rebuilt state from tx event log."
-            active_tx["next_action"] = self._derive_next_action(active_tx)
+
+            status = (
+                active_tx.get("phase")
+                if isinstance(active_tx.get("phase"), str)
+                and active_tx.get("phase").strip()
+                else None
+            )
+            verify_state = None
+            commit_state = None
+            semantic_summary = None
+
+            last_result_payload = {}
+            tx_event_type = None
+            if isinstance(last_valid_seq, int):
+                matching_event = next(
+                    (
+                        event
+                        for event in reversed(events)
+                        if isinstance(event, dict)
+                        and event.get("tx_id") == active_tx.get("tx_id")
+                        and event.get("seq") == last_valid_seq
+                    ),
+                    None,
+                )
+                if isinstance(matching_event, dict):
+                    tx_event_type = matching_event.get("event_type")
+                    last_result_payload = (
+                        matching_event.get("payload")
+                        if isinstance(matching_event.get("payload"), dict)
+                        else {}
+                    )
+
+            if tx_event_type == "tx.verify.start":
+                verify_state = {"status": "running", "last_result": last_result_payload}
+            elif tx_event_type == "tx.verify.pass":
+                verify_state = {"status": "passed", "last_result": last_result_payload}
+            elif tx_event_type == "tx.verify.fail":
+                verify_state = {"status": "failed", "last_result": last_result_payload}
+
+            if tx_event_type == "tx.commit.start":
+                commit_state = {"status": "running", "last_result": last_result_payload}
+            elif tx_event_type == "tx.commit.done":
+                commit_state = {"status": "passed", "last_result": last_result_payload}
+            elif tx_event_type == "tx.commit.fail":
+                commit_state = {"status": "failed", "last_result": last_result_payload}
+
+            semantic_summary = self._update_semantic_summary(
+                tx_event_type if isinstance(tx_event_type, str) else "",
+                last_result_payload,
+                active_tx.get("current_step")
+                if isinstance(active_tx.get("current_step"), str)
+                else "",
+            )
+            if not semantic_summary:
+                semantic_summary = "Rebuilt state from tx event log."
+
+            next_action = self._derive_next_action(
+                status=status,
+                verify_state=verify_state,
+                commit_state=commit_state,
+                active_tx=active_tx,
+                semantic_summary=semantic_summary,
+            )
+
             state["active_tx"] = active_tx
-            state["status"] = active_tx.get("status")
-            state["next_action"] = active_tx.get("next_action")
-            state["semantic_summary"] = active_tx.get("semantic_summary")
-            state["verify_state"] = active_tx.get("verify_state")
-            state["commit_state"] = active_tx.get("commit_state")
+            state["status"] = status
+            state["next_action"] = next_action
+            state["semantic_summary"] = semantic_summary
+            state["verify_state"] = verify_state
+            state["commit_state"] = commit_state
         else:
             state["active_tx"] = None
             state["status"] = None

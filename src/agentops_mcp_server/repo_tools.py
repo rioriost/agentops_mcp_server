@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 from .git_repo import GitRepo
 from .test_suggestions import CODE_SUFFIXES, is_test_path, parse_changed_files
 from .verify_runner import VerifyRunner
-from .workflow_response import build_guidance_from_active_tx, build_success_response
+from .workflow_response import build_success_response
 
 
 class RepoTools:
@@ -36,16 +36,12 @@ class RepoTools:
         tx_id = active_tx.get("tx_id")
         ticket_id = active_tx.get("ticket_id")
         session_id = active_tx.get("session_id")
-        phase = active_tx.get("phase") or active_tx.get("status") or "in-progress"
+        phase = active_tx.get("phase") or "in-progress"
         step_id = active_tx.get("current_step") or "verify"
 
         if isinstance(tx_id, bool) or not isinstance(tx_id, int):
             return None
-        if (
-            not isinstance(ticket_id, str)
-            or not ticket_id.strip()
-            or ticket_id.strip() == "none"
-        ):
+        if not isinstance(ticket_id, str) or not ticket_id.strip():
             return None
         if not isinstance(session_id, str) or not session_id.strip():
             return None
@@ -86,30 +82,9 @@ class RepoTools:
             if isinstance(active_tx, dict):
                 active_tx["tx_id"] = context["tx_id"]
                 active_tx["ticket_id"] = context["ticket_id"]
-                active_tx["status"] = phase
                 active_tx["phase"] = phase
                 active_tx["current_step"] = step_id
                 active_tx["session_id"] = context["session_id"]
-                if event_type == "tx.verify.start":
-                    active_tx["verify_state"] = {
-                        "status": "running",
-                        "last_result": payload,
-                    }
-                    active_tx["next_action"] = "tx.verify.pass"
-                elif event_type == "tx.verify.pass":
-                    active_tx["verify_state"] = {
-                        "status": "passed",
-                        "last_result": payload,
-                    }
-                    active_tx["semantic_summary"] = "Verification passed"
-                    active_tx["next_action"] = "tx.commit.start"
-                elif event_type == "tx.verify.fail":
-                    active_tx["verify_state"] = {
-                        "status": "failed",
-                        "last_result": payload,
-                    }
-                    active_tx["semantic_summary"] = "Verification failed"
-                    active_tx["next_action"] = "fix and re-verify"
             return self.state_store.tx_event_append_and_state_save(
                 tx_id=context["tx_id"],
                 ticket_id=context["ticket_id"],
@@ -136,30 +111,9 @@ class RepoTools:
                     if isinstance(active_tx, dict):
                         active_tx["tx_id"] = context["tx_id"]
                         active_tx["ticket_id"] = context["ticket_id"]
-                        active_tx["status"] = phase
                         active_tx["phase"] = phase
                         active_tx["current_step"] = step_id
                         active_tx["session_id"] = context["session_id"]
-                        if event_type == "tx.verify.start":
-                            active_tx["verify_state"] = {
-                                "status": "running",
-                                "last_result": payload,
-                            }
-                            active_tx["next_action"] = "tx.verify.pass"
-                        elif event_type == "tx.verify.pass":
-                            active_tx["verify_state"] = {
-                                "status": "passed",
-                                "last_result": payload,
-                            }
-                            active_tx["semantic_summary"] = "Verification passed"
-                            active_tx["next_action"] = "tx.commit.start"
-                        elif event_type == "tx.verify.fail":
-                            active_tx["verify_state"] = {
-                                "status": "failed",
-                                "last_result": payload,
-                            }
-                            active_tx["semantic_summary"] = "Verification failed"
-                            active_tx["next_action"] = "fix and re-verify"
                     return self.state_store.tx_event_append_and_state_save(
                         tx_id=context["tx_id"],
                         ticket_id=context["ticket_id"],
@@ -185,56 +139,36 @@ class RepoTools:
 
     def _workflow_guidance(self) -> Dict[str, Any]:
         if self.state_store is None:
-            return {
-                "tx_status": "",
-                "tx_phase": "",
-                "next_action": "",
-                "terminal": False,
-                "requires_followup": False,
-                "followup_tool": None,
-                "canonical_status": "",
-                "canonical_phase": "",
-                "active_tx_id": None,
-                "active_ticket_id": None,
-                "current_step": None,
-                "verify_status": None,
-                "commit_status": None,
-                "integrity_status": None,
-                "can_start_new_ticket": True,
-                "resume_required": False,
-                "active_tx": {},
-            }
+            response = build_success_response(
+                tx_state={
+                    "active_tx": None,
+                    "status": None,
+                    "next_action": "tx.begin",
+                    "verify_state": None,
+                    "commit_state": None,
+                    "semantic_summary": None,
+                    "integrity": {},
+                }
+            )
+        else:
+            tx_state = self.state_store.read_json_file(
+                self.state_store.repo_context.tx_state
+            )
+            if not isinstance(tx_state, dict):
+                tx_state = {
+                    "active_tx": None,
+                    "status": None,
+                    "next_action": "tx.begin",
+                    "verify_state": None,
+                    "commit_state": None,
+                    "semantic_summary": None,
+                    "integrity": {},
+                }
+            response = build_success_response(tx_state=tx_state)
 
-        tx_state = self.state_store.read_json_file(
-            self.state_store.repo_context.tx_state
-        )
-        if not isinstance(tx_state, dict):
-            return {
-                "tx_status": "",
-                "tx_phase": "",
-                "next_action": "",
-                "terminal": False,
-                "requires_followup": False,
-                "followup_tool": None,
-                "canonical_status": "",
-                "canonical_phase": "",
-                "active_tx_id": None,
-                "active_ticket_id": None,
-                "current_step": None,
-                "verify_status": None,
-                "commit_status": None,
-                "integrity_status": None,
-                "can_start_new_ticket": True,
-                "resume_required": False,
-                "active_tx": {},
-            }
-
-        response = build_success_response(tx_state=tx_state)
-        response["active_tx"] = (
-            tx_state.get("active_tx")
-            if isinstance(tx_state.get("active_tx"), dict)
-            else {}
-        )
+        active_tx = response.get("active_tx")
+        if not isinstance(active_tx, dict):
+            active_tx = {}
         return {
             "tx_status": response["canonical_status"],
             "tx_phase": response["canonical_phase"],
@@ -252,7 +186,7 @@ class RepoTools:
             "integrity_status": response["integrity_status"],
             "can_start_new_ticket": response["can_start_new_ticket"],
             "resume_required": response["resume_required"],
-            "active_tx": response["active_tx"],
+            "active_tx": active_tx,
         }
 
     def repo_verify(self, timeout_sec: Optional[int] = None) -> Dict[str, Any]:

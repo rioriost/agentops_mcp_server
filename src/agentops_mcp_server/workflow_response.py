@@ -77,10 +77,7 @@ def _clean_int(value: Any) -> Optional[int]:
 
 
 def _clean_optional_tx_id(value: Any) -> Optional[int]:
-    cleaned = _clean_int(value)
-    if cleaned is None or cleaned == 0:
-        return None
-    return cleaned
+    return _clean_int(value)
 
 
 def _as_dict(value: Any) -> Dict[str, Any]:
@@ -91,14 +88,29 @@ def _as_dict(value: Any) -> Dict[str, Any]:
 
 def _active_tx_from_state(tx_state: Any) -> Dict[str, Any]:
     state = _as_dict(tx_state)
-    return _as_dict(state.get("active_tx"))
+    active_tx = state.get("active_tx")
+    if isinstance(active_tx, dict):
+        return dict(active_tx)
+    return {}
 
 
-def _verify_state_from_active_tx(active_tx: Mapping[str, Any]) -> Dict[str, Any]:
+def _verify_state_from_state(
+    tx_state: Any, active_tx: Mapping[str, Any]
+) -> Dict[str, Any]:
+    state = _as_dict(tx_state)
+    verify_state = state.get("verify_state")
+    if isinstance(verify_state, dict):
+        return dict(verify_state)
     return _as_dict(active_tx.get("verify_state"))
 
 
-def _commit_state_from_active_tx(active_tx: Mapping[str, Any]) -> Dict[str, Any]:
+def _commit_state_from_state(
+    tx_state: Any, active_tx: Mapping[str, Any]
+) -> Dict[str, Any]:
+    state = _as_dict(tx_state)
+    commit_state = state.get("commit_state")
+    if isinstance(commit_state, dict):
+        return dict(commit_state)
     return _as_dict(active_tx.get("commit_state"))
 
 
@@ -112,19 +124,21 @@ def _integrity_from_state(tx_state: Any) -> Dict[str, Any]:
 
 
 def _resolved_status_phase_next_action(
+    tx_state: Any,
     active_tx: Mapping[str, Any],
     *,
     canonical_status: Any = None,
     canonical_phase: Any = None,
     next_action: Any = None,
 ) -> tuple[str, str, str]:
-    tx_status = _clean_str(canonical_status) or _clean_str(active_tx.get("status"))
-    tx_phase = (
-        _clean_str(canonical_phase) or _clean_str(active_tx.get("phase")) or tx_status
-    )
+    state = _as_dict(tx_state)
+    tx_status = _clean_str(canonical_status) or _clean_str(state.get("status"))
     resolved_next_action = _clean_str(next_action) or _clean_str(
-        active_tx.get("next_action")
+        state.get("next_action")
     )
+    tx_phase = _clean_str(canonical_phase) or tx_status
+    if not tx_phase and not resolved_next_action:
+        tx_phase = _clean_str(active_tx.get("phase"))
     return tx_status, tx_phase, resolved_next_action
 
 
@@ -146,12 +160,14 @@ def derive_workflow_guidance(
     active_tx_id: Any = None,
     active_ticket_id: Any = None,
 ) -> Dict[str, Any]:
-    active_tx = _active_tx_from_state(tx_state)
-    integrity = _integrity_from_state(tx_state)
-    verify_state = _verify_state_from_active_tx(active_tx)
-    commit_state = _commit_state_from_active_tx(active_tx)
+    state = _as_dict(tx_state)
+    active_tx = _active_tx_from_state(state)
+    integrity = _integrity_from_state(state)
+    verify_state = _verify_state_from_state(state, active_tx)
+    commit_state = _commit_state_from_state(state, active_tx)
 
     tx_status, tx_phase, resolved_next_action = _resolved_status_phase_next_action(
+        state,
         active_tx,
         canonical_status=canonical_status,
         canonical_phase=canonical_phase,
@@ -160,9 +176,7 @@ def derive_workflow_guidance(
 
     resolved_terminal = _clean_bool(terminal)
     if resolved_terminal is None:
-        resolved_terminal = (
-            tx_status in TERMINAL_STATUSES or tx_phase in TERMINAL_STATUSES
-        )
+        resolved_terminal = tx_status in TERMINAL_STATUSES
 
     resolved_followup_tool = _clean_optional_str(followup_tool)
     if resolved_followup_tool is None and resolved_next_action in END_TASK_ACTIONS:
@@ -181,7 +195,7 @@ def derive_workflow_guidance(
     resolved_active_ticket_id = _clean_optional_str(active_ticket_id)
     if resolved_active_ticket_id is None:
         candidate = _clean_str(active_tx.get("ticket_id"))
-        if candidate and candidate != "none":
+        if candidate:
             resolved_active_ticket_id = candidate
 
     resolved_current_step = _clean_optional_str(current_step)
@@ -203,7 +217,7 @@ def derive_workflow_guidance(
         elif integrity:
             resolved_integrity_status = "ok"
 
-    has_active_tx = bool(resolved_active_tx_id)
+    has_active_tx = bool(active_tx) and resolved_active_tx_id is not None
 
     resolved_resume_required = _clean_bool(resume_required)
     if resolved_resume_required is None:
