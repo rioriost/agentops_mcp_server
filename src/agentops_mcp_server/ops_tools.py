@@ -1311,11 +1311,15 @@ class OpsTools:
                 else {}
             )
             active_phase = active_tx.get("phase")
+            active_status = active_tx.get("status")
             commit_passed = commit_state.get("status") == "passed"
             committed_phase = (
                 isinstance(active_phase, str) and active_phase.strip() == "committed"
             )
-            if not (commit_passed or committed_phase):
+            committed_status = (
+                isinstance(active_status, str) and active_status.strip() == "committed"
+            )
+            if not (commit_passed or committed_phase or committed_status):
                 raise ValueError(
                     "cannot mark task done before commit is finished; "
                     "complete commit workflow first"
