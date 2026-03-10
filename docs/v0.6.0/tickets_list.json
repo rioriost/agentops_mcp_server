@@ -20,19 +20,19 @@
         {
           "ticket_id": "p0-t01",
           "title": "Review all Python files under src and build an implementation map",
-          "status": "planned",
+          "status": "done",
           "path": "docs/v0.6.0/p0-t01.json"
         },
         {
           "ticket_id": "p0-t02",
           "title": "Map persistence artifacts and their read/write code paths",
-          "status": "planned",
+          "status": "done",
           "path": "docs/v0.6.0/p0-t02.json"
         },
         {
           "ticket_id": "p0-t03",
           "title": "Map begin, resume, and active-transaction selection code paths",
-          "status": "planned",
+          "status": "done",
           "path": "docs/v0.6.0/p0-t03.json"
         }
       ]
@@ -166,7 +166,7 @@
       "ticket_id": "p0-t01",
       "phase_id": "p0",
       "title": "Review all Python files under src and build an implementation map",
-      "status": "planned",
+      "status": "done",
       "path": "docs/v0.6.0/p0-t01.json",
       "plan_sections": [
         "Objectives",
@@ -180,7 +180,7 @@
       "ticket_id": "p0-t02",
       "phase_id": "p0",
       "title": "Map persistence artifacts and their read/write code paths",
-      "status": "planned",
+      "status": "done",
       "path": "docs/v0.6.0/p0-t02.json",
       "plan_sections": [
         "Persistence Model",
@@ -193,7 +193,7 @@
       "ticket_id": "p0-t03",
       "phase_id": "p0",
       "title": "Map begin, resume, and active-transaction selection code paths",
-      "status": "planned",
+      "status": "done",
       "path": "docs/v0.6.0/p0-t03.json",
       "plan_sections": [
         "Canonical Invariants",

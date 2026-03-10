@@ -2,7 +2,7 @@
   "ticket_id": "p0-t02",
   "phase_id": "p0",
   "title": "Map persistence artifacts and their read/write code paths",
-  "status": "planned",
+  "status": "done",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Persistence Model",
@@ -62,17 +62,8 @@
     "Known mismatches between current persistence behavior and the 0.6.0 plan are called out explicitly.",
     "The output is detailed enough that later tickets can identify which files to change without redoing the persistence survey."
   ],
-  "dependencies": [
-    "p0-t01"
-  ],
-  "enables": [
-    "p1-t02",
-    "p2-t01",
-    "p2-t03",
-    "p2-t04",
-    "p2-t08",
-    "p3-t04"
-  ],
+  "dependencies": ["p0-t01"],
+  "enables": ["p1-t02", "p2-t01", "p2-t03", "p2-t04", "p2-t08", "p3-t04"],
   "notes": [
     "Treat materialized state, event history, and issuance metadata as distinct concerns even when handled in the same module.",
     "Pay special attention to defaulting behavior for missing versus malformed artifacts.",

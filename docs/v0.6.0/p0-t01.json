@@ -2,7 +2,7 @@
   "ticket_id": "p0-t01",
   "phase_id": "p0",
   "title": "Review all Python files under src and build an implementation map",
-  "status": "planned",
+  "status": "done",
   "goal": "Review every Python file under `src/` and create a codebase map that explains each file's role, major symbols, protocol responsibilities, and likely impact on the 0.6.0 redesign.",
   "why_this_ticket_exists": "The 0.6.0 redesign changes transaction identity, continuation semantics, persistence behavior, and resume logic across multiple parts of the runtime. A complete implementation map is needed before later tickets can safely identify exact modification targets without drifting from the plan.",
   "scope": [
@@ -34,10 +34,7 @@
     "Compatibility Policy",
     "Implementation Strategy"
   ],
-  "inputs": [
-    "docs/v0.6.0/plan.md",
-    "src/**/*.py"
-  ],
+  "inputs": ["docs/v0.6.0/plan.md", "src/**/*.py"],
   "tasks": [
     "Enumerate all Python files under `src/`.",
     "Read each file and summarize its responsibility in 1-3 lines.",
