@@ -6,6 +6,7 @@ from typing import Optional
 CANONICAL_ARTIFACT_FILES = {
     "tx_event_log": "tx_event_log.jsonl",
     "tx_state": "tx_state.json",
+    "tx_id_counter": "tx_id_counter.json",
 }
 
 DERIVED_ARTIFACT_FILES = {
@@ -36,6 +37,7 @@ class RepoContext:
         self.observability: Optional[Path] = None
         self.tx_event_log: Optional[Path] = None
         self.tx_state: Optional[Path] = None
+        self.tx_id_counter: Optional[Path] = None
         self.errors: Optional[Path] = None
         self.verify: Optional[Path] = None
 
@@ -117,6 +119,7 @@ class RepoContext:
         self.observability = self.state_artifact_path("observability", root)
         self.tx_event_log = self.state_artifact_path("tx_event_log", root)
         self.tx_state = self.state_artifact_path("tx_state", root)
+        self.tx_id_counter = self.state_artifact_path("tx_id_counter", root)
         self.errors = self.state_artifact_path("errors", root)
         self.verify = root / ".zed" / "scripts" / "verify"
 

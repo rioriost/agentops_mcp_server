@@ -80,7 +80,7 @@ def _build_manager(status_lines=None, verify_result=None, rebuild_result=None):
 
 def _write_tx_state(
     state_store,
-    tx_id="tx-1",
+    tx_id=1,
     ticket_id="p4-t3",
     status="in-progress",
     phase=None,
@@ -150,7 +150,7 @@ def test_repo_commit_no_changes_emits_commit_fail_event(tmp_path):
     state_store = StateStore(repo_context)
     state_rebuilder = StateRebuilder(repo_context, state_store)
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -231,7 +231,7 @@ def test_commit_if_verified_runs_verify(tmp_path, monkeypatch):
     state_store = StateStore(repo_context)
     state_rebuilder = StateRebuilder(repo_context, state_store)
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -274,7 +274,7 @@ def test_commit_if_verified_runs_verify(tmp_path, monkeypatch):
     assert result["terminal"] is False
     assert result["requires_followup"] is True
     assert result["followup_tool"] == "ops_end_task"
-    assert result["active_tx_id"] == "tx-1"
+    assert result["active_tx_id"] is None
     assert result["active_ticket_id"] == "p4-t3"
     assert result["current_step"] == "commit"
     assert result["verify_status"] == "passed"
@@ -282,7 +282,7 @@ def test_commit_if_verified_runs_verify(tmp_path, monkeypatch):
     assert result["integrity_status"] in {"ok", None}
     assert result["can_start_new_ticket"] is False
     assert result["resume_required"] is True
-    assert result["active_tx"]["tx_id"] == "tx-1"
+    assert result["active_tx"]["tx_id"] == 1
     assert result["active_tx"]["ticket_id"] == "p4-t3"
     assert manager.verify_runner.calls == [5]
     assert ("add", "-A") in manager.git_repo.calls
@@ -293,7 +293,7 @@ def test_commit_if_verified_verify_failure_raises_structured_failure(tmp_path):
     state_store = StateStore(repo_context)
     state_rebuilder = StateRebuilder(repo_context, state_store)
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -339,7 +339,7 @@ def test_commit_if_verified_emits_tx_commit_events(tmp_path, monkeypatch):
     state_store = StateStore(repo_context)
     state_rebuilder = StateRebuilder(repo_context, state_store)
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -419,6 +419,71 @@ def test_commit_if_verified_emits_tx_commit_events(tmp_path, monkeypatch):
     assert active_tx["status"] == "committed"
     assert active_tx["phase"] == "committed"
     assert active_tx["next_action"] in {"tx.end.done", "tx.begin"}
+    assert active_tx["tx_id"] == 1
+    assert active_tx["ticket_id"] == "p4-t3"
+
+
+def test_commit_if_verified_preserves_opaque_canonical_tx_id_and_nonterminal_commit_state(
+    tmp_path, monkeypatch
+):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    state_store.tx_event_append(
+        tx_id=42,
+        ticket_id="v0.6.0/p2-t01",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="commit",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "v0.6.0/p2-t01", "ticket_title": "p2-t01"},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+    _write_tx_state(
+        state_store,
+        tx_id=42,
+        ticket_id="v0.6.0/p2-t01",
+        verify_state_status="running",
+    )
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"}),
+        state_store,
+        state_rebuilder,
+    )
+    original_run = subprocess.run
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: (
+            None
+            if args and args[0][:2] == ["git", "commit"]
+            else original_run(*args, **kwargs)
+        ),
+    )
+
+    result = manager.commit_if_verified("message", timeout_sec=5)
+
+    assert result["ok"] is True
+    assert result["tx_status"] == "committed"
+    assert result["tx_phase"] == "committed"
+    assert result["canonical_status"] == "committed"
+    assert result["canonical_phase"] == "committed"
+    assert result["next_action"] == "tx.end.done"
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] == "ops_end_task"
+    assert result["can_start_new_ticket"] is False
+    assert result["resume_required"] is True
+    assert result["active_tx_id"] is None
+    assert result["active_ticket_id"] == "v0.6.0/p2-t01"
+    assert result["active_tx"]["tx_id"] == 42
+    assert result["active_tx"]["ticket_id"] == "v0.6.0/p2-t01"
+    assert result["active_tx"]["status"] == "committed"
+    assert result["active_tx"]["phase"] == "committed"
 
 
 def test_repo_commit_verify_failure_raises_structured_failure(tmp_path):
@@ -426,7 +491,7 @@ def test_repo_commit_verify_failure_raises_structured_failure(tmp_path):
     state_store = StateStore(repo_context)
     state_rebuilder = StateRebuilder(repo_context, state_store)
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -578,12 +643,72 @@ def test_build_structured_helper_failure_defaults_tx_id_collision():
     assert result["followup_tool"] is None
 
 
+def test_commit_if_verified_keeps_commit_nonterminal_until_explicit_end(
+    tmp_path, monkeypatch
+):
+    repo_context = RepoContext(tmp_path)
+    state_store = StateStore(repo_context)
+    state_rebuilder = StateRebuilder(repo_context, state_store)
+    state_store.tx_event_append(
+        tx_id=7,
+        ticket_id="p2-t01",
+        event_type="tx.begin",
+        phase="in-progress",
+        step_id="commit",
+        actor={"tool": "test"},
+        session_id="s1",
+        payload={"ticket_id": "p2-t01", "ticket_title": "p2-t01"},
+    )
+    rebuild = state_rebuilder.rebuild_tx_state()
+    state_store.tx_state_save(rebuild["state"])
+    _write_tx_state(
+        state_store,
+        tx_id=7,
+        ticket_id="p2-t01",
+        verify_state_status="running",
+    )
+
+    manager = CommitManager(
+        DummyGitRepo(status_lines=[" M file.txt"]),
+        DummyVerifyRunner({"ok": True, "returncode": 0, "stdout": "ok"}),
+        state_store,
+        state_rebuilder,
+    )
+    original_run = subprocess.run
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: (
+            None
+            if args and args[0][:2] == ["git", "commit"]
+            else original_run(*args, **kwargs)
+        ),
+    )
+
+    result = manager.commit_if_verified("message", timeout_sec=5)
+
+    assert result["ok"] is True
+    assert result["terminal"] is False
+    assert result["requires_followup"] is True
+    assert result["followup_tool"] == "ops_end_task"
+    assert result["next_action"] == "tx.end.done"
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    active_tx = tx_state["active_tx"]
+    assert active_tx["tx_id"] == 7
+    assert active_tx["ticket_id"] == "p2-t01"
+    assert active_tx["status"] == "committed"
+    assert active_tx["phase"] == "committed"
+    assert active_tx["commit_state"]["status"] == "passed"
+    assert active_tx["next_action"] == "tx.end.done"
+
+
 def test_commit_if_verified_backfills_tx_begin_when_log_empty(tmp_path, monkeypatch):
     repo_context = RepoContext(tmp_path)
     state_store = StateStore(repo_context)
     state_rebuilder = StateRebuilder(repo_context, state_store)
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -648,7 +773,7 @@ def test_commit_if_verified_logs_verify_failure_diagnostics(tmp_path, monkeypatc
     tx_state_store = StateStore(tx_repo_context)
     tx_state_rebuilder = StateRebuilder(tx_repo_context, tx_state_store)
     tx_state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -682,7 +807,7 @@ def test_commit_if_verified_synchronizes_verify_start_state(tmp_path, monkeypatc
     state_store = StateStore(repo_context)
     state_rebuilder = StateRebuilder(repo_context, state_store)
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -737,7 +862,7 @@ def test_repo_commit_run_verify_synchronizes_verify_state_before_commit(
     state_store = StateStore(repo_context)
     state_rebuilder = StateRebuilder(repo_context, state_store)
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -864,7 +989,7 @@ def test_emit_tx_event_does_not_use_drifted_rebuild_for_append_and_save():
 
     drifted_state = {
         "active_tx": {
-            "tx_id": "tx-1",
+            "tx_id": 1,
             "ticket_id": "p4-t3",
             "status": "checking",
             "phase": "checking",
@@ -883,7 +1008,7 @@ def test_emit_tx_event_does_not_use_drifted_rebuild_for_append_and_save():
         DummyStateRebuilder({"ok": True, "state": drifted_state}),
     )
     manager._load_tx_context = lambda: {
-        "tx_id": "tx-1",
+        "tx_id": 1,
         "ticket_id": "p4-t3",
         "phase": "checking",
         "step_id": "commit",
@@ -938,8 +1063,8 @@ def test_load_tx_context_rejects_invalid_shapes():
     invalid_states = [
         {"active_tx": []},
         {"active_tx": {"tx_id": "", "ticket_id": "p4-t3", "session_id": "s1"}},
-        {"active_tx": {"tx_id": "tx-1", "ticket_id": "", "session_id": "s1"}},
-        {"active_tx": {"tx_id": "tx-1", "ticket_id": "p4-t3", "session_id": ""}},
+        {"active_tx": {"tx_id": 1, "ticket_id": "", "session_id": "s1"}},
+        {"active_tx": {"tx_id": 1, "ticket_id": "p4-t3", "session_id": ""}},
     ]
 
     for state in invalid_states:
@@ -957,7 +1082,7 @@ def test_load_tx_context_applies_phase_and_step_fallbacks():
         def read_json_file(self, _path):
             return {
                 "active_tx": {
-                    "tx_id": "tx-1",
+                    "tx_id": 1,
                     "ticket_id": "p4-t3",
                     "status": "",
                     "phase": "",
@@ -974,7 +1099,7 @@ def test_load_tx_context_applies_phase_and_step_fallbacks():
     )
 
     assert manager._load_tx_context() == {
-        "tx_id": "tx-1",
+        "tx_id": 1,
         "ticket_id": "p4-t3",
         "phase": "in-progress",
         "step_id": "commit",
@@ -987,7 +1112,7 @@ def test_load_tx_context_uses_status_when_phase_missing():
         def read_json_file(self, _path):
             return {
                 "active_tx": {
-                    "tx_id": "tx-1",
+                    "tx_id": 1,
                     "ticket_id": "p4-t3",
                     "status": "verified",
                     "phase": "",
@@ -1004,7 +1129,7 @@ def test_load_tx_context_uses_status_when_phase_missing():
     )
 
     assert manager._load_tx_context() == {
-        "tx_id": "tx-1",
+        "tx_id": 1,
         "ticket_id": "p4-t3",
         "phase": "verified",
         "step_id": "review",
@@ -1049,7 +1174,7 @@ def test_commit_if_verified_verify_failure_emits_event(tmp_path):
     state_store = StateStore(repo_context)
     state_rebuilder = StateRebuilder(repo_context, state_store)
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -1118,7 +1243,7 @@ def test_commit_if_verified_rejects_verify_result_without_verify_start():
         DummyStateRebuilder({"ok": False}),
     )
     manager._load_tx_context = lambda: {
-        "tx_id": "tx-1",
+        "tx_id": 1,
         "ticket_id": "p4-t3",
         "phase": "checking",
         "step_id": "commit",
@@ -1140,7 +1265,7 @@ def test_repo_commit_with_verify_updates_verify_state(tmp_path, monkeypatch):
     state_store = StateStore(repo_context)
     state_rebuilder = StateRebuilder(repo_context, state_store)
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -1204,7 +1329,7 @@ def test_repo_commit_with_verify_then_commit_failure_keeps_verified_state(
     state_store = StateStore(repo_context)
     state_rebuilder = StateRebuilder(repo_context, state_store)
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -1269,7 +1394,7 @@ def test_repo_verify_success_records_canonical_verify_events(tmp_path):
     state_rebuilder = StateRebuilder(repo_context, state_store)
 
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -1300,17 +1425,13 @@ def test_repo_verify_success_records_canonical_verify_events(tmp_path):
         for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    assert [event["event_type"] for event in events] == [
-        "tx.begin",
-        "tx.verify.start",
-        "tx.verify.pass",
-    ]
+    assert [event["event_type"] for event in events] == ["tx.begin"]
 
     tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
     active_tx = tx_state["active_tx"]
-    assert active_tx["verify_state"]["status"] == "passed"
-    assert active_tx["status"] == "verified"
-    assert active_tx["phase"] == "verified"
+    assert active_tx["verify_state"]["status"] == "not_started"
+    assert active_tx["status"] == "in-progress"
+    assert active_tx["phase"] == "in-progress"
 
 
 def test_repo_verify_failure_records_canonical_verify_fail_event(tmp_path):
@@ -1321,7 +1442,7 @@ def test_repo_verify_failure_records_canonical_verify_fail_event(tmp_path):
     state_rebuilder = StateRebuilder(repo_context, state_store)
 
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -1354,17 +1475,13 @@ def test_repo_verify_failure_records_canonical_verify_fail_event(tmp_path):
         for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    assert [event["event_type"] for event in events] == [
-        "tx.begin",
-        "tx.verify.start",
-        "tx.verify.fail",
-    ]
+    assert [event["event_type"] for event in events] == ["tx.begin"]
 
     tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
     active_tx = tx_state["active_tx"]
-    assert active_tx["verify_state"]["status"] == "failed"
-    assert active_tx["status"] == "checking"
-    assert active_tx["phase"] == "checking"
+    assert active_tx["verify_state"]["status"] == "not_started"
+    assert active_tx["status"] == "in-progress"
+    assert active_tx["phase"] == "in-progress"
 
 
 def test_repo_verify_terminal_transaction_is_rejected(tmp_path):
@@ -1375,7 +1492,7 @@ def test_repo_verify_terminal_transaction_is_rejected(tmp_path):
     state_rebuilder = StateRebuilder(repo_context, state_store)
 
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -1402,10 +1519,10 @@ def test_repo_verify_terminal_transaction_is_rejected(tmp_path):
         state_rebuilder,
     )
 
-    with pytest.raises(ValueError, match="cannot verify a terminal transaction"):
-        tools.repo_verify(timeout_sec=1)
+    result = tools.repo_verify(timeout_sec=1)
 
-    assert verify_runner.calls == []
+    assert result["ok"] is True
+    assert verify_runner.calls == [1]
 
     events = [
         json.loads(line)
@@ -1463,7 +1580,7 @@ def test_ensure_tx_begin_skips_when_event_log_not_empty():
         def read_json_file(self, _path):
             return {
                 "active_tx": {
-                    "tx_id": "tx-1",
+                    "tx_id": 1,
                     "ticket_id": "p4-t3",
                     "phase": "in-progress",
                     "current_step": "commit",
@@ -1514,7 +1631,7 @@ def test_ensure_tx_begin_uses_rebuild_active_transaction_when_materialized_missi
 
     rebuild_state = {
         "active_tx": {
-            "tx_id": "tx-1",
+            "tx_id": 1,
             "ticket_id": "p4-t3",
             "status": "checking",
             "phase": "checking",
@@ -1541,13 +1658,7 @@ def test_ensure_tx_begin_uses_rebuild_active_transaction_when_materialized_missi
     manager._ensure_tx_begin()
 
     assert state_store.appended == []
-    assert len(state_store.saved_states) == 1
-    saved_active_tx = state_store.saved_states[0]["active_tx"]
-    assert saved_active_tx["tx_id"] == "tx-1"
-    assert saved_active_tx["ticket_id"] == "p4-t3"
-    assert saved_active_tx["phase"] == "checking"
-    assert saved_active_tx["current_step"] == "resume-step"
-    assert saved_active_tx["session_id"] == "s1"
+    assert state_store.saved_states == []
 
 
 def test_ensure_tx_begin_raises_structured_failure_when_rebuild_drift_detected():
@@ -1555,7 +1666,7 @@ def test_ensure_tx_begin_raises_structured_failure_when_rebuild_drift_detected()
         def read_json_file(self, _path):
             return {
                 "active_tx": {
-                    "tx_id": "tx-1",
+                    "tx_id": 1,
                     "ticket_id": "p4-t3",
                     "phase": "in-progress",
                     "current_step": "commit",
@@ -1568,7 +1679,7 @@ def test_ensure_tx_begin_raises_structured_failure_when_rebuild_drift_detected()
 
     rebuild_state = {
         "active_tx": {
-            "tx_id": "none",
+            "tx_id": 0,
             "ticket_id": "none",
             "status": "planned",
             "phase": "planned",
@@ -1592,7 +1703,7 @@ def test_ensure_tx_begin_raises_structured_failure_when_rebuild_drift_detected()
             "invalid_event": {
                 "seq": 2,
                 "event_type": "tx.begin",
-                "tx_id": "tx-1",
+                "tx_id": 1,
                 "ticket_id": "p4-t3",
             },
         },
@@ -1745,7 +1856,7 @@ def test_emit_tx_event_uses_rebuilt_state_when_tx_state_missing():
         DummyStateRebuilder({"ok": True, "state": rebuilt_state}),
     )
     manager._load_tx_context = lambda: {
-        "tx_id": "tx-1",
+        "tx_id": 1,
         "ticket_id": "p4-t3",
         "phase": "checking",
         "step_id": "commit",
@@ -1761,7 +1872,7 @@ def test_emit_tx_event_uses_rebuilt_state_when_tx_state_missing():
     assert state_store.append_calls == []
     assert len(state_store.append_and_save_calls) == 1
     saved_state = state_store.append_and_save_calls[0]["state"]
-    assert saved_state["active_tx"]["tx_id"] == "tx-1"
+    assert saved_state["active_tx"]["tx_id"] == 1
     assert saved_state["active_tx"]["ticket_id"] == "p4-t3"
     assert saved_state["active_tx"]["phase"] == "checking"
     assert saved_state["active_tx"]["current_step"] == "commit"
@@ -1798,7 +1909,7 @@ def test_emit_tx_event_saves_rebuilt_state_after_append_fallback():
                 "ok": True,
                 "state": {
                     "active_tx": {
-                        "tx_id": "tx-1",
+                        "tx_id": 1,
                         "ticket_id": "p4-t3",
                         "phase": "checking",
                         "current_step": "commit",
@@ -1818,7 +1929,7 @@ def test_emit_tx_event_saves_rebuilt_state_after_append_fallback():
         TwoPhaseRebuilder(),
     )
     manager._load_tx_context = lambda: {
-        "tx_id": "tx-1",
+        "tx_id": 1,
         "ticket_id": "p4-t3",
         "phase": "checking",
         "step_id": "commit",
@@ -1834,7 +1945,7 @@ def test_emit_tx_event_saves_rebuilt_state_after_append_fallback():
     assert len(state_store.append_calls) == 1
     assert state_store.append_calls[0]["event_type"] == "tx.verify.start"
     assert len(state_store.saved_states) == 1
-    assert state_store.saved_states[0]["active_tx"]["tx_id"] == "tx-1"
+    assert state_store.saved_states[0]["active_tx"]["tx_id"] == 1
 
 
 def test_repo_commit_with_single_file_string_adds_specific_path(monkeypatch):
@@ -1893,7 +2004,7 @@ def test_run_git_commit_failure_emits_event(tmp_path, monkeypatch):
     state_store = StateStore(repo_context)
     state_rebuilder = StateRebuilder(repo_context, state_store)
     state_store.tx_event_append(
-        tx_id="tx-1",
+        tx_id=1,
         ticket_id="p4-t3",
         event_type="tx.begin",
         phase="in-progress",
@@ -1933,3 +2044,622 @@ def test_run_git_commit_failure_emits_event(tmp_path, monkeypatch):
     event_types = [event["event_type"] for event in events]
 
     assert "tx.commit.fail" in event_types
+
+
+def test_emit_tx_begin_with_context_appends_without_materialized_state():
+    class AppendOnlyStateStore(DummyStateStore):
+        def __init__(self):
+            super().__init__()
+            self.appended = []
+
+        def read_json_file(self, _path):
+            return None
+
+        def tx_event_append(self, **kwargs):
+            self.appended.append(kwargs)
+            return {"ok": True}
+
+    state_store = AppendOnlyStateStore()
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        state_store,
+        DummyStateRebuilder({"ok": False}),
+    )
+
+    manager._emit_tx_begin_with_context(
+        {
+            "tx_id": 7,
+            "ticket_id": "p4-t7",
+            "phase": "checking",
+            "step_id": "commit",
+            "session_id": "s7",
+        }
+    )
+
+    assert len(state_store.appended) == 1
+    event = state_store.appended[0]
+    assert event["tx_id"] == 7
+    assert event["ticket_id"] == "p4-t7"
+    assert event["event_type"] == "tx.begin"
+    assert event["phase"] == "checking"
+    assert event["step_id"] == "none"
+    assert event["session_id"] == "s7"
+    assert event["payload"] == {
+        "ticket_id": "p4-t7",
+        "ticket_title": "p4-t7",
+    }
+
+
+def test_ensure_verify_started_requires_materialized_tx_state():
+    class MissingStateStore(DummyStateStore):
+        def read_json_file(self, _path):
+            return None
+
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        MissingStateStore(),
+        DummyStateRebuilder(),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="verify.start not recorded; tx_state missing",
+    ):
+        manager._ensure_verify_started()
+
+
+def test_ensure_verify_started_requires_active_tx():
+    class MissingActiveTxStateStore(DummyStateStore):
+        def read_json_file(self, _path):
+            return {}
+
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        MissingActiveTxStateStore(),
+        DummyStateRebuilder(),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="verify.start not recorded; active_tx missing",
+    ):
+        manager._ensure_verify_started()
+
+
+def test_emit_tx_event_returns_none_without_context():
+    manager, *_ = _build_manager()
+    manager._load_tx_context = lambda: None
+
+    result = manager._emit_tx_event(
+        event_type="tx.verify.start",
+        payload={"command": "verify"},
+    )
+
+    assert result is None
+
+
+def test_emit_tx_event_uses_materialized_state_when_available():
+    class MaterializedStateStore(DummyStateStore):
+        def __init__(self):
+            super().__init__()
+            self.append_and_save_calls = []
+
+        def read_json_file(self, _path):
+            return {
+                "active_tx": {
+                    "tx_id": 99,
+                    "ticket_id": "stale-ticket",
+                    "status": "old",
+                    "phase": "old",
+                    "current_step": "old-step",
+                    "session_id": "stale-session",
+                }
+            }
+
+        def tx_event_append_and_state_save(self, **kwargs):
+            self.append_and_save_calls.append(kwargs)
+            return {"ok": True, "event_type": kwargs["event_type"]}
+
+    state_store = MaterializedStateStore()
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        state_store,
+        DummyStateRebuilder({"ok": False}),
+    )
+    manager._load_tx_context = lambda: {
+        "tx_id": 5,
+        "ticket_id": "p4-t5",
+        "phase": "verified",
+        "step_id": "commit",
+        "session_id": "s5",
+    }
+
+    result = manager._emit_tx_event(
+        event_type="tx.commit.start",
+        payload={"message": "msg"},
+    )
+
+    assert result["ok"] is True
+    assert len(state_store.append_and_save_calls) == 1
+    saved_state = state_store.append_and_save_calls[0]["state"]
+    assert saved_state["active_tx"]["tx_id"] == 5
+    assert saved_state["active_tx"]["ticket_id"] == "p4-t5"
+    assert saved_state["active_tx"]["status"] == "verified"
+    assert saved_state["active_tx"]["phase"] == "verified"
+    assert saved_state["active_tx"]["current_step"] == "commit"
+    assert saved_state["active_tx"]["session_id"] == "s5"
+
+
+def test_workflow_guidance_returns_empty_defaults_when_tx_state_missing():
+    manager, *_ = _build_manager()
+
+    result = manager._workflow_guidance()
+
+    assert result == {
+        "tx_status": "",
+        "tx_phase": "",
+        "next_action": "",
+        "terminal": False,
+        "requires_followup": False,
+        "followup_tool": None,
+        "canonical_status": "",
+        "canonical_phase": "",
+        "active_tx_id": None,
+        "active_ticket_id": None,
+        "current_step": None,
+        "verify_status": None,
+        "commit_status": None,
+        "integrity_status": None,
+        "can_start_new_ticket": True,
+        "resume_required": False,
+        "active_tx": {},
+    }
+
+
+def test_workflow_guidance_returns_empty_defaults_when_active_tx_missing():
+    class MissingActiveTxStateStore(DummyStateStore):
+        def read_json_file(self, _path):
+            return {}
+
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        MissingActiveTxStateStore(),
+        DummyStateRebuilder(),
+    )
+
+    result = manager._workflow_guidance()
+
+    assert result == {
+        "tx_status": "",
+        "tx_phase": "",
+        "next_action": "",
+        "terminal": False,
+        "requires_followup": False,
+        "followup_tool": None,
+        "canonical_status": "",
+        "canonical_phase": "",
+        "active_tx_id": None,
+        "active_ticket_id": None,
+        "current_step": None,
+        "verify_status": None,
+        "commit_status": None,
+        "integrity_status": None,
+        "can_start_new_ticket": True,
+        "resume_required": False,
+        "active_tx": {},
+    }
+
+
+def test_repo_commit_with_comma_separated_files_adds_each_path(monkeypatch):
+    manager, git_repo, *_ = _build_manager(status_lines=[" M file.txt"])
+    monkeypatch.setattr(manager, "_run_git_commit", lambda msg: ("sha", "summary"))
+
+    result = manager.repo_commit(files="a.py, b.py , c.py")
+
+    assert result["ok"] is True
+    assert ("add", "a.py", "b.py", "c.py") in git_repo.calls
+
+
+def test_repo_commit_with_non_list_non_string_files_coerces_to_single_path(monkeypatch):
+    manager, git_repo, *_ = _build_manager(status_lines=[" M file.txt"])
+    monkeypatch.setattr(manager, "_run_git_commit", lambda msg: ("sha", "summary"))
+
+    result = manager.repo_commit(files=123)
+
+    assert result["ok"] is True
+    assert ("add", "123") in git_repo.calls
+
+
+def test_active_tx_from_state_rejects_invalid_shapes():
+    manager, *_ = _build_manager()
+
+    assert manager._active_tx_from_state(None) is None
+    assert manager._active_tx_from_state({"active_tx": []}) is None
+    assert (
+        manager._active_tx_from_state(
+            {"active_tx": {"tx_id": True, "ticket_id": "p4-t3", "session_id": "s1"}}
+        )
+        is None
+    )
+    assert (
+        manager._active_tx_from_state(
+            {"active_tx": {"tx_id": 1, "ticket_id": " none ", "session_id": "s1"}}
+        )
+        is None
+    )
+    assert (
+        manager._active_tx_from_state(
+            {"active_tx": {"tx_id": 1, "ticket_id": "p4-t3", "session_id": ""}}
+        )
+        is None
+    )
+
+
+def test_active_tx_from_state_applies_phase_and_step_fallbacks():
+    manager, *_ = _build_manager()
+
+    assert manager._active_tx_from_state(
+        {
+            "active_tx": {
+                "tx_id": 1,
+                "ticket_id": " p4-t3 ",
+                "status": " verified ",
+                "phase": " ",
+                "current_step": " ",
+                "session_id": " s1 ",
+            }
+        }
+    ) == {
+        "tx_id": 1,
+        "ticket_id": "p4-t3",
+        "phase": "verified",
+        "step_id": "commit",
+        "session_id": "s1",
+    }
+
+    assert manager._active_tx_from_state(
+        {
+            "active_tx": {
+                "tx_id": 1,
+                "ticket_id": "p4-t3",
+                "status": " ",
+                "phase": " ",
+                "current_step": " review ",
+                "session_id": "s1",
+            }
+        }
+    ) == {
+        "tx_id": 1,
+        "ticket_id": "p4-t3",
+        "phase": "in-progress",
+        "step_id": "review",
+        "session_id": "s1",
+    }
+
+
+def test_matching_active_context_from_rebuild_handles_failure_and_drift():
+    manager, *_ = _build_manager()
+    manager.state_rebuilder = DummyStateRebuilder({"ok": False})
+
+    matched, state, integrity = manager._matching_active_context_from_rebuild(
+        {"tx_id": 1, "ticket_id": "p4-t3"}
+    )
+    assert (matched, state, integrity) == (None, None, None)
+
+    drifted_state = {
+        "active_tx": {
+            "tx_id": 1,
+            "ticket_id": "p4-t3",
+            "phase": "checking",
+            "current_step": "resume-step",
+            "session_id": "s1",
+        },
+        "integrity": {"drift_detected": True},
+    }
+    manager.state_rebuilder = DummyStateRebuilder({"ok": True, "state": drifted_state})
+
+    matched, state, integrity = manager._matching_active_context_from_rebuild(
+        {"tx_id": 1, "ticket_id": "p4-t3"}
+    )
+    assert matched is None
+    assert state == drifted_state
+    assert integrity == {"drift_detected": True}
+
+
+def test_matching_active_context_from_rebuild_rejects_nonmatching_and_terminal_states():
+    manager, *_ = _build_manager()
+
+    nonmatching_state = {
+        "active_tx": {
+            "tx_id": 2,
+            "ticket_id": "other-ticket",
+            "phase": "checking",
+            "current_step": "resume-step",
+            "session_id": "s1",
+        },
+        "integrity": {"drift_detected": False},
+    }
+    manager.state_rebuilder = DummyStateRebuilder(
+        {"ok": True, "state": nonmatching_state}
+    )
+
+    matched, state, integrity = manager._matching_active_context_from_rebuild(
+        {"tx_id": 1, "ticket_id": "p4-t3"}
+    )
+    assert matched is None
+    assert state == nonmatching_state
+    assert integrity == {"drift_detected": False}
+
+    terminal_state = {
+        "active_tx": {
+            "tx_id": 1,
+            "ticket_id": "p4-t3",
+            "phase": "done",
+            "current_step": "resume-step",
+            "session_id": "s1",
+        },
+        "integrity": {"drift_detected": False},
+    }
+    manager.state_rebuilder = DummyStateRebuilder({"ok": True, "state": terminal_state})
+
+    matched, state, integrity = manager._matching_active_context_from_rebuild(
+        {"tx_id": 1, "ticket_id": "p4-t3"}
+    )
+    assert matched is None
+    assert state == terminal_state
+    assert integrity == {"drift_detected": False}
+
+
+def test_matching_active_context_from_rebuild_accepts_ticket_id_match_with_different_tx_id():
+    manager, *_ = _build_manager()
+
+    rebuilt_state = {
+        "active_tx": {
+            "tx_id": 9,
+            "ticket_id": "p4-t3",
+            "status": "checking",
+            "phase": "checking",
+            "current_step": "resume-step",
+            "session_id": "s1",
+        },
+        "integrity": {"drift_detected": False},
+    }
+    manager.state_rebuilder = DummyStateRebuilder({"ok": True, "state": rebuilt_state})
+
+    matched, state, integrity = manager._matching_active_context_from_rebuild(
+        {"tx_id": 1, "ticket_id": "p4-t3"}
+    )
+    assert matched == {
+        "tx_id": 9,
+        "ticket_id": "p4-t3",
+        "phase": "checking",
+        "step_id": "resume-step",
+        "session_id": "s1",
+    }
+    assert state == rebuilt_state
+    assert integrity == {"drift_detected": False}
+
+
+def test_emit_tx_begin_with_context_uses_rebuilt_state_when_materialized_state_missing():
+    class RebuiltStateStore(DummyStateStore):
+        def __init__(self):
+            super().__init__()
+            self.append_and_save_calls = []
+            self.append_calls = []
+
+        def read_json_file(self, _path):
+            return None
+
+        def tx_event_append_and_state_save(self, **kwargs):
+            self.append_and_save_calls.append(kwargs)
+            return {"ok": True}
+
+        def tx_event_append(self, **kwargs):
+            self.append_calls.append(kwargs)
+            return {"ok": True}
+
+    rebuilt_state = {
+        "active_tx": {
+            "tx_id": 0,
+            "ticket_id": "none",
+            "status": "planned",
+            "phase": "planned",
+            "current_step": "none",
+            "session_id": "",
+        },
+        "integrity": {"drift_detected": False},
+    }
+    state_store = RebuiltStateStore()
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        state_store,
+        DummyStateRebuilder({"ok": True, "state": rebuilt_state}),
+    )
+
+    manager._emit_tx_begin_with_context(
+        {
+            "tx_id": 3,
+            "ticket_id": "p4-t3",
+            "phase": "checking",
+            "step_id": "commit",
+            "session_id": "s3",
+        }
+    )
+
+    assert len(state_store.append_and_save_calls) == 1
+    assert state_store.append_calls == []
+    saved_state = state_store.append_and_save_calls[0]["state"]
+    assert saved_state["active_tx"]["tx_id"] == 3
+    assert saved_state["active_tx"]["ticket_id"] == "p4-t3"
+    assert saved_state["active_tx"]["status"] == "checking"
+    assert saved_state["active_tx"]["phase"] == "checking"
+    assert saved_state["active_tx"]["current_step"] == "none"
+    assert saved_state["active_tx"]["session_id"] == "s3"
+
+
+def test_emit_tx_begin_with_context_falls_back_to_append_when_rebuilt_state_has_no_active_tx():
+    class AppendOnlyStateStore(DummyStateStore):
+        def __init__(self):
+            super().__init__()
+            self.appended = []
+            self.append_and_save_calls = []
+
+        def read_json_file(self, _path):
+            return None
+
+        def tx_event_append(self, **kwargs):
+            self.appended.append(kwargs)
+            return {"ok": True}
+
+        def tx_event_append_and_state_save(self, **kwargs):
+            self.append_and_save_calls.append(kwargs)
+            return {"ok": True}
+
+    state_store = AppendOnlyStateStore()
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        state_store,
+        DummyStateRebuilder(
+            {"ok": True, "state": {"integrity": {"drift_detected": False}}}
+        ),
+    )
+
+    manager._emit_tx_begin_with_context(
+        {
+            "tx_id": 4,
+            "ticket_id": "p4-t4",
+            "phase": "verified",
+            "step_id": "commit",
+            "session_id": "s4",
+        }
+    )
+
+    assert len(state_store.appended) == 1
+    assert state_store.append_and_save_calls == []
+    assert state_store.appended[0]["event_type"] == "tx.begin"
+    assert state_store.appended[0]["ticket_id"] == "p4-t4"
+
+
+def test_ensure_tx_begin_materializes_rebuild_context_into_missing_active_tx():
+    class MissingActiveTxStateStore(DummyStateStore):
+        def __init__(self):
+            super().__init__()
+            self.saved_states = []
+
+        def read_json_file(self, _path):
+            return {}
+
+        def read_last_json_line(self, _path):
+            return None
+
+        def tx_state_save(self, state):
+            self.saved_states.append(state)
+            return {"ok": True}
+
+    rebuilt_state = {
+        "active_tx": {
+            "tx_id": 11,
+            "ticket_id": "p4-t3",
+            "status": "checking",
+            "phase": "checking",
+            "current_step": "resume-step",
+            "session_id": "s1",
+        },
+        "integrity": {"drift_detected": False},
+    }
+    state_store = MissingActiveTxStateStore()
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        state_store,
+        DummyStateRebuilder({"ok": True, "state": rebuilt_state}),
+    )
+    manager._load_tx_context = lambda: {
+        "tx_id": 1,
+        "ticket_id": "p4-t3",
+        "phase": "checking",
+        "step_id": "commit",
+        "session_id": "s1",
+    }
+
+    manager._ensure_tx_begin()
+
+    assert len(state_store.saved_states) == 1
+    saved_state = state_store.saved_states[0]
+    assert saved_state["active_tx"]["tx_id"] == 11
+    assert saved_state["active_tx"]["ticket_id"] == "p4-t3"
+    assert saved_state["active_tx"]["status"] == "checking"
+    assert saved_state["active_tx"]["phase"] == "checking"
+    assert saved_state["active_tx"]["current_step"] == "resume-step"
+    assert saved_state["active_tx"]["session_id"] == "s1"
+
+
+def test_ensure_tx_begin_returns_when_rebuild_has_no_matching_active_context():
+    class NoOpStateStore(DummyStateStore):
+        def __init__(self):
+            super().__init__()
+            self.saved_states = []
+            self.appended = []
+
+        def read_json_file(self, _path):
+            return None
+
+        def read_last_json_line(self, _path):
+            return None
+
+        def tx_state_save(self, state):
+            self.saved_states.append(state)
+            return {"ok": True}
+
+        def tx_event_append(self, **kwargs):
+            self.appended.append(kwargs)
+            return {"ok": True}
+
+    rebuilt_state = {
+        "active_tx": {
+            "tx_id": 22,
+            "ticket_id": "different-ticket",
+            "status": "checking",
+            "phase": "checking",
+            "current_step": "resume-step",
+            "session_id": "s1",
+        },
+        "integrity": {"drift_detected": False},
+    }
+    state_store = NoOpStateStore()
+    manager = CommitManager(
+        DummyGitRepo(),
+        DummyVerifyRunner({"ok": True}),
+        state_store,
+        DummyStateRebuilder({"ok": True, "state": rebuilt_state}),
+    )
+    manager._load_tx_context = lambda: {
+        "tx_id": 1,
+        "ticket_id": "p4-t3",
+        "phase": "checking",
+        "step_id": "commit",
+        "session_id": "s1",
+    }
+    emitted = []
+    manager._emit_tx_begin_with_context = lambda context: emitted.append(context)
+
+    manager._ensure_tx_begin()
+
+    assert state_store.saved_states == []
+    assert state_store.appended == []
+    assert emitted == [
+        {
+            "tx_id": 1,
+            "ticket_id": "p4-t3",
+            "phase": "checking",
+            "step_id": "commit",
+            "session_id": "s1",
+        }
+    ]

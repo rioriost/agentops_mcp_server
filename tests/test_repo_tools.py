@@ -1499,6 +1499,7 @@ def test_ops_tools_helper_branches_cover_identifier_and_error_helpers():
         "tx_id": "",
         "ticket_id": "t-1",
         "canonical_id": "t-1",
+        "has_canonical_tx": False,
     }
 
     assert (

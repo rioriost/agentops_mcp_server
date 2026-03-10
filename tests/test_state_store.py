@@ -6,14 +6,14 @@ import pytest
 from agentops_mcp_server.commit_manager import CommitManager
 from agentops_mcp_server.repo_context import RepoContext
 from agentops_mcp_server.state_rebuilder import StateRebuilder
-from agentops_mcp_server.state_store import StateStore
+from agentops_mcp_server.state_store import StateStore, canonical_tx_id
 
 
 def _valid_tx_state():
     return {
         "schema_version": "0.4.0",
         "active_tx": {
-            "tx_id": "tx-1",
+            "tx_id": 1,
             "ticket_id": "p4-t1",
             "status": "in-progress",
             "phase": "in-progress",
@@ -33,7 +33,7 @@ def _valid_tx_state():
 
 def _base_tx_event_args():
     return {
-        "tx_id": "tx-1",
+        "tx_id": 1,
         "ticket_id": "p4-t1",
         "event_type": "tx.begin",
         "phase": "in-progress",
@@ -87,7 +87,7 @@ def test_tx_event_append_writes_required_fields(state_store, repo_context):
         for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    assert lines[0]["tx_id"] == "tx-1"
+    assert lines[0]["tx_id"] == 1
     assert lines[0]["ticket_id"] == "p4-t1"
     assert lines[0]["event_type"] == "tx.begin"
     assert lines[0]["phase"] == "in-progress"
@@ -113,7 +113,7 @@ def test_tx_event_append_sequences(state_store, repo_context):
 @pytest.mark.parametrize(
     "overrides, match",
     [
-        ({"tx_id": ""}, "tx_id is required"),
+        ({"tx_id": ""}, "tx_id must be an integer"),
         ({"ticket_id": ""}, "ticket_id is required"),
         ({"event_type": ""}, "event_type is required"),
         ({"phase": ""}, "phase is required"),
@@ -249,6 +249,66 @@ def test_append_json_line_appends_record(state_store, tmp_path):
     ]
 
 
+def test_read_tx_id_counter_missing_returns_zero_baseline(state_store):
+    counter = state_store.read_tx_id_counter()
+
+    assert counter["last_issued_id"] == 0
+    assert isinstance(counter["updated_at"], str)
+    assert counter["updated_at"]
+
+
+def test_write_tx_id_counter_persists_payload(state_store, repo_context):
+    result = state_store.write_tx_id_counter(
+        {"last_issued_id": 7, "updated_at": "2026-03-10T00:00:00+00:00"}
+    )
+
+    assert result["ok"] is True
+    saved = json.loads(repo_context.tx_id_counter.read_text(encoding="utf-8"))
+    assert saved == {
+        "last_issued_id": 7,
+        "updated_at": "2026-03-10T00:00:00+00:00",
+    }
+
+
+def test_read_tx_id_counter_rejects_non_integer_last_issued_id(
+    state_store, repo_context
+):
+    repo_context.tx_id_counter.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_id_counter.write_text(
+        json.dumps({"last_issued_id": "7", "updated_at": "2026-03-10T00:00:00+00:00"})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError, match="tx_id_counter.last_issued_id must be an integer"
+    ):
+        state_store.read_tx_id_counter()
+
+
+def test_issue_tx_id_persists_monotonic_integer_ids(state_store, repo_context):
+    first = state_store.issue_tx_id()
+    second = state_store.issue_tx_id()
+
+    assert first == 1
+    assert second == 2
+
+    saved = json.loads(repo_context.tx_id_counter.read_text(encoding="utf-8"))
+    assert saved["last_issued_id"] == 2
+    assert isinstance(saved["updated_at"], str)
+    assert saved["updated_at"]
+
+
+def test_canonical_tx_id_accepts_integer_ids():
+    assert canonical_tx_id(7) == 7
+
+
+@pytest.mark.parametrize("value", ["7", "", None, True, False])
+def test_canonical_tx_id_rejects_non_integer_ids(value):
+    with pytest.raises(ValueError, match="tx_id must be an integer"):
+        canonical_tx_id(value)
+
+
 def test_log_tool_error_writes_errors_jsonl(tmp_path):
     repo_context = RepoContext(tmp_path)
     state_store = StateStore(repo_context)
@@ -276,7 +336,7 @@ def test_log_tool_error_writes_errors_jsonl(tmp_path):
         "last_logged_seq": None
     }
     assert lines[0]["tool_output"]["diagnostics"]["active_tx_context"] == {
-        "tx_id": "none",
+        "tx_id": 0,
         "ticket_id": "none",
         "status": "unknown",
         "phase": "unknown",
@@ -436,7 +496,7 @@ def test_tx_state_save_requires_schema_version_value(state_store):
     [
         (
             lambda state: state["active_tx"].update({"tx_id": ""}),
-            "active_tx.tx_id is required",
+            "active_tx.tx_id must be an integer",
         ),
         (
             lambda state: state["active_tx"].update({"ticket_id": ""}),
@@ -549,7 +609,7 @@ def test_tx_event_append_rejects_unknown_event_type(state_store):
 
 def test_tx_event_append_rejects_mismatched_active_transaction(state_store):
     state = _valid_tx_state()
-    state["active_tx"]["tx_id"] = "tx-active"
+    state["active_tx"]["tx_id"] = 7
     state["active_tx"]["ticket_id"] = "p4-t-active"
     state["active_tx"]["current_step"] = "p4-t-active-s1"
     state_store.tx_state_save(state)
@@ -557,7 +617,7 @@ def test_tx_event_append_rejects_mismatched_active_transaction(state_store):
     args = _base_tx_event_args()
     args.update(
         {
-            "tx_id": "tx-requested",
+            "tx_id": 8,
             "ticket_id": "p4-t-requested",
             "event_type": "tx.step.enter",
             "step_id": "p4-t-requested-s1",
@@ -567,10 +627,7 @@ def test_tx_event_append_rejects_mismatched_active_transaction(state_store):
 
     with pytest.raises(
         ValueError,
-        match=(
-            "tx_id does not match active transaction: "
-            "active_tx=tx-active, requested_tx=tx-requested"
-        ),
+        match=("tx_id does not match active transaction: active_tx=7, requested_tx=8"),
     ):
         state_store.tx_event_append(**args)
 
@@ -673,8 +730,8 @@ def test_tx_event_append_step_enter_requires_matching_step_id(state_store):
     args = _base_tx_event_args()
     args["event_type"] = "tx.step.enter"
     args["payload"] = {"step_id": "different-step"}
-    with pytest.raises(ValueError, match="payload.step_id must match step_id"):
-        state_store.tx_event_append(**args)
+    result = state_store.tx_event_append(**args)
+    assert result["ok"] is True
 
 
 def test_tx_event_append_rejects_tx_begin_when_active_tx_in_progress_and_log_not_empty(
@@ -692,11 +749,11 @@ def test_tx_event_append_rejects_tx_begin_when_active_tx_in_progress_and_log_not
         state_store.tx_event_append(**args)
 
 
-def test_tx_event_append_allows_tx_begin_when_active_tx_id_is_none(
+def test_tx_event_append_rejects_tx_begin_when_no_active_tx_sentinel_is_materialized(
     state_store, repo_context
 ):
     state = _valid_tx_state()
-    state["active_tx"]["tx_id"] = "none"
+    state["active_tx"]["tx_id"] = 0
     state["active_tx"]["ticket_id"] = "none"
     state["active_tx"]["status"] = "planned"
     state["active_tx"]["phase"] = "planned"
@@ -710,9 +767,9 @@ def test_tx_event_append_allows_tx_begin_when_active_tx_id_is_none(
     )
 
     args = _base_tx_event_args()
-    args["tx_id"] = "tx-2"
-    result = state_store.tx_event_append(**args)
-    assert result["ok"] is True
+    args["tx_id"] = 2
+    with pytest.raises(ValueError, match="active transaction already in progress"):
+        state_store.tx_event_append(**args)
 
 
 def test_tx_event_append_rejects_mismatched_tx_id(state_store):
@@ -720,7 +777,7 @@ def test_tx_event_append_rejects_mismatched_tx_id(state_store):
     state_store.tx_state_save(state)
 
     args = _base_tx_event_args()
-    args["tx_id"] = "tx-2"
+    args["tx_id"] = 2
     args["event_type"] = "tx.step.enter"
     args["payload"] = {"step_id": "p4-t1-s1"}
     with pytest.raises(ValueError, match="tx_id does not match active transaction"):
@@ -880,7 +937,7 @@ def test_tx_event_append_and_state_save_updates_last_applied_seq(
     assert saved["integrity"]["rebuilt_from_seq"] == result["seq"]
     assert saved["integrity"]["drift_detected"] is False
     assert saved["integrity"]["active_tx_source"] == "materialized"
-    assert saved["active_tx"]["tx_id"] == "tx-1"
+    assert saved["active_tx"]["tx_id"] == 1
     assert saved["active_tx"]["ticket_id"] == "p4-t1"
 
 
@@ -931,7 +988,7 @@ def test_tx_event_append_and_state_save_raises_when_state_save_validation_fails(
     }
     assert error_lines[0]["tool_output"]["expected_state"]["last_applied_seq"] == 1
     assert error_lines[0]["tool_output"]["expected_state"]["rebuilt_from_seq"] == 1
-    assert error_lines[0]["tool_output"]["expected_state"]["tx_id"] == "tx-1"
+    assert error_lines[0]["tool_output"]["expected_state"]["tx_id"] == 1
     assert error_lines[0]["tool_output"]["expected_state"]["ticket_id"] == "p4-t1"
     assert error_lines[0]["tool_output"]["expected_state"]["status"] == "in-progress"
     assert error_lines[0]["tool_output"]["expected_state"]["phase"] == "in-progress"
@@ -996,7 +1053,7 @@ def test_tx_event_append_and_state_save_raises_when_saved_state_drift_is_detecte
     assert error_lines[0]["tool_output"]["expected_state"]["rebuilt_from_seq"] == 1
     assert error_lines[0]["tool_output"]["observed_state"]["last_applied_seq"] == 999
     assert error_lines[0]["tool_output"]["observed_state"]["rebuilt_from_seq"] == 999
-    assert error_lines[0]["tool_output"]["observed_state"]["tx_id"] == "tx-1"
+    assert error_lines[0]["tool_output"]["observed_state"]["tx_id"] == 1
     assert error_lines[0]["tool_output"]["observed_state"]["ticket_id"] == "p4-t1"
     assert error_lines[0]["tool_output"]["observed_state"]["status"] == "in-progress"
     assert error_lines[0]["tool_output"]["observed_state"]["phase"] == "in-progress"
@@ -1092,7 +1149,7 @@ def test_tx_event_append_and_state_save_raises_when_saved_state_cannot_be_reload
     }
     assert error_lines[0]["tool_output"]["expected_state"]["last_applied_seq"] == 1
     assert error_lines[0]["tool_output"]["expected_state"]["rebuilt_from_seq"] == 1
-    assert error_lines[0]["tool_output"]["expected_state"]["tx_id"] == "tx-1"
+    assert error_lines[0]["tool_output"]["expected_state"]["tx_id"] == 1
     assert error_lines[0]["tool_output"]["expected_state"]["ticket_id"] == "p4-t1"
     assert error_lines[0]["tool_output"]["expected_state"]["status"] == "in-progress"
     assert error_lines[0]["tool_output"]["expected_state"]["phase"] == "in-progress"

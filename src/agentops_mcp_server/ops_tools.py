@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .git_repo import GitRepo
 from .repo_context import RepoContext
 from .state_rebuilder import StateRebuilder
-from .state_store import StateStore, canonical_tx_id, now_iso
+from .state_store import StateStore, now_iso
 from .workflow_response import (
     build_failure_response,
     build_success_response,
@@ -489,6 +489,10 @@ class OpsTools:
         return None
 
     def _normalize_tx_identifier(self, value: Any) -> str:
+        if isinstance(value, bool):
+            return ""
+        if isinstance(value, int):
+            return str(value)
         if not isinstance(value, str):
             return ""
         normalized = value.strip()
@@ -738,11 +742,9 @@ class OpsTools:
 
         active_status = active_tx.get("status")
         active_tx_id = active_tx.get("tx_id")
-        has_active_tx = (
-            isinstance(active_tx_id, str)
-            and active_tx_id.strip()
-            and active_tx_id.strip() != "none"
-            and isinstance(active_status, str)
+        normalized_active_tx_id = self._normalize_tx_identifier(active_tx_id)
+        has_active_tx = bool(normalized_active_tx_id) and (
+            isinstance(active_status, str)
             and active_status.strip() not in {"done", "blocked"}
         )
 
@@ -861,17 +863,17 @@ class OpsTools:
 
         if event_type == "tx.begin":
             ticket_id = resolved_task_id or resolved_title
-            tx_id = canonical_tx_id(ticket_id) if ticket_id else ""
+            tx_id = self.state_store.issue_tx_id() if ticket_id else None
         else:
-            active_tx_id = self._normalize_tx_identifier(active_tx.get("tx_id"))
+            active_tx_id = active_tx.get("tx_id")
             active_ticket_id = self._normalize_tx_identifier(active_tx.get("ticket_id"))
-            tx_id = active_tx_id
+            tx_id = active_tx_id if isinstance(active_tx_id, int) else None
             ticket_id = active_ticket_id or resolved_task_id or resolved_title
 
         if not ticket_id:
             return None
-        if not tx_id:
-            tx_id = ticket_id
+        if event_type != "tx.begin" and tx_id is None:
+            return None
 
         allow_recovery = event_type != "tx.begin"
         resolved_session_id = self._resolve_session_id(
@@ -888,10 +890,8 @@ class OpsTools:
         if isinstance(tx_state, dict):
             materialized_active_tx = tx_state.get("active_tx")
             if isinstance(materialized_active_tx, dict):
-                existing_tx_id = self._normalize_tx_identifier(
-                    materialized_active_tx.get("tx_id")
-                )
-                if event_type == "tx.begin" or existing_tx_id:
+                existing_tx_id = materialized_active_tx.get("tx_id")
+                if event_type == "tx.begin" or isinstance(existing_tx_id, int):
                     materialized_active_tx["tx_id"] = tx_id
                     materialized_active_tx["ticket_id"] = ticket_id
                     materialized_active_tx["status"] = phase
@@ -1141,23 +1141,21 @@ class OpsTools:
             payload["status"] = status.strip()
         event = None
 
-        tx_phase = (
-            status.strip()
-            if isinstance(status, str) and status.strip()
-            else "in-progress"
+        resolved_task_id = self._normalize_tx_identifier(task_id)
+        requested_status = (
+            status.strip() if isinstance(status, str) and status.strip() else ""
         )
-        tx_step_id = (
-            task_id.strip() if isinstance(task_id, str) and task_id.strip() else "task"
-        )
+        tx_phase = "in-progress"
+        tx_step_id = resolved_task_id or "task"
+
         active_tx = self._active_tx()
         identity = self._active_tx_identity(active_tx)
-        resolved_task_id = self._normalize_tx_identifier(task_id)
-        resolved_tx_id = identity["tx_id"]
         terminal_active_tx = self._is_terminal_active_tx(active_tx)
+        has_active_tx = bool(identity["tx_id"]) and not terminal_active_tx
 
-        if not resolved_tx_id or terminal_active_tx:
+        if not has_active_tx:
             if not resolved_task_id:
-                raise ValueError("tx.begin required before other events")
+                raise ValueError("task_id is required to bootstrap tx.begin")
             begin_conflict = self._canonical_begin_conflict(resolved_task_id)
             if begin_conflict is not None:
                 raise begin_conflict
@@ -1175,11 +1173,19 @@ class OpsTools:
                 resolved_task_id, allow_resume=True
             )
         else:
-            if not isinstance(session_id, str) or not session_id.strip():
-                raise ValueError("session_id is required")
             active_tx, resolved_tx_id = self._require_active_tx(
-                resolved_task_id, allow_resume=True
+                resolved_task_id or None, allow_resume=True
             )
+            if not resolved_task_id:
+                resolved_task_id = (
+                    self._normalize_tx_identifier(active_tx.get("ticket_id"))
+                    or resolved_tx_id
+                )
+                payload["task_id"] = resolved_task_id
+            tx_step_id = resolved_task_id or tx_step_id
+
+        if requested_status and requested_status != "in-progress":
+            payload["requested_status"] = requested_status
 
         event = self._emit_tx_event(
             event_type="tx.step.enter",
@@ -1220,34 +1226,39 @@ class OpsTools:
 
         resolved_task_id = self._normalize_tx_identifier(task_id)
         active_tx, active_tx_id = self._require_active_tx(resolved_task_id or None)
+        active_ticket_id = self._normalize_tx_identifier(active_tx.get("ticket_id"))
         if not resolved_task_id:
-            resolved_task_id = active_tx_id
+            resolved_task_id = active_ticket_id or active_tx_id
         if resolved_task_id and "task_id" not in payload:
             payload["task_id"] = resolved_task_id
 
-        resolved_status = status.strip() if isinstance(status, str) else ""
-        if resolved_status in {"blocked", "done"}:
-            tx_phase = "in-progress"
-        else:
-            tx_phase = resolved_status or "in-progress"
-        tx_step_id = (
-            task_id.strip()
-            if isinstance(task_id, str) and task_id.strip()
-            else (resolved_status if resolved_status else "task")
+        resolved_status = (
+            status.strip() if isinstance(status, str) and status.strip() else ""
         )
-        state_step_id = (
-            task_id.strip()
-            if isinstance(task_id, str) and task_id.strip()
-            else (resolved_status if resolved_status else "task")
+        if resolved_status == "done":
+            raise ValueError("use ops_end_task for terminal done state")
+        if resolved_status == "blocked":
+            raise ValueError("use ops_end_task for terminal blocked state")
+
+        allowed_statuses = {"", "in-progress", "checking", "verified", "committed"}
+        if resolved_status not in allowed_statuses:
+            raise ValueError("unsupported status for ops_update_task")
+
+        tx_phase = resolved_status or (
+            active_tx.get("phase").strip()
+            if isinstance(active_tx.get("phase"), str)
+            and active_tx.get("phase").strip()
+            else "in-progress"
         )
+        tx_step_id = resolved_task_id or active_ticket_id or active_tx_id or "task"
         description = payload.get("note") or "task updated"
         event = self._emit_tx_event(
             event_type="tx.step.enter",
             payload={"step_id": tx_step_id, "description": description},
-            title=resolved_task_id or "task",
+            title=resolved_task_id or active_ticket_id or "task",
             task_id=resolved_task_id or None,
             phase=tx_phase,
-            step_id=state_step_id,
+            step_id=tx_step_id,
             session_id=session_id,
             agent_id=agent_id,
         )
@@ -1255,7 +1266,7 @@ class OpsTools:
             self._emit_tx_event(
                 event_type="tx.user_intent.set",
                 payload={"user_intent": user_intent.strip()},
-                title=resolved_task_id or "task",
+                title=resolved_task_id or active_ticket_id or "task",
                 task_id=resolved_task_id or None,
                 phase=tx_phase,
                 step_id=tx_step_id,
@@ -1290,25 +1301,38 @@ class OpsTools:
         event = None
 
         resolved_task_id = self._normalize_tx_identifier(task_id)
-        active_tx, active_tx_id = self._require_active_tx(resolved_task_id or None)
+        active_tx, active_tx_id = self._require_active_tx(
+            resolved_task_id or None, allow_resume=True
+        )
+        active_ticket_id = self._normalize_tx_identifier(active_tx.get("ticket_id"))
         if not resolved_task_id:
-            resolved_task_id = active_tx_id
+            resolved_task_id = active_ticket_id or active_tx_id
         if resolved_task_id and "task_id" not in payload:
             payload["task_id"] = resolved_task_id
 
         tx_phase = (
             status.strip() if isinstance(status, str) and status.strip() else "done"
         )
-        if not isinstance(session_id, str) or not session_id.strip():
-            raise ValueError("session_id is required")
+        if tx_phase not in {"done", "blocked"}:
+            raise ValueError("ops_end_task status must be done or blocked")
         if tx_phase == "done":
+            commit_state = (
+                active_tx.get("commit_state")
+                if isinstance(active_tx.get("commit_state"), dict)
+                else {}
+            )
             active_phase = active_tx.get("phase")
-            if not isinstance(active_phase, str) or active_phase.strip() != "committed":
+            commit_passed = commit_state.get("status") == "passed"
+            committed_phase = (
+                isinstance(active_phase, str) and active_phase.strip() == "committed"
+            )
+            if not (commit_passed or committed_phase):
                 raise ValueError(
                     "cannot mark task done before commit is finished; "
                     "complete commit workflow first"
                 )
-        tx_step_id = resolved_task_id or "task"
+
+        tx_step_id = resolved_task_id or active_ticket_id or active_tx_id or "task"
         end_type = "tx.end.blocked" if tx_phase == "blocked" else "tx.end.done"
         end_payload = {"summary": payload.get("summary", "")}
         if isinstance(payload.get("next_action"), str) and payload.get("next_action"):
@@ -1318,7 +1342,7 @@ class OpsTools:
         event = self._emit_tx_event(
             event_type=end_type,
             payload=end_payload,
-            title=resolved_task_id or "task",
+            title=resolved_task_id or active_ticket_id or "task",
             task_id=resolved_task_id or None,
             phase=tx_phase,
             step_id=tx_step_id,
@@ -1342,23 +1366,35 @@ class OpsTools:
             if isinstance(active_response_tx.get("commit_state"), dict)
             else {}
         )
-        if isinstance(active_tx.get("verify_state"), dict) and verify_state.get(
-            "status"
-        ) != active_tx.get("verify_state", {}).get("status"):
+        source_verify_state = (
+            active_tx.get("verify_state")
+            if isinstance(active_tx.get("verify_state"), dict)
+            else {}
+        )
+        source_commit_state = (
+            active_tx.get("commit_state")
+            if isinstance(active_tx.get("commit_state"), dict)
+            else {}
+        )
+        if source_verify_state and (
+            not verify_state
+            or verify_state.get("status") != source_verify_state.get("status")
+            or verify_state.get("last_result") != source_verify_state.get("last_result")
+        ):
             active_response_tx["verify_state"] = json.loads(
-                json.dumps(active_tx.get("verify_state"), ensure_ascii=False)
+                json.dumps(source_verify_state, ensure_ascii=False)
             )
-        if (
-            tx_phase == "done"
-            and commit_state.get("status") != "passed"
-            and isinstance(active_tx.get("commit_state"), dict)
+        if source_commit_state and (
+            not commit_state
+            or commit_state.get("status") != source_commit_state.get("status")
+            or commit_state.get("last_result") != source_commit_state.get("last_result")
         ):
             active_response_tx["commit_state"] = json.loads(
-                json.dumps(active_tx.get("commit_state"), ensure_ascii=False)
+                json.dumps(source_commit_state, ensure_ascii=False)
             )
 
         guidance_overrides: Dict[str, Any] = {}
-        if tx_phase == "done" and isinstance(next_action, str) and next_action.strip():
+        if tx_phase == "done":
             guidance_overrides["next_action"] = "tx.begin"
             guidance_overrides["followup_tool"] = None
         return self._workflow_success_response(

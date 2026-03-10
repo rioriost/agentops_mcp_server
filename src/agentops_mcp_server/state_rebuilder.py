@@ -121,10 +121,10 @@ class StateRebuilder:
         return events
 
     def _init_active_tx(
-        self, tx_id: str, ticket_id: str, phase: str, step_id: str
+        self, tx_id: int, ticket_id: str, phase: str, step_id: str
     ) -> Dict[str, Any]:
         return {
-            "tx_id": tx_id or "none",
+            "tx_id": tx_id,
             "ticket_id": ticket_id or "none",
             "status": phase,
             "phase": phase,
@@ -144,7 +144,7 @@ class StateRebuilder:
     def _init_tx_state(self) -> Dict[str, Any]:
         return {
             "schema_version": "0.4.0",
-            "active_tx": self._init_active_tx("", "", "planned", "none"),
+            "active_tx": self._init_active_tx(0, "none", "planned", "none"),
             "last_applied_seq": 0,
             "integrity": {
                 "state_hash": "",
@@ -173,7 +173,8 @@ class StateRebuilder:
     def _validate_tx_event(self, event: Dict[str, Any]) -> Tuple[bool, str]:
         if not isinstance(event.get("seq"), int):
             return False, "missing seq"
-        if not isinstance(event.get("tx_id"), str):
+        tx_id = event.get("tx_id")
+        if isinstance(tx_id, bool) or not isinstance(tx_id, int):
             return False, "missing tx_id"
         if not isinstance(event.get("ticket_id"), str):
             return False, "missing ticket_id"
@@ -596,11 +597,11 @@ class StateRebuilder:
             return False
         active_tx_id = active_tx.get("tx_id")
         active_status = active_tx.get("status")
-        if not isinstance(active_tx_id, str) or not active_tx_id.strip():
+        if isinstance(active_tx_id, bool) or not isinstance(active_tx_id, int):
             return False
         if not isinstance(active_status, str) or not active_status.strip():
             return False
-        if active_tx_id == "none":
+        if active_tx_id == 0:
             if active_status != "planned":
                 return False
             if active_tx_source != "none":
@@ -636,7 +637,7 @@ class StateRebuilder:
             "active_tx_id": (
                 selected_active_tx.get("tx_id")
                 if isinstance(selected_active_tx, dict)
-                else "none"
+                else 0
             ),
             "active_ticket_id": (
                 selected_active_tx.get("ticket_id")
@@ -735,7 +736,7 @@ class StateRebuilder:
                 integrity["active_tx_source"] = "materialized"
                 if (
                     isinstance(active_tx, dict)
-                    and active_tx.get("tx_id") == "none"
+                    and active_tx.get("tx_id") == 0
                     and active_tx.get("status") == "planned"
                 ):
                     integrity["active_tx_source"] = "none"
@@ -799,10 +800,13 @@ class StateRebuilder:
             ticket_id = event.get("ticket_id")
             phase = event.get("phase")
             step_id = event.get("step_id")
-            active_tx = tx_states.get(tx_id)
+            tx_key = (
+                tx_id if isinstance(tx_id, int) and not isinstance(tx_id, bool) else 0
+            )
+            active_tx = tx_states.get(tx_key)
             if active_tx is None:
                 active_tx = self._init_active_tx(
-                    tx_id if isinstance(tx_id, str) else "",
+                    tx_key,
                     ticket_id if isinstance(ticket_id, str) else "",
                     phase if isinstance(phase, str) else "planned",
                     step_id if isinstance(step_id, str) else "none",
@@ -836,23 +840,23 @@ class StateRebuilder:
             if seq_value is not None:
                 active_tx["_last_event_seq"] = seq_value
                 last_valid_seq = seq_value
-                if isinstance(tx_id, str) and tx_id:
-                    last_seen_event_by_tx[tx_id] = seq_value
+                if tx_key != 0:
+                    last_seen_event_by_tx[str(tx_key)] = seq_value
                     if event_type == "tx.begin":
-                        begin_seq_by_tx[tx_id] = seq_value
+                        begin_seq_by_tx[str(tx_key)] = seq_value
             if (
                 isinstance(event.get("session_id"), str)
                 and event.get("session_id").strip()
             ):
-                if isinstance(tx_id, str) and tx_id:
-                    last_session_by_tx[tx_id] = event.get("session_id").strip()
+                if tx_key != 0:
+                    last_session_by_tx[str(tx_key)] = event.get("session_id").strip()
             if isinstance(event.get("event_type"), str) and event.get(
                 "event_type"
             ).startswith("tx.end."):
                 active_tx["_terminal"] = True
-                if isinstance(tx_id, str) and tx_id:
-                    terminal_tx_ids.add(tx_id)
-            tx_states[tx_id] = active_tx
+                if tx_key != 0:
+                    terminal_tx_ids.add(str(tx_key))
+            tx_states[tx_key] = active_tx
             if isinstance(event_id, str):
                 applied_event_ids.add(event_id)
 
@@ -861,13 +865,20 @@ class StateRebuilder:
             state["rebuild_warning"] = invalid_reason
             if isinstance(invalid_event, dict):
                 invalid_tx_id = invalid_event.get("tx_id")
-                if isinstance(invalid_tx_id, str) and invalid_tx_id in tx_states:
-                    tx_states.pop(invalid_tx_id, None)
-                    tx_contexts.pop(invalid_tx_id, None)
-                    last_seen_event_by_tx.pop(invalid_tx_id, None)
-                    begin_seq_by_tx.pop(invalid_tx_id, None)
-                    last_session_by_tx.pop(invalid_tx_id, None)
-                    terminal_tx_ids.discard(invalid_tx_id)
+                invalid_tx_key = (
+                    invalid_tx_id
+                    if isinstance(invalid_tx_id, int)
+                    and not isinstance(invalid_tx_id, bool)
+                    else 0
+                )
+                invalid_tx_name = str(invalid_tx_key)
+                if invalid_tx_key in tx_states:
+                    tx_states.pop(invalid_tx_key, None)
+                    tx_contexts.pop(invalid_tx_key, None)
+                    last_seen_event_by_tx.pop(invalid_tx_name, None)
+                    begin_seq_by_tx.pop(invalid_tx_name, None)
+                    last_session_by_tx.pop(invalid_tx_name, None)
+                    terminal_tx_ids.discard(invalid_tx_name)
                 state["rebuild_invalid_event"] = invalid_event
                 if isinstance(invalid_event.get("seq"), int):
                     state["rebuild_invalid_seq"] = invalid_event.get("seq")
@@ -887,8 +898,8 @@ class StateRebuilder:
                 candidates,
                 key=lambda item: (
                     item.get("_last_event_seq", -1),
-                    begin_seq_by_tx.get(item.get("tx_id"), -1),
-                    item.get("tx_id", ""),
+                    begin_seq_by_tx.get(str(item.get("tx_id")), -1),
+                    item.get("tx_id", 0),
                 ),
             )
             active_tx_source = "active_candidate"

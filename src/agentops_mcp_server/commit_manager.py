@@ -29,7 +29,7 @@ class CommitManager:
         self.repo_context = state_store.repo_context
         self._verify_started_in_call = False
 
-    def _load_tx_context(self) -> Optional[Dict[str, str]]:
+    def _load_tx_context(self) -> Optional[Dict[str, Any]]:
         tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
         if not isinstance(tx_state, dict):
             return None
@@ -38,7 +38,7 @@ class CommitManager:
             return None
         tx_id = active_tx.get("tx_id")
         ticket_id = active_tx.get("ticket_id")
-        if not isinstance(tx_id, str) or not tx_id.strip():
+        if isinstance(tx_id, bool) or not isinstance(tx_id, int):
             return None
         if not isinstance(ticket_id, str) or not ticket_id.strip():
             return None
@@ -55,7 +55,7 @@ class CommitManager:
             return None
         return {
             "tx_id": tx_id,
-            "ticket_id": ticket_id,
+            "ticket_id": ticket_id.strip(),
             "phase": phase,
             "step_id": step_id,
             "session_id": session_id.strip(),
@@ -73,7 +73,7 @@ class CommitManager:
             return None
         tx_id = active_tx.get("tx_id")
         ticket_id = active_tx.get("ticket_id")
-        if not isinstance(tx_id, str) or not tx_id.strip() or tx_id.strip() == "none":
+        if isinstance(tx_id, bool) or not isinstance(tx_id, int):
             return None
         if (
             not isinstance(ticket_id, str)
@@ -93,7 +93,7 @@ class CommitManager:
         if not isinstance(session_id, str) or not session_id.strip():
             return None
         return {
-            "tx_id": tx_id.strip(),
+            "tx_id": tx_id,
             "ticket_id": ticket_id.strip(),
             "phase": phase.strip(),
             "step_id": step_id.strip(),
@@ -122,7 +122,7 @@ class CommitManager:
         if not rebuilt_context:
             return None, rebuilt_state, integrity
 
-        requested_tx_id = requested_context["tx_id"].strip()
+        requested_tx_id = requested_context["tx_id"]
         requested_ticket_id = requested_context["ticket_id"].strip()
         if (
             rebuilt_context["tx_id"] != requested_tx_id

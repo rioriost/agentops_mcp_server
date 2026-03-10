@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,15 +44,14 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def canonical_tx_id(ticket_id: str) -> str:
-    if not isinstance(ticket_id, str) or not ticket_id.strip():
-        raise ValueError("ticket_id is required")
-    normalized_ticket_id = ticket_id.strip()
-    opaque_suffix = uuid.uuid4().hex[:12]
-    safe_ticket_id = re.sub(r"[^A-Za-z0-9._-]+", "-", normalized_ticket_id).strip("-")
-    if not safe_ticket_id:
-        safe_ticket_id = "ticket"
-    return f"tx-{safe_ticket_id}-{opaque_suffix}"
+def _validate_json_int(value: Any, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{name} must be an integer")
+    return value
+
+
+def canonical_tx_id(value: Any) -> int:
+    return _validate_json_int(value, "tx_id")
 
 
 class StateStore:
@@ -88,7 +86,7 @@ class StateStore:
         active_tx = self._load_active_tx()
         if not isinstance(active_tx, dict):
             return {
-                "tx_id": "none",
+                "tx_id": 0,
                 "ticket_id": "none",
                 "status": "unknown",
                 "phase": "unknown",
@@ -98,8 +96,9 @@ class StateStore:
             }
         return {
             "tx_id": active_tx.get("tx_id")
-            if isinstance(active_tx.get("tx_id"), str)
-            else "none",
+            if isinstance(active_tx.get("tx_id"), int)
+            and not isinstance(active_tx.get("tx_id"), bool)
+            else 0,
             "ticket_id": active_tx.get("ticket_id")
             if isinstance(active_tx.get("ticket_id"), str)
             else "none",
@@ -217,6 +216,59 @@ class StateStore:
         except json.JSONDecodeError:
             return None
 
+    def read_tx_id_counter(self) -> Dict[str, Any]:
+        payload = self.read_json_file(self.repo_context.tx_id_counter)
+        if payload is None:
+            return {
+                "last_issued_id": 0,
+                "updated_at": now_iso(),
+            }
+        if not isinstance(payload, dict):
+            raise ValueError("tx_id_counter must be an object")
+        last_issued_id = payload.get("last_issued_id")
+        updated_at = payload.get("updated_at")
+        if isinstance(last_issued_id, bool) or not isinstance(last_issued_id, int):
+            raise ValueError("tx_id_counter.last_issued_id must be an integer")
+        if not isinstance(updated_at, str) or not updated_at.strip():
+            raise ValueError("tx_id_counter.updated_at is required")
+        return {
+            "last_issued_id": last_issued_id,
+            "updated_at": updated_at,
+        }
+
+    def write_tx_id_counter(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise ValueError("tx_id_counter payload is required")
+        last_issued_id = payload.get("last_issued_id")
+        updated_at = payload.get("updated_at")
+        _validate_json_int(last_issued_id, "tx_id_counter.last_issued_id")
+        if not isinstance(updated_at, str) or not updated_at.strip():
+            raise ValueError("tx_id_counter.updated_at is required")
+        self.write_text(
+            self.repo_context.tx_id_counter,
+            json.dumps(
+                {
+                    "last_issued_id": last_issued_id,
+                    "updated_at": updated_at,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+        )
+        return {"ok": True, "path": str(self.repo_context.tx_id_counter)}
+
+    def issue_tx_id(self) -> int:
+        counter = self.read_tx_id_counter()
+        next_id = counter["last_issued_id"] + 1
+        self.write_tx_id_counter(
+            {
+                "last_issued_id": next_id,
+                "updated_at": now_iso(),
+            }
+        )
+        return next_id
+
     def read_last_json_line(self, path: Path) -> Optional[Dict[str, Any]]:
         if not path.exists():
             return None
@@ -331,7 +383,7 @@ class StateStore:
         return self.read_last_json_line(self.repo_context.tx_event_log) is None
 
     def _validate_tx_event_invariants(
-        self, event_type: str, payload: Dict[str, Any], step_id: str, tx_id: str
+        self, event_type: str, payload: Dict[str, Any], step_id: str, tx_id: int
     ) -> None:
         active_tx = self._load_active_tx()
         if not active_tx:
@@ -339,10 +391,8 @@ class StateStore:
                 raise ValueError("tx.begin required before other events")
             return
         active_tx_id = active_tx.get("tx_id")
-        active_tx_id_value = (
-            active_tx_id.strip() if isinstance(active_tx_id, str) else ""
-        )
-        has_active_tx = bool(active_tx_id_value) and active_tx_id_value != "none"
+        active_tx_id_value = active_tx_id if isinstance(active_tx_id, int) else None
+        has_active_tx = active_tx_id_value is not None
         if has_active_tx and event_type != "tx.begin" and active_tx_id_value != tx_id:
             next_action = active_tx.get("next_action")
             next_action_value = (
@@ -471,7 +521,7 @@ class StateStore:
     def tx_event_append(
         self,
         *,
-        tx_id: str,
+        tx_id: int,
         ticket_id: str,
         event_type: str,
         phase: str,
@@ -481,7 +531,7 @@ class StateStore:
         payload: Dict[str, Any],
         event_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        resolved_tx_id = self._require_str(tx_id, "tx_id")
+        resolved_tx_id = canonical_tx_id(tx_id)
         resolved_ticket_id = self._require_str(ticket_id, "ticket_id")
         resolved_event_type = self._require_str(event_type, "event_type")
         resolved_phase = self._require_str(phase, "phase")
@@ -533,8 +583,10 @@ class StateStore:
             raise ValueError("active_tx is required")
 
         tx_id = active_tx.get("tx_id")
-        if not isinstance(tx_id, str) or not tx_id.strip():
-            raise ValueError("active_tx.tx_id is required")
+        try:
+            canonical_tx_id(tx_id)
+        except ValueError as exc:
+            raise ValueError("active_tx.tx_id must be an integer") from exc
         ticket_id = active_tx.get("ticket_id")
         if not isinstance(ticket_id, str) or not ticket_id.strip():
             raise ValueError("active_tx.ticket_id is required")
@@ -609,7 +661,7 @@ class StateStore:
     def tx_event_append_and_state_save(
         self,
         *,
-        tx_id: str,
+        tx_id: int,
         ticket_id: str,
         event_type: str,
         phase: str,
