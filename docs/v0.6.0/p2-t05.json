@@ -2,7 +2,7 @@
   "ticket_id": "p2-t05",
   "phase_id": "p2",
   "title": "Make canonical next_action the sole continuation dispatcher",
-  "status": "planned",
+  "status": "in-progress",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Resume is deterministic",
@@ -43,19 +43,8 @@
     "docs/v0.6.0/p1-t03.json",
     "src/**/*.py"
   ],
-  "dependencies": [
-    "p0-t01",
-    "p0-t02",
-    "p0-t03",
-    "p1-t02",
-    "p1-t03"
-  ],
-  "enables": [
-    "p2-t06",
-    "p3-t01",
-    "p3-t02",
-    "p3-t03"
-  ],
+  "dependencies": ["p0-t01", "p0-t02", "p0-t03", "p1-t02", "p1-t03"],
+  "enables": ["p2-t06", "p3-t01", "p3-t02", "p3-t03"],
   "expected_outputs": [
     "A list of continuation entrypoints and dispatcher branches in the runtime.",
     "A code update that routes continuation through canonical next_action whenever it is present and valid.",
@@ -91,6 +80,10 @@
   ],
   "notes": [
     "This ticket is high leverage because ambiguous dispatcher logic would leak into verify, commit, terminal, and resume behavior.",
-    "All code review and implementation decisions must be checked against the minimal canonical continuation contract defined in the plan."
+    "All code review and implementation decisions must be checked against the minimal canonical continuation contract defined in the plan.",
+    "Current review finding: src/agentops_mcp_server/repo_tools.py::_load_tx_context still derives helper execution context from active_tx.phase and active_tx.current_step, so continuation is not yet driven solely by canonical top-level next_action.",
+    "Current review finding: src/agentops_mcp_server/repo_tools.py::repo_verify still checks terminal eligibility from nested active_tx.status rather than treating top-level canonical status and next_action as the authoritative continuation contract.",
+    "Current review finding: src/agentops_mcp_server/repo_tools.py::_emit_tx_event still writes phase/current_step/session_id back into materialized active_tx before state synchronization, which preserves non-canonical dispatcher inputs in helper flows.",
+    "Current review finding: tests/test_repo_tools.py still encodes old-shaped active_tx fixtures and expectations around phase/current_step/session_id-driven continuation, so p2-t05 needs paired runtime and regression updates."
   ]
 }

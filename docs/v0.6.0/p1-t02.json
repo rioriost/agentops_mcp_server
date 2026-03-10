@@ -2,7 +2,7 @@
   "ticket_id": "p1-t02",
   "phase_id": "p1",
   "title": "Define the minimal canonical continuation contract in code",
-  "status": "done",
+  "status": "checking",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Server-owned transaction variables vs client-managed inputs",
@@ -33,7 +33,8 @@
     "A clear code-level definition of the minimal continuation contract.",
     "A list of runtime structures or modules that own the continuation contract.",
     "A mapping from plan-defined canonical continuation fields to concrete code locations.",
-    "A short note identifying fields that are currently present but must not control deterministic continuation."
+    "A short note identifying fields that are currently present but must not control deterministic continuation.",
+    "A gap note identifying remaining helper/runtime dependencies that still rely on non-canonical active_tx metadata and therefore block terminal completion of this ticket."
   ],
   "canonical_fields": [
     "active_tx",
@@ -65,10 +66,33 @@
     "The no-active baseline is represented structurally and matches the plan.",
     "The implementation clearly distinguishes active_tx from top-level status responsibilities.",
     "Optional or derived metadata is not required for continuation correctness.",
-    "The resulting contract can be described in terms of the minimal canonical continuation contract plus top-level next_action."
+    "The resulting contract can be described in terms of the minimal canonical continuation contract plus top-level next_action.",
+    "Helper and runtime continuation paths no longer require active_tx phase/current_step/session metadata as correctness-critical inputs."
   ],
   "notes": [
     "This ticket should be completed before tickets that depend on exact active-transaction continuation behavior.",
-    "Any ambiguity found while mapping fields should be resolved in favor of the minimal contract defined in plan.md."
+    "Any ambiguity found while mapping fields should be resolved in favor of the minimal contract defined in plan.md.",
+    "Corrective plan: restrict next_action derivation to top-level canonical fields, remove canonical sentinel no-active semantics, and reduce active_tx consumers to identity-only continuation use.",
+    "Follow-up boundary: helper execution flows that still depend on active_tx phase/current_step/session metadata remain out of scope for p1-t02 and should be handled by later tickets.",
+    "Current audit result: the materialized contract and workflow guidance were narrowed toward the minimal canonical surface, but repo/commit helper paths still depend on active_tx phase/current_step/session metadata and therefore acceptance remains incomplete.",
+    "Current audit result: tickets_list.json bookkeeping must not mark p1-t02 as done until the remaining helper/runtime dependencies are removed or the ticket boundary is explicitly re-scoped.",
+    "Concrete remaining dependency: src/agentops_mcp_server/repo_tools.py::_load_tx_context still requires active_tx.session_id and still derives phase/step execution context from active_tx.phase and active_tx.current_step.",
+    "Concrete remaining dependency: src/agentops_mcp_server/repo_tools.py::_emit_tx_event still writes phase/current_step/session_id back into materialized active_tx before appending tx events, which keeps helper continuation coupled to non-canonical active_tx metadata.",
+    "Concrete remaining dependency: src/agentops_mcp_server/commit_manager.py::_load_tx_context still requires active_tx.session_id and still derives commit execution context from active_tx.phase and active_tx.current_step.",
+    "Concrete remaining dependency: src/agentops_mcp_server/commit_manager.py::_emit_tx_begin_with_context and _ensure_tx_begin still repopulate active_tx.phase/current_step/session_id into materialized state, so helper bootstrap still assumes old-shaped active_tx metadata.",
+    "Concrete remaining dependency: src/agentops_mcp_server/state_store.py::tx_event_append_and_state_save still materializes phase/current_step/session_id and other helper-oriented fields under active_tx, so canonical-state writes are not yet reduced to an identity-only active_tx snapshot.",
+    "Concrete remaining dependency: src/agentops_mcp_server/state_store.py::_current_active_tx_context still reports status/phase/current_step/next_action/session_id from active_tx, which shows diagnostics and helper context are still modeled around old-shaped active_tx content.",
+    "Concrete remaining dependency: tests/test_repo_tools.py and tests/test_commit_manager.py still build and assert old-shaped active_tx fixtures containing status/phase/current_step/session_id/next_action nested under active_tx, so regression coverage still encodes the pre-minimal continuation contract.",
+    "Follow-on ticket mapping: move active_tx write-shape reduction in src/agentops_mcp_server/state_store.py and related materialized-state cleanup into p2-t04.",
+    "Follow-on ticket mapping: move canonical next_action-driven continuation cleanup in src/agentops_mcp_server/repo_tools.py and src/agentops_mcp_server/commit_manager.py into p2-t05.",
+    "Follow-on ticket mapping: move session_id de-hardening so helper continuation no longer treats session context as correctness-critical into p2-t07.",
+    "Follow-on ticket mapping: move old-shaped helper regression fixture cleanup in tests/test_repo_tools.py and tests/test_commit_manager.py alongside the corresponding p2 runtime changes rather than forcing partial updates in p1-t02.",
+    "Concrete remaining dependency: src/agentops_mcp_server/repo_tools.py::_load_tx_context still requires active_tx.session_id and still derives phase/step execution context from active_tx.phase and active_tx.current_step.",
+    "Concrete remaining dependency: src/agentops_mcp_server/repo_tools.py::_emit_tx_event still writes phase/current_step/session_id back into materialized active_tx before appending tx events, which keeps helper continuation coupled to non-canonical active_tx metadata.",
+    "Concrete remaining dependency: src/agentops_mcp_server/commit_manager.py::_load_tx_context still requires active_tx.session_id and still derives commit execution context from active_tx.phase and active_tx.current_step.",
+    "Concrete remaining dependency: src/agentops_mcp_server/commit_manager.py::_emit_tx_begin_with_context and _ensure_tx_begin still repopulate active_tx.phase/current_step/session_id into materialized state, so helper bootstrap still assumes old-shaped active_tx metadata.",
+    "Concrete remaining dependency: src/agentops_mcp_server/state_store.py::tx_event_append_and_state_save still materializes phase/current_step/session_id and other helper-oriented fields under active_tx, so canonical-state writes are not yet reduced to an identity-only active_tx snapshot.",
+    "Concrete remaining dependency: src/agentops_mcp_server/state_store.py::_current_active_tx_context still reports status/phase/current_step/next_action/session_id from active_tx, which shows diagnostics and helper context are still modeled around old-shaped active_tx content.",
+    "Concrete remaining dependency: tests/test_repo_tools.py and tests/test_commit_manager.py still build and assert old-shaped active_tx fixtures containing status/phase/current_step/session_id/next_action nested under active_tx, so regression coverage still encodes the pre-minimal continuation contract."
   ]
 }

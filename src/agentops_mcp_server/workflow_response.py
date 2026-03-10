@@ -101,7 +101,7 @@ def _verify_state_from_state(
     verify_state = state.get("verify_state")
     if isinstance(verify_state, dict):
         return dict(verify_state)
-    return _as_dict(active_tx.get("verify_state"))
+    return {}
 
 
 def _commit_state_from_state(
@@ -111,7 +111,7 @@ def _commit_state_from_state(
     commit_state = state.get("commit_state")
     if isinstance(commit_state, dict):
         return dict(commit_state)
-    return _as_dict(active_tx.get("commit_state"))
+    return {}
 
 
 def _failure_defaults(error_code: str) -> Dict[str, Any]:
@@ -137,8 +137,6 @@ def _resolved_status_phase_next_action(
         state.get("next_action")
     )
     tx_phase = _clean_str(canonical_phase) or tx_status
-    if not tx_phase and not resolved_next_action:
-        tx_phase = _clean_str(active_tx.get("phase"))
     return tx_status, tx_phase, resolved_next_action
 
 
@@ -194,13 +192,9 @@ def derive_workflow_guidance(
 
     resolved_active_ticket_id = _clean_optional_str(active_ticket_id)
     if resolved_active_ticket_id is None:
-        candidate = _clean_str(active_tx.get("ticket_id"))
-        if candidate:
-            resolved_active_ticket_id = candidate
+        resolved_active_ticket_id = _clean_optional_str(active_tx.get("ticket_id"))
 
     resolved_current_step = _clean_optional_str(current_step)
-    if resolved_current_step is None:
-        resolved_current_step = _clean_optional_str(active_tx.get("current_step"))
 
     resolved_verify_status = _clean_optional_str(verify_status)
     if resolved_verify_status is None:
@@ -217,7 +211,11 @@ def derive_workflow_guidance(
         elif integrity:
             resolved_integrity_status = "ok"
 
-    has_active_tx = bool(active_tx) and resolved_active_tx_id is not None
+    has_active_tx = (
+        bool(active_tx)
+        and resolved_active_tx_id is not None
+        and resolved_active_ticket_id is not None
+    )
 
     resolved_resume_required = _clean_bool(resume_required)
     if resolved_resume_required is None:

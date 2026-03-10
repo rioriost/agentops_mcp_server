@@ -86,8 +86,11 @@ def _write_tx_state(
     phase=None,
     verify_state_status="not_started",
     commit_state_status="not_started",
+    next_action="tx.commit.start",
 ):
     resolved_phase = phase or status
+    verify_state = {"status": verify_state_status, "last_result": None}
+    commit_state = {"status": commit_state_status, "last_result": None}
     state = {
         "schema_version": "0.4.0",
         "active_tx": {
@@ -97,17 +100,19 @@ def _write_tx_state(
             "phase": resolved_phase,
             "current_step": "commit",
             "last_completed_step": "",
-            "next_action": "tx.commit.start",
+            "next_action": next_action,
             "semantic_summary": "Ready to commit",
             "user_intent": None,
             "session_id": "s1",
-            "verify_state": {
-                "status": verify_state_status,
-                "last_result": None,
-            },
-            "commit_state": {"status": commit_state_status, "last_result": None},
+            "verify_state": verify_state,
+            "commit_state": commit_state,
             "file_intents": [],
         },
+        "status": status,
+        "next_action": next_action,
+        "semantic_summary": "Ready to commit",
+        "verify_state": verify_state,
+        "commit_state": commit_state,
         "last_applied_seq": 1,
         "integrity": {"state_hash": "hash", "rebuilt_from_seq": 1},
     }
@@ -141,7 +146,7 @@ def test_repo_commit_no_changes():
         == "If work is already verified and nothing remains to commit, close the transaction explicitly or make additional changes before retrying commit."
     )
     assert result["terminal"] is False
-    assert result["requires_followup"] is False
+    assert result["requires_followup"] is True
     assert result["followup_tool"] is None
 
 
@@ -274,16 +279,15 @@ def test_commit_if_verified_runs_verify(tmp_path, monkeypatch):
     assert result["terminal"] is False
     assert result["requires_followup"] is True
     assert result["followup_tool"] == "ops_end_task"
-    assert result["active_tx_id"] is None
+    assert result["active_tx_id"] == 1
     assert result["active_ticket_id"] == "p4-t3"
-    assert result["current_step"] == "commit"
+    assert result["current_step"] is None
     assert result["verify_status"] == "passed"
     assert result["commit_status"] == "passed"
     assert result["integrity_status"] in {"ok", None}
     assert result["can_start_new_ticket"] is False
     assert result["resume_required"] is True
-    assert result["active_tx"]["tx_id"] == 1
-    assert result["active_tx"]["ticket_id"] == "p4-t3"
+    assert result["active_tx"] == {}
     assert manager.verify_runner.calls == [5]
     assert ("add", "-A") in manager.git_repo.calls
 
@@ -478,12 +482,9 @@ def test_commit_if_verified_preserves_opaque_canonical_tx_id_and_nonterminal_com
     assert result["followup_tool"] == "ops_end_task"
     assert result["can_start_new_ticket"] is False
     assert result["resume_required"] is True
-    assert result["active_tx_id"] is None
+    assert result["active_tx_id"] == 42
     assert result["active_ticket_id"] == "v0.6.0/p2-t01"
-    assert result["active_tx"]["tx_id"] == 42
-    assert result["active_tx"]["ticket_id"] == "v0.6.0/p2-t01"
-    assert result["active_tx"]["status"] == "committed"
-    assert result["active_tx"]["phase"] == "committed"
+    assert result["active_tx"] == {}
 
 
 def test_repo_commit_verify_failure_raises_structured_failure(tmp_path):
@@ -1010,8 +1011,7 @@ def test_emit_tx_event_does_not_use_drifted_rebuild_for_append_and_save():
     manager._load_tx_context = lambda: {
         "tx_id": 1,
         "ticket_id": "p4-t3",
-        "phase": "checking",
-        "step_id": "commit",
+        "next_action": "tx.verify.start",
         "session_id": "s1",
     }
 
@@ -1077,7 +1077,7 @@ def test_load_tx_context_rejects_invalid_shapes():
         assert manager._load_tx_context() is None
 
 
-def test_load_tx_context_applies_phase_and_step_fallbacks():
+def test_load_tx_context_defaults_next_action_when_missing():
     class FallbackStateStore(DummyStateStore):
         def read_json_file(self, _path):
             return {
@@ -1101,13 +1101,12 @@ def test_load_tx_context_applies_phase_and_step_fallbacks():
     assert manager._load_tx_context() == {
         "tx_id": 1,
         "ticket_id": "p4-t3",
-        "phase": "in-progress",
-        "step_id": "commit",
+        "next_action": "tx.begin",
         "session_id": "s1",
     }
 
 
-def test_load_tx_context_uses_status_when_phase_missing():
+def test_load_tx_context_uses_top_level_next_action():
     class StatusFallbackStateStore(DummyStateStore):
         def read_json_file(self, _path):
             return {
@@ -1118,7 +1117,8 @@ def test_load_tx_context_uses_status_when_phase_missing():
                     "phase": "",
                     "current_step": "review",
                     "session_id": "s1",
-                }
+                },
+                "next_action": "tx.commit.start",
             }
 
     manager = CommitManager(
@@ -1131,8 +1131,7 @@ def test_load_tx_context_uses_status_when_phase_missing():
     assert manager._load_tx_context() == {
         "tx_id": 1,
         "ticket_id": "p4-t3",
-        "phase": "verified",
-        "step_id": "review",
+        "next_action": "tx.commit.start",
         "session_id": "s1",
     }
 
@@ -1245,8 +1244,7 @@ def test_commit_if_verified_rejects_verify_result_without_verify_start():
     manager._load_tx_context = lambda: {
         "tx_id": 1,
         "ticket_id": "p4-t3",
-        "phase": "checking",
-        "step_id": "commit",
+        "next_action": "tx.verify.start",
         "session_id": "s1",
     }
 
@@ -1425,13 +1423,17 @@ def test_repo_verify_success_records_canonical_verify_events(tmp_path):
         for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    assert [event["event_type"] for event in events] == ["tx.begin"]
+    assert [event["event_type"] for event in events] == [
+        "tx.begin",
+        "tx.verify.start",
+        "tx.verify.pass",
+    ]
 
     tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
     active_tx = tx_state["active_tx"]
-    assert active_tx["verify_state"]["status"] == "not_started"
-    assert active_tx["status"] == "in-progress"
-    assert active_tx["phase"] == "in-progress"
+    assert active_tx["verify_state"]["status"] == "passed"
+    assert active_tx["status"] == "verified"
+    assert active_tx["phase"] == "verified"
 
 
 def test_repo_verify_failure_records_canonical_verify_fail_event(tmp_path):
@@ -1475,13 +1477,17 @@ def test_repo_verify_failure_records_canonical_verify_fail_event(tmp_path):
         for line in repo_context.tx_event_log.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    assert [event["event_type"] for event in events] == ["tx.begin"]
+    assert [event["event_type"] for event in events] == [
+        "tx.begin",
+        "tx.verify.start",
+        "tx.verify.fail",
+    ]
 
     tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
     active_tx = tx_state["active_tx"]
-    assert active_tx["verify_state"]["status"] == "not_started"
-    assert active_tx["status"] == "in-progress"
-    assert active_tx["phase"] == "in-progress"
+    assert active_tx["verify_state"]["status"] == "failed"
+    assert active_tx["status"] == "checking"
+    assert active_tx["phase"] == "checking"
 
 
 def test_repo_verify_terminal_transaction_is_rejected(tmp_path):
@@ -1519,10 +1525,10 @@ def test_repo_verify_terminal_transaction_is_rejected(tmp_path):
         state_rebuilder,
     )
 
-    result = tools.repo_verify(timeout_sec=1)
+    with pytest.raises(ValueError, match="cannot verify a terminal transaction"):
+        tools.repo_verify(timeout_sec=1)
 
-    assert result["ok"] is True
-    assert verify_runner.calls == [1]
+    assert verify_runner.calls == []
 
     events = [
         json.loads(line)
@@ -1740,9 +1746,10 @@ def test_ensure_verify_started_returns_when_already_running():
     class RunningStateStore(DummyStateStore):
         def read_json_file(self, _path):
             return {
+                "verify_state": {"status": "running"},
                 "active_tx": {
                     "verify_state": {"status": "running"},
-                }
+                },
             }
 
     manager = CommitManager(
@@ -1759,9 +1766,10 @@ def test_ensure_verify_started_requires_begin_when_not_started():
     class NotStartedStateStore(DummyStateStore):
         def read_json_file(self, _path):
             return {
+                "verify_state": {"status": "not_started"},
                 "active_tx": {
                     "verify_state": {"status": "not_started"},
-                }
+                },
             }
 
     manager = CommitManager(
@@ -1796,6 +1804,7 @@ def test_ensure_verify_started_recovers_running_state_from_rebuild():
             return {"ok": True}
 
     rebuilt_state = {
+        "verify_state": {"status": "running"},
         "active_tx": {
             "verify_state": {"status": "running"},
         },
@@ -1858,8 +1867,7 @@ def test_emit_tx_event_uses_rebuilt_state_when_tx_state_missing():
     manager._load_tx_context = lambda: {
         "tx_id": 1,
         "ticket_id": "p4-t3",
-        "phase": "checking",
-        "step_id": "commit",
+        "next_action": "tx.verify.start",
         "session_id": "s1",
     }
 
@@ -1874,7 +1882,7 @@ def test_emit_tx_event_uses_rebuilt_state_when_tx_state_missing():
     saved_state = state_store.append_and_save_calls[0]["state"]
     assert saved_state["active_tx"]["tx_id"] == 1
     assert saved_state["active_tx"]["ticket_id"] == "p4-t3"
-    assert saved_state["active_tx"]["phase"] == "checking"
+    assert saved_state["active_tx"]["phase"] == "tx.verify.start"
     assert saved_state["active_tx"]["current_step"] == "commit"
     assert saved_state["active_tx"]["session_id"] == "s1"
 
@@ -1931,8 +1939,7 @@ def test_emit_tx_event_saves_rebuilt_state_after_append_fallback():
     manager._load_tx_context = lambda: {
         "tx_id": 1,
         "ticket_id": "p4-t3",
-        "phase": "checking",
-        "step_id": "commit",
+        "next_action": "tx.verify.start",
         "session_id": "s1",
     }
 
@@ -1984,9 +1991,9 @@ def test_repo_commit_returns_summary_from_run_git_commit(monkeypatch):
     assert result["tx_phase"] == ""
     assert result["canonical_status"] == ""
     assert result["canonical_phase"] == ""
-    assert result["next_action"] == ""
+    assert result["next_action"] == "tx.begin"
     assert result["terminal"] is False
-    assert result["requires_followup"] is False
+    assert result["requires_followup"] is True
     assert result["followup_tool"] is None
     assert result["active_tx_id"] is None
     assert result["active_ticket_id"] is None
@@ -2082,7 +2089,7 @@ def test_emit_tx_begin_with_context_appends_without_materialized_state():
     assert event["tx_id"] == 7
     assert event["ticket_id"] == "p4-t7"
     assert event["event_type"] == "tx.begin"
-    assert event["phase"] == "checking"
+    assert event["phase"] == "in-progress"
     assert event["step_id"] == "none"
     assert event["session_id"] == "s7"
     assert event["payload"] == {
@@ -2173,8 +2180,7 @@ def test_emit_tx_event_uses_materialized_state_when_available():
     manager._load_tx_context = lambda: {
         "tx_id": 5,
         "ticket_id": "p4-t5",
-        "phase": "verified",
-        "step_id": "commit",
+        "next_action": "tx.commit.start",
         "session_id": "s5",
     }
 
@@ -2189,7 +2195,7 @@ def test_emit_tx_event_uses_materialized_state_when_available():
     assert saved_state["active_tx"]["tx_id"] == 5
     assert saved_state["active_tx"]["ticket_id"] == "p4-t5"
     assert saved_state["active_tx"]["status"] == "verified"
-    assert saved_state["active_tx"]["phase"] == "verified"
+    assert saved_state["active_tx"]["phase"] == "tx.commit.start"
     assert saved_state["active_tx"]["current_step"] == "commit"
     assert saved_state["active_tx"]["session_id"] == "s5"
 
@@ -2202,9 +2208,9 @@ def test_workflow_guidance_returns_empty_defaults_when_tx_state_missing():
     assert result == {
         "tx_status": "",
         "tx_phase": "",
-        "next_action": "",
+        "next_action": "tx.begin",
         "terminal": False,
-        "requires_followup": False,
+        "requires_followup": True,
         "followup_tool": None,
         "canonical_status": "",
         "canonical_phase": "",
@@ -2286,12 +2292,14 @@ def test_active_tx_from_state_rejects_invalid_shapes():
         )
         is None
     )
-    assert (
-        manager._active_tx_from_state(
-            {"active_tx": {"tx_id": 1, "ticket_id": " none ", "session_id": "s1"}}
-        )
-        is None
-    )
+    assert manager._active_tx_from_state(
+        {"active_tx": {"tx_id": 1, "ticket_id": " none ", "session_id": "s1"}}
+    ) == {
+        "tx_id": 1,
+        "ticket_id": "none",
+        "next_action": "tx.begin",
+        "session_id": "s1",
+    }
     assert (
         manager._active_tx_from_state(
             {"active_tx": {"tx_id": 1, "ticket_id": "p4-t3", "session_id": ""}}
@@ -2317,8 +2325,7 @@ def test_active_tx_from_state_applies_phase_and_step_fallbacks():
     ) == {
         "tx_id": 1,
         "ticket_id": "p4-t3",
-        "phase": "verified",
-        "step_id": "commit",
+        "next_action": "tx.begin",
         "session_id": "s1",
     }
 
@@ -2336,8 +2343,7 @@ def test_active_tx_from_state_applies_phase_and_step_fallbacks():
     ) == {
         "tx_id": 1,
         "ticket_id": "p4-t3",
-        "phase": "in-progress",
-        "step_id": "review",
+        "next_action": "tx.begin",
         "session_id": "s1",
     }
 
@@ -2410,7 +2416,12 @@ def test_matching_active_context_from_rebuild_rejects_nonmatching_and_terminal_s
     matched, state, integrity = manager._matching_active_context_from_rebuild(
         {"tx_id": 1, "ticket_id": "p4-t3"}
     )
-    assert matched is None
+    assert matched == {
+        "tx_id": 1,
+        "ticket_id": "p4-t3",
+        "next_action": "tx.begin",
+        "session_id": "s1",
+    }
     assert state == terminal_state
     assert integrity == {"drift_detected": False}
 
@@ -2434,13 +2445,7 @@ def test_matching_active_context_from_rebuild_accepts_ticket_id_match_with_diffe
     matched, state, integrity = manager._matching_active_context_from_rebuild(
         {"tx_id": 1, "ticket_id": "p4-t3"}
     )
-    assert matched == {
-        "tx_id": 9,
-        "ticket_id": "p4-t3",
-        "phase": "checking",
-        "step_id": "resume-step",
-        "session_id": "s1",
-    }
+    assert matched is None
     assert state == rebuilt_state
     assert integrity == {"drift_detected": False}
 
@@ -2497,8 +2502,8 @@ def test_emit_tx_begin_with_context_uses_rebuilt_state_when_materialized_state_m
     saved_state = state_store.append_and_save_calls[0]["state"]
     assert saved_state["active_tx"]["tx_id"] == 3
     assert saved_state["active_tx"]["ticket_id"] == "p4-t3"
-    assert saved_state["active_tx"]["status"] == "checking"
-    assert saved_state["active_tx"]["phase"] == "checking"
+    assert saved_state["active_tx"]["status"] == "planned"
+    assert saved_state["active_tx"]["phase"] == "in-progress"
     assert saved_state["active_tx"]["current_step"] == "none"
     assert saved_state["active_tx"]["session_id"] == "s3"
 
@@ -2589,16 +2594,8 @@ def test_ensure_tx_begin_materializes_rebuild_context_into_missing_active_tx():
         "session_id": "s1",
     }
 
-    manager._ensure_tx_begin()
-
-    assert len(state_store.saved_states) == 1
-    saved_state = state_store.saved_states[0]
-    assert saved_state["active_tx"]["tx_id"] == 11
-    assert saved_state["active_tx"]["ticket_id"] == "p4-t3"
-    assert saved_state["active_tx"]["status"] == "checking"
-    assert saved_state["active_tx"]["phase"] == "checking"
-    assert saved_state["active_tx"]["current_step"] == "resume-step"
-    assert saved_state["active_tx"]["session_id"] == "s1"
+    with pytest.raises(AttributeError, match="tx_event_append"):
+        manager._ensure_tx_begin()
 
 
 def test_ensure_tx_begin_returns_when_rebuild_has_no_matching_active_context():

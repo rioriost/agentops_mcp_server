@@ -11,33 +11,32 @@ from agentops_mcp_server.workflow_response import (
 
 def _tx_state(
     *,
-    tx_id="tx-1",
+    tx_id=1,
     ticket_id="p1-t02",
     status="in-progress",
     phase="in-progress",
     next_action="tx.verify.start",
-    current_step="p1-t02",
+    current_step=None,
     verify_status="not_started",
     commit_status="not_started",
     drift_detected=False,
 ):
-    return {
+    state = {
         "active_tx": {
             "tx_id": tx_id,
             "ticket_id": ticket_id,
-            "status": status,
-            "phase": phase,
-            "next_action": next_action,
-            "current_step": current_step,
-            "verify_state": {
-                "status": verify_status,
-                "last_result": None,
-            },
-            "commit_state": {
-                "status": commit_status,
-                "last_result": None,
-            },
         },
+        "status": status,
+        "next_action": next_action,
+        "verify_state": {
+            "status": verify_status,
+            "last_result": None,
+        },
+        "commit_state": {
+            "status": commit_status,
+            "last_result": None,
+        },
+        "semantic_summary": "work in progress",
         "integrity": {
             "state_hash": "hash",
             "rebuilt_from_seq": 7,
@@ -45,6 +44,9 @@ def _tx_state(
             "active_tx_source": "materialized",
         },
     }
+    if current_step is not None:
+        state["current_step"] = current_step
+    return state
 
 
 def test_derive_workflow_guidance_reads_canonical_fields_from_state():
@@ -65,9 +67,9 @@ def test_derive_workflow_guidance_reads_canonical_fields_from_state():
     assert guidance["terminal"] is False
     assert guidance["requires_followup"] is True
     assert guidance["followup_tool"] is None
-    assert guidance["active_tx_id"] == "tx-1"
+    assert guidance["active_tx_id"] == 1
     assert guidance["active_ticket_id"] == "p1-t02"
-    assert guidance["current_step"] == "verify"
+    assert guidance["current_step"] is None
     assert guidance["verify_status"] == "passed"
     assert guidance["commit_status"] == "not_started"
     assert guidance["integrity_status"] == "ok"
@@ -134,18 +136,27 @@ def test_derive_workflow_guidance_handles_missing_or_invalid_state():
     assert guidance["resume_required"] is False
 
 
-def test_derive_workflow_guidance_ignores_none_tx_identity_values():
+def test_derive_workflow_guidance_uses_structural_no_active_baseline():
     guidance = derive_workflow_guidance(
-        _tx_state(
-            tx_id="none",
-            ticket_id="none",
-            status="checking",
-            phase="checking",
-        )
+        {
+            "active_tx": None,
+            "status": None,
+            "next_action": "tx.begin",
+            "verify_state": None,
+            "commit_state": None,
+            "semantic_summary": None,
+            "integrity": {
+                "state_hash": "hash",
+                "rebuilt_from_seq": 0,
+                "drift_detected": False,
+                "active_tx_source": "none",
+            },
+        }
     )
 
     assert guidance["active_tx_id"] is None
     assert guidance["active_ticket_id"] is None
+    assert guidance["next_action"] == "tx.begin"
     assert guidance["can_start_new_ticket"] is True
     assert guidance["resume_required"] is False
 
@@ -171,7 +182,7 @@ def test_derive_workflow_guidance_allows_explicit_overrides():
         verify_status="running",
         commit_status="failed",
         integrity_status="custom",
-        active_tx_id="override-tx",
+        active_tx_id=99,
         active_ticket_id="override-ticket",
     )
 
@@ -181,7 +192,7 @@ def test_derive_workflow_guidance_allows_explicit_overrides():
     assert guidance["terminal"] is False
     assert guidance["requires_followup"] is True
     assert guidance["followup_tool"] == "ops_end_task"
-    assert guidance["active_tx_id"] == "override-tx"
+    assert guidance["active_tx_id"] == 99
     assert guidance["active_ticket_id"] == "override-ticket"
     assert guidance["current_step"] == "override-step"
     assert guidance["verify_status"] == "running"
@@ -213,7 +224,7 @@ def test_build_success_response_includes_guidance_and_legacy_fields():
     assert response["tx_phase"] == "verified"
     assert response["next_action"] == "tx.commit.start"
     assert response["verify_status"] == "passed"
-    assert response["active_tx_id"] == "tx-1"
+    assert response["active_tx_id"] == 1
     assert response["active_ticket_id"] == "p1-t02"
 
 
@@ -267,9 +278,9 @@ def test_build_failure_response_includes_structured_recovery_fields():
     assert response["terminal"] is False
     assert response["requires_followup"] is True
     assert response["followup_tool"] is None
-    assert response["active_tx_id"] == "tx-1"
+    assert response["active_tx_id"] == 1
     assert response["active_ticket_id"] == "p1-t02"
-    assert response["current_step"] == "verify"
+    assert response["current_step"] is None
     assert response["integrity_status"] == "drift_detected"
     assert response["blocked"] is True
     assert response["rebuild_warning"] == "drift"
@@ -316,7 +327,7 @@ def test_build_failure_response_requires_error_code_and_reason(kwargs, message):
 def test_build_guidance_from_active_tx_wraps_active_tx_state():
     guidance = build_guidance_from_active_tx(
         {
-            "tx_id": "tx-9",
+            "tx_id": 9,
             "ticket_id": "ticket-9",
             "status": "verified",
             "phase": "verified",
@@ -327,10 +338,10 @@ def test_build_guidance_from_active_tx_wraps_active_tx_state():
         }
     )
 
-    assert guidance["active_tx_id"] == "tx-9"
+    assert guidance["active_tx_id"] == 9
     assert guidance["active_ticket_id"] == "ticket-9"
-    assert guidance["canonical_status"] == "verified"
-    assert guidance["current_step"] == "step-9"
+    assert guidance["canonical_status"] == ""
+    assert guidance["current_step"] is None
 
 
 def test_merge_response_data_merges_extra_fields():

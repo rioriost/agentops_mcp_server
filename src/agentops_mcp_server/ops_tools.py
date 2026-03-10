@@ -385,20 +385,12 @@ class OpsTools:
         verify_state = (
             resolved_state.get("verify_state")
             if isinstance(resolved_state.get("verify_state"), dict)
-            else (
-                active_tx.get("verify_state")
-                if isinstance(active_tx.get("verify_state"), dict)
-                else {}
-            )
+            else {}
         )
         commit_state = (
             resolved_state.get("commit_state")
             if isinstance(resolved_state.get("commit_state"), dict)
-            else (
-                active_tx.get("commit_state")
-                if isinstance(active_tx.get("commit_state"), dict)
-                else {}
-            )
+            else {}
         )
         integrity = (
             resolved_state.get("integrity")
@@ -406,16 +398,10 @@ class OpsTools:
             else {}
         )
 
-        response["active_tx"] = active_tx
-        response["active_tx_id"] = (
-            active_tx.get("tx_id") if isinstance(active_tx, dict) else None
-        )
-        response["active_ticket_id"] = (
-            active_tx.get("ticket_id") if isinstance(active_tx, dict) else None
-        )
-        response["current_step"] = (
-            active_tx.get("current_step") if isinstance(active_tx, dict) else None
-        )
+        response["active_tx"] = active_tx if active_tx else None
+        response["active_tx_id"] = active_tx.get("tx_id") if active_tx else None
+        response["active_ticket_id"] = active_tx.get("ticket_id") if active_tx else None
+        response["current_step"] = None
         response["verify_status"] = verify_state.get("status")
         response["commit_status"] = commit_state.get("status")
         response["integrity_status"] = (
@@ -514,15 +500,9 @@ class OpsTools:
         return normalized
 
     def _is_terminal_active_tx(self, active_tx: Dict[str, Any]) -> bool:
-        status = active_tx.get("status")
-        phase = active_tx.get("phase")
-        if isinstance(status, str) and status.strip() in {"done", "blocked"}:
-            return True
-        if isinstance(phase, str) and phase.strip() in {"done", "blocked"}:
-            return True
-        if active_tx.get("_terminal") is True:
-            return True
-        return False
+        tx_state = self._load_tx_state()
+        status = tx_state.get("status") if isinstance(tx_state, dict) else None
+        return isinstance(status, str) and status.strip() in {"done", "blocked"}
 
     def _active_tx_identity(self, active_tx: Dict[str, Any]) -> Dict[str, str]:
         tx_id = self._normalize_tx_identifier(active_tx.get("tx_id"))
@@ -601,27 +581,30 @@ class OpsTools:
         )
         resolved_include_diff = bool(include_diff)
 
-        active_tx = self._active_tx()
+        tx_state = self._load_tx_state()
+        active_tx = (
+            tx_state.get("active_tx")
+            if isinstance(tx_state.get("active_tx"), dict)
+            else {}
+        )
         verify_state = (
-            active_tx.get("verify_state")
-            if isinstance(active_tx.get("verify_state"), dict)
+            tx_state.get("verify_state")
+            if isinstance(tx_state.get("verify_state"), dict)
             else {}
         )
         commit_state = (
-            active_tx.get("commit_state")
-            if isinstance(active_tx.get("commit_state"), dict)
+            tx_state.get("commit_state")
+            if isinstance(tx_state.get("commit_state"), dict)
             else {}
         )
         last_error = self._extract_last_error(verify_state, commit_state)
         last_commit = self._extract_last_commit(commit_state)
         state_view = {
             "session_id": "",
-            "current_phase": active_tx.get("status") or "",
+            "current_phase": tx_state.get("status") or "",
             "current_task": active_tx.get("ticket_id") or "",
-            "last_action": active_tx.get("semantic_summary") or "",
-            "next_step": active_tx.get("next_action")
-            or active_tx.get("current_step")
-            or "",
+            "last_action": tx_state.get("semantic_summary") or "",
+            "next_step": tx_state.get("next_action") or "",
             "verification_status": verify_state.get("status") or "",
             "last_commit": last_commit,
             "last_error": last_error,
@@ -640,58 +623,41 @@ class OpsTools:
     def ops_handoff_export(self) -> Dict[str, Any]:
         rebuild = self.state_rebuilder.rebuild_tx_state()
         if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
-            rebuilt_state = rebuild["state"]
-            integrity = (
-                rebuilt_state.get("integrity")
-                if isinstance(rebuilt_state.get("integrity"), dict)
-                else {}
-            )
-            if integrity.get("drift_detected") is not True:
-                rebuilt_active = (
-                    rebuilt_state.get("active_tx")
-                    if isinstance(rebuilt_state.get("active_tx"), dict)
-                    else {}
-                )
-                next_action = rebuilt_active.get("next_action")
-                current_step = rebuilt_active.get("current_step")
-                if not isinstance(next_action, str) or not next_action.strip():
-                    rebuilt_active["next_action"] = (
-                        current_step.strip()
-                        if isinstance(current_step, str) and current_step.strip()
-                        else "tx.begin"
-                    )
-                self.state_store.tx_state_save(rebuilt_state)
-                active_tx = rebuilt_active
-            else:
-                active_tx = self._active_tx()
+            state = rebuild["state"]
         else:
-            active_tx = self._active_tx()
+            state = self._load_tx_state()
+
+        active_tx = (
+            state.get("active_tx") if isinstance(state.get("active_tx"), dict) else {}
+        )
         verify_state = (
-            active_tx.get("verify_state")
-            if isinstance(active_tx.get("verify_state"), dict)
+            state.get("verify_state")
+            if isinstance(state.get("verify_state"), dict)
             else {}
         )
         commit_state = (
-            active_tx.get("commit_state")
-            if isinstance(active_tx.get("commit_state"), dict)
+            state.get("commit_state")
+            if isinstance(state.get("commit_state"), dict)
             else {}
         )
         last_error = self._extract_last_error(verify_state, commit_state)
         last_commit = self._extract_last_commit(commit_state)
         next_step = (
-            active_tx.get("next_action") or active_tx.get("current_step") or "tx.begin"
+            state.get("next_action")
+            if isinstance(state.get("next_action"), str) and state.get("next_action")
+            else "tx.begin"
         )
 
         handoff = {
             "ts": now_iso(),
             "session_id": "",
             "current_task": active_tx.get("ticket_id") or "",
-            "last_action": active_tx.get("semantic_summary") or "",
+            "last_action": state.get("semantic_summary") or "",
             "next_step": next_step,
             "verification_status": verify_state.get("status") or "",
             "last_commit": last_commit,
             "last_error": last_error,
-            "compact_context": active_tx.get("semantic_summary") or "",
+            "compact_context": state.get("semantic_summary") or "",
         }
         if (
             rebuild.get("ok")

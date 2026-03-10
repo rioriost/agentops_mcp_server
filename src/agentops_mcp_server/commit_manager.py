@@ -35,24 +35,20 @@ class CommitManager:
             return None
         tx_id = active_tx.get("tx_id")
         ticket_id = active_tx.get("ticket_id")
+        next_action = tx_state.get("next_action")
         if isinstance(tx_id, bool) or not isinstance(tx_id, int):
             return None
         if not isinstance(ticket_id, str) or not ticket_id.strip():
             return None
-        phase = active_tx.get("phase")
-        if not isinstance(phase, str) or not phase.strip():
-            phase = "in-progress"
-        step_id = active_tx.get("current_step")
-        if not isinstance(step_id, str) or not step_id.strip():
-            step_id = "commit"
+        if not isinstance(next_action, str) or not next_action.strip():
+            next_action = "tx.begin"
         session_id = active_tx.get("session_id")
         if not isinstance(session_id, str) or not session_id.strip():
             return None
         return {
             "tx_id": tx_id,
             "ticket_id": ticket_id.strip(),
-            "phase": phase,
-            "step_id": step_id,
+            "next_action": next_action.strip(),
             "session_id": session_id.strip(),
         }
 
@@ -68,24 +64,20 @@ class CommitManager:
             return None
         tx_id = active_tx.get("tx_id")
         ticket_id = active_tx.get("ticket_id")
+        next_action = tx_state.get("next_action")
         if isinstance(tx_id, bool) or not isinstance(tx_id, int):
             return None
         if not isinstance(ticket_id, str) or not ticket_id.strip():
             return None
-        phase = active_tx.get("phase")
-        if not isinstance(phase, str) or not phase.strip():
-            phase = "in-progress"
-        step_id = active_tx.get("current_step")
-        if not isinstance(step_id, str) or not step_id.strip():
-            step_id = "commit"
+        if not isinstance(next_action, str) or not next_action.strip():
+            next_action = "tx.begin"
         session_id = active_tx.get("session_id")
         if not isinstance(session_id, str) or not session_id.strip():
             return None
         return {
             "tx_id": tx_id,
             "ticket_id": ticket_id.strip(),
-            "phase": phase.strip(),
-            "step_id": step_id.strip(),
+            "next_action": next_action.strip(),
             "session_id": session_id.strip(),
         }
 
@@ -115,7 +107,11 @@ class CommitManager:
         if rebuilt_context["tx_id"] != requested_tx_id:
             return None, rebuilt_state, integrity
 
-        terminal = rebuilt_context["phase"] in {"done", "blocked"}
+        terminal = (
+            rebuilt_state.get("status") in {"done", "blocked"}
+            if isinstance(rebuilt_state, dict)
+            else False
+        )
         if terminal:
             return None, rebuilt_state, integrity
 
@@ -139,14 +135,14 @@ class CommitManager:
             if isinstance(active_tx, dict):
                 active_tx["tx_id"] = context["tx_id"]
                 active_tx["ticket_id"] = context["ticket_id"]
-                active_tx["phase"] = context["phase"]
+                active_tx["phase"] = "in-progress"
                 active_tx["current_step"] = "none"
                 active_tx["session_id"] = context["session_id"]
                 self.state_store.tx_event_append_and_state_save(
                     tx_id=context["tx_id"],
                     ticket_id=context["ticket_id"],
                     event_type="tx.begin",
-                    phase=context["phase"],
+                    phase="in-progress",
                     step_id="none",
                     actor={"tool": "commit_manager"},
                     session_id=context["session_id"],
@@ -161,7 +157,7 @@ class CommitManager:
             tx_id=context["tx_id"],
             ticket_id=context["ticket_id"],
             event_type="tx.begin",
-            phase=context["phase"],
+            phase="in-progress",
             step_id="none",
             actor={"tool": "commit_manager"},
             session_id=context["session_id"],
@@ -193,8 +189,8 @@ class CommitManager:
                     tx_state["active_tx"] = active_tx
                 active_tx["tx_id"] = rebuild_context["tx_id"]
                 active_tx["ticket_id"] = rebuild_context["ticket_id"]
-                active_tx["phase"] = rebuild_context["phase"]
-                active_tx["current_step"] = rebuild_context["step_id"]
+                active_tx["phase"] = "in-progress"
+                active_tx["current_step"] = "none"
                 active_tx["session_id"] = rebuild_context["session_id"]
                 self.state_store.tx_state_save(tx_state)
             return
@@ -311,8 +307,8 @@ class CommitManager:
         context = self._load_tx_context()
         if not context:
             return None
-        phase = phase_override or context["phase"]
-        step_id = step_id_override or context["step_id"]
+        phase = phase_override or context["next_action"]
+        step_id = step_id_override or "commit"
         actor = {"tool": "commit_manager"}
         tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
         if isinstance(tx_state, dict):
@@ -324,6 +320,54 @@ class CommitManager:
                 active_tx["current_step"] = step_id
                 if isinstance(context.get("session_id"), str):
                     active_tx["session_id"] = context["session_id"]
+                if event_type == "tx.verify.start":
+                    active_tx["status"] = "checking"
+                    active_tx["verify_state"] = {
+                        "status": "running",
+                        "last_result": payload,
+                    }
+                    active_tx["semantic_summary"] = "Verification started"
+                    active_tx["next_action"] = "tx.verify.pass"
+                elif event_type == "tx.verify.pass":
+                    active_tx["status"] = "verified"
+                    active_tx["verify_state"] = {
+                        "status": "passed",
+                        "last_result": payload,
+                    }
+                    active_tx["semantic_summary"] = "Verification passed"
+                    active_tx["next_action"] = "tx.commit.start"
+                elif event_type == "tx.verify.fail":
+                    active_tx["status"] = "checking"
+                    active_tx["verify_state"] = {
+                        "status": "failed",
+                        "last_result": payload,
+                    }
+                    active_tx["semantic_summary"] = "Verification failed"
+                    active_tx["next_action"] = "fix and re-verify"
+                elif event_type == "tx.commit.start":
+                    active_tx["status"] = "verified"
+                    active_tx["commit_state"] = {
+                        "status": "running",
+                        "last_result": payload,
+                    }
+                    active_tx["semantic_summary"] = "Commit started"
+                    active_tx["next_action"] = "tx.commit.done"
+                elif event_type == "tx.commit.done":
+                    active_tx["status"] = "committed"
+                    active_tx["commit_state"] = {
+                        "status": "passed",
+                        "last_result": payload,
+                    }
+                    active_tx["semantic_summary"] = "Commit completed"
+                    active_tx["next_action"] = "tx.end.done"
+                elif event_type == "tx.commit.fail":
+                    active_tx["status"] = "verified"
+                    active_tx["commit_state"] = {
+                        "status": "failed",
+                        "last_result": payload,
+                    }
+                    active_tx["semantic_summary"] = "Commit failed"
+                    active_tx["next_action"] = "tx.commit.start"
             return self.state_store.tx_event_append_and_state_save(
                 tx_id=context["tx_id"],
                 ticket_id=context["ticket_id"],
@@ -355,6 +399,54 @@ class CommitManager:
                         active_tx["current_step"] = step_id
                         if isinstance(context.get("session_id"), str):
                             active_tx["session_id"] = context["session_id"]
+                        if event_type == "tx.verify.start":
+                            active_tx["status"] = "checking"
+                            active_tx["verify_state"] = {
+                                "status": "running",
+                                "last_result": payload,
+                            }
+                            active_tx["semantic_summary"] = "Verification started"
+                            active_tx["next_action"] = "tx.verify.pass"
+                        elif event_type == "tx.verify.pass":
+                            active_tx["status"] = "verified"
+                            active_tx["verify_state"] = {
+                                "status": "passed",
+                                "last_result": payload,
+                            }
+                            active_tx["semantic_summary"] = "Verification passed"
+                            active_tx["next_action"] = "tx.commit.start"
+                        elif event_type == "tx.verify.fail":
+                            active_tx["status"] = "checking"
+                            active_tx["verify_state"] = {
+                                "status": "failed",
+                                "last_result": payload,
+                            }
+                            active_tx["semantic_summary"] = "Verification failed"
+                            active_tx["next_action"] = "fix and re-verify"
+                        elif event_type == "tx.commit.start":
+                            active_tx["status"] = "verified"
+                            active_tx["commit_state"] = {
+                                "status": "running",
+                                "last_result": payload,
+                            }
+                            active_tx["semantic_summary"] = "Commit started"
+                            active_tx["next_action"] = "tx.commit.done"
+                        elif event_type == "tx.commit.done":
+                            active_tx["status"] = "committed"
+                            active_tx["commit_state"] = {
+                                "status": "passed",
+                                "last_result": payload,
+                            }
+                            active_tx["semantic_summary"] = "Commit completed"
+                            active_tx["next_action"] = "tx.end.done"
+                        elif event_type == "tx.commit.fail":
+                            active_tx["status"] = "verified"
+                            active_tx["commit_state"] = {
+                                "status": "failed",
+                                "last_result": payload,
+                            }
+                            active_tx["semantic_summary"] = "Commit failed"
+                            active_tx["next_action"] = "tx.commit.start"
                     return self.state_store.tx_event_append_and_state_save(
                         tx_id=context["tx_id"],
                         ticket_id=context["ticket_id"],

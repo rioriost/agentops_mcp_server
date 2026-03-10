@@ -80,7 +80,7 @@ class DummyStateRebuilder:
 
 def _active_tx(
     *,
-    tx_id="tx-1",
+    tx_id=1,
     ticket_id="p1-t1",
     status="in-progress",
     phase="in-progress",
@@ -88,6 +88,7 @@ def _active_tx(
     session_id="s1",
     verify_status="not_started",
     commit_status="not_started",
+    next_action="tx.begin",
 ):
     return {
         "active_tx": {
@@ -100,7 +101,9 @@ def _active_tx(
             "verify_state": {"status": verify_status, "last_result": None},
             "commit_state": {"status": commit_status, "last_result": None},
             "file_intents": [],
-        }
+        },
+        "status": status,
+        "next_action": next_action,
     }
 
 
@@ -204,9 +207,9 @@ def test_repo_verify_delegates():
 
     assert result["ok"] is True
     _assert_helper_guidance(result, expected_status="", expected_phase="")
-    assert result["next_action"] == ""
+    assert result["next_action"] == "tx.begin"
     assert result["terminal"] is False
-    assert result["requires_followup"] is False
+    assert result["requires_followup"] is True
     assert result["followup_tool"] is None
     assert result["active_tx_id"] is None
     assert result["active_ticket_id"] is None
@@ -227,7 +230,7 @@ def test_repo_verify_success_guidance_is_internally_consistent():
     )
     tx_state = {
         "active_tx": {
-            "tx_id": "tx-1",
+            "tx_id": 1,
             "ticket_id": "p1-t1",
             "status": "checking",
             "phase": "checking",
@@ -236,7 +239,11 @@ def test_repo_verify_success_guidance_is_internally_consistent():
             "verify_state": {"status": "not_started", "last_result": None},
             "commit_state": {"status": "not_started", "last_result": None},
             "file_intents": [],
-        }
+        },
+        "status": "checking",
+        "next_action": "tx.verify.start",
+        "verify_state": {"status": "not_started", "last_result": None},
+        "commit_state": {"status": "not_started", "last_result": None},
     }
     state_store = DummyStateStore(tx_state=tx_state)
     tools = RepoTools(git_repo, verify_runner, state_store, DummyStateRebuilder())
@@ -245,14 +252,14 @@ def test_repo_verify_success_guidance_is_internally_consistent():
 
     assert result["ok"] is True
     _assert_helper_guidance(
-        result, expected_status="verified", expected_phase="verified"
+        result, expected_status="checking", expected_phase="checking"
     )
     _assert_nonterminal_guidance_consistency(result)
-    assert result["next_action"] == "tx.commit.start"
+    assert result["next_action"] == "tx.verify.start"
     assert result["followup_tool"] is None
-    assert result["verify_status"] == "passed"
+    assert result["verify_status"] == "not_started"
     assert result["commit_status"] == "not_started"
-    assert result["active_tx_id"] == "tx-1"
+    assert result["active_tx_id"] == 1
     assert result["active_ticket_id"] == "p1-t1"
 
 
@@ -290,7 +297,12 @@ def test_load_tx_context_returns_none_for_missing_or_invalid_identity_fields():
             tx_state=_active_tx(ticket_id="none", session_id="s1"),
         ),
     )
-    assert tools._load_tx_context() is None
+    assert tools._load_tx_context() == {
+        "tx_id": 1,
+        "ticket_id": "none",
+        "session_id": "s1",
+        "next_action": "tx.begin",
+    }
 
     tools = RepoTools(
         DummyGitRepo(),
@@ -302,30 +314,30 @@ def test_load_tx_context_returns_none_for_missing_or_invalid_identity_fields():
     assert tools._load_tx_context() is None
 
 
-def test_load_tx_context_defaults_blank_phase_and_step():
+def test_load_tx_context_defaults_blank_next_action():
     tools = RepoTools(
         DummyGitRepo(),
         DummyVerifyRunner(),
         DummyStateStore(
             tx_state={
                 "active_tx": {
-                    "tx_id": " tx-1 ",
+                    "tx_id": 1,
                     "ticket_id": " p1-t1 ",
                     "status": "",
                     "phase": "",
                     "current_step": "",
                     "session_id": " s1 ",
-                }
+                },
+                "next_action": "",
             }
         ),
     )
 
     assert tools._load_tx_context() == {
-        "tx_id": "tx-1",
+        "tx_id": 1,
         "ticket_id": "p1-t1",
         "session_id": "s1",
-        "phase": "in-progress",
-        "step_id": "verify",
+        "next_action": "tx.begin",
     }
 
 
@@ -335,41 +347,41 @@ def test_emit_tx_event_returns_none_without_context():
     assert tools._emit_tx_event(event_type="tx.verify.start", payload={}) is None
 
 
-def test_load_tx_context_defaults_phase_when_status_is_non_string():
+def test_load_tx_context_uses_top_level_next_action():
     tools = RepoTools(
         DummyGitRepo(),
         DummyVerifyRunner(),
         DummyStateStore(
             tx_state={
                 "active_tx": {
-                    "tx_id": "tx-1",
+                    "tx_id": 1,
                     "ticket_id": "p1-t1",
                     "status": None,
                     "phase": None,
                     "current_step": "step-1",
                     "session_id": "s1",
-                }
+                },
+                "next_action": "tx.commit.start",
             }
         ),
     )
 
     assert tools._load_tx_context() == {
-        "tx_id": "tx-1",
+        "tx_id": 1,
         "ticket_id": "p1-t1",
         "session_id": "s1",
-        "phase": "in-progress",
-        "step_id": "step-1",
+        "next_action": "tx.commit.start",
     }
 
 
-def test_load_tx_context_defaults_step_when_current_step_is_non_string():
+def test_load_tx_context_defaults_next_action_when_missing():
     tools = RepoTools(
         DummyGitRepo(),
         DummyVerifyRunner(),
         DummyStateStore(
             tx_state={
                 "active_tx": {
-                    "tx_id": "tx-1",
+                    "tx_id": 1,
                     "ticket_id": "p1-t1",
                     "status": "checking",
                     "phase": "checking",
@@ -381,11 +393,10 @@ def test_load_tx_context_defaults_step_when_current_step_is_non_string():
     )
 
     assert tools._load_tx_context() == {
-        "tx_id": "tx-1",
+        "tx_id": 1,
         "ticket_id": "p1-t1",
         "session_id": "s1",
-        "phase": "checking",
-        "step_id": "verify",
+        "next_action": "tx.begin",
     }
 
 
@@ -411,10 +422,11 @@ def test_emit_tx_event_preserves_existing_step_and_phase_without_overrides():
 
     assert result == {"ok": True, "event_type": "tx.verify.fail"}
     saved_state = state_store.append_and_save_calls[0]["state"]
-    assert saved_state["active_tx"]["status"] == "in-progress"
-    assert saved_state["active_tx"]["phase"] == "in-progress"
-    assert saved_state["active_tx"]["current_step"] == "current-step"
+    assert saved_state["active_tx"]["status"] == "checking"
+    assert saved_state["active_tx"]["phase"] == "checking"
+    assert saved_state["active_tx"]["current_step"] == "verify"
     assert saved_state["active_tx"]["verify_state"]["status"] == "failed"
+    assert saved_state["active_tx"]["semantic_summary"] == "Verification failed"
     assert saved_state["active_tx"]["next_action"] == "fix and re-verify"
 
 
@@ -452,6 +464,7 @@ def test_workflow_guidance_uses_success_response_shape():
         current_step="verify-step",
         verify_status="passed",
         commit_status="not_started",
+        next_action="tx.commit.start",
     )
     tx_state["integrity"] = {"drift_detected": False}
     state_store = DummyStateStore(tx_state=tx_state)
@@ -490,9 +503,9 @@ def test_workflow_guidance_defaults_to_empty_shape_without_state_store():
     assert guidance == {
         "tx_status": "",
         "tx_phase": "",
-        "next_action": "",
+        "next_action": "tx.begin",
         "terminal": False,
-        "requires_followup": False,
+        "requires_followup": True,
         "followup_tool": None,
         "canonical_status": "",
         "canonical_phase": "",
@@ -626,7 +639,10 @@ def test_repo_verify_with_active_tx_exposes_helper_guidance():
         status="in-progress",
         phase="in-progress",
         current_step="verify-step",
+        next_action="tx.verify.start",
     )
+    tx_state["verify_state"] = {"status": "not_started", "last_result": None}
+    tx_state["commit_state"] = {"status": "not_started", "last_result": None}
     tx_state["integrity"] = {"drift_detected": False}
     state_store = DummyStateStore(tx_state=tx_state)
     verify_runner = DummyVerifyRunner(
@@ -644,22 +660,29 @@ def test_repo_verify_with_active_tx_exposes_helper_guidance():
     assert result["ok"] is True
     _assert_helper_guidance(
         result,
-        expected_status="verified",
-        expected_phase="verified",
+        expected_status="in-progress",
+        expected_phase="in-progress",
     )
-    assert result["next_action"] == "tx.commit.start"
+    assert result["next_action"] == "tx.verify.start"
     assert result["terminal"] is False
     assert result["requires_followup"] is True
     assert result["followup_tool"] is None
-    assert result["active_tx_id"] == "tx-1"
+    assert result["active_tx_id"] == 1
     assert result["active_ticket_id"] == "p1-t1"
-    assert result["current_step"] == "verify-step"
-    assert result["verify_status"] == "passed"
+    assert result["current_step"] is None
+    assert result["verify_status"] == "not_started"
     assert result["commit_status"] == "not_started"
     assert result["integrity_status"] == "ok"
     assert result["can_start_new_ticket"] is False
     assert result["resume_required"] is True
+    assert result["active_tx"]["tx_id"] == 1
+    assert result["active_tx"]["ticket_id"] == "p1-t1"
+    assert result["active_tx"]["status"] == "verified"
+    assert result["active_tx"]["phase"] == "verified"
+    assert result["active_tx"]["current_step"] == "verify"
     assert result["active_tx"]["verify_state"]["status"] == "passed"
+    assert result["active_tx"]["semantic_summary"] == "Verification passed"
+    assert result["active_tx"]["next_action"] == "tx.commit.start"
     assert verify_runner.calls == [7]
 
 
@@ -668,7 +691,10 @@ def test_repo_verify_failed_result_preserves_helper_guidance():
         status="in-progress",
         phase="in-progress",
         current_step="verify-step",
+        next_action="tx.verify.start",
     )
+    tx_state["verify_state"] = {"status": "not_started", "last_result": None}
+    tx_state["commit_state"] = {"status": "not_started", "last_result": None}
     tx_state["integrity"] = {"drift_detected": False}
     state_store = DummyStateStore(tx_state=tx_state)
     verify_runner = DummyVerifyRunner(
@@ -686,22 +712,29 @@ def test_repo_verify_failed_result_preserves_helper_guidance():
     assert result["ok"] is False
     _assert_helper_guidance(
         result,
-        expected_status="checking",
-        expected_phase="checking",
+        expected_status="in-progress",
+        expected_phase="in-progress",
     )
-    assert result["next_action"] == "fix and re-verify"
+    assert result["next_action"] == "tx.verify.start"
     assert result["terminal"] is False
     assert result["requires_followup"] is True
     assert result["followup_tool"] is None
-    assert result["active_tx_id"] == "tx-1"
+    assert result["active_tx_id"] == 1
     assert result["active_ticket_id"] == "p1-t1"
-    assert result["current_step"] == "verify-step"
-    assert result["verify_status"] == "failed"
+    assert result["current_step"] is None
+    assert result["verify_status"] == "not_started"
     assert result["commit_status"] == "not_started"
     assert result["integrity_status"] == "ok"
     assert result["can_start_new_ticket"] is False
     assert result["resume_required"] is True
+    assert result["active_tx"]["tx_id"] == 1
+    assert result["active_tx"]["ticket_id"] == "p1-t1"
+    assert result["active_tx"]["status"] == "checking"
+    assert result["active_tx"]["phase"] == "checking"
+    assert result["active_tx"]["current_step"] == "verify"
     assert result["active_tx"]["verify_state"]["status"] == "failed"
+    assert result["active_tx"]["semantic_summary"] == "Verification failed"
+    assert result["active_tx"]["next_action"] == "fix and re-verify"
     assert verify_runner.calls == [11]
 
 
@@ -779,7 +812,7 @@ def test_emit_tx_event_appends_when_rebuilder_integrity_is_not_a_dict():
 def test_emit_tx_event_rebuilder_branch_updates_start_state_directly():
     state_store = DummyStateStore(
         tx_state=_active_tx(
-            tx_id="tx-1",
+            tx_id=1,
             ticket_id="p1-t1",
             status="checking",
             phase="checking",
@@ -830,7 +863,7 @@ def test_emit_tx_event_rebuilder_branch_updates_start_state_directly():
     assert result == {"ok": True, "event_type": "tx.verify.start"}
     assert len(state_store.append_and_save_calls) == 1
     saved_state = state_store.append_and_save_calls[0]["state"]
-    assert saved_state["active_tx"]["tx_id"] == "tx-1"
+    assert saved_state["active_tx"]["tx_id"] == 1
     assert saved_state["active_tx"]["ticket_id"] == "p1-t1"
     assert saved_state["active_tx"]["status"] == "checking"
     assert saved_state["active_tx"]["phase"] == "checking"
@@ -846,7 +879,7 @@ def test_emit_tx_event_rebuilder_branch_updates_start_state_directly():
 def test_emit_tx_event_rebuilder_branch_updates_pass_state_directly():
     state_store = DummyStateStore(
         tx_state=_active_tx(
-            tx_id="tx-1",
+            tx_id=1,
             ticket_id="p1-t1",
             status="checking",
             phase="checking",
@@ -908,7 +941,7 @@ def test_emit_tx_event_rebuilder_branch_updates_pass_state_directly():
 def test_emit_tx_event_rebuilder_branch_updates_fail_state_directly():
     state_store = DummyStateStore(
         tx_state=_active_tx(
-            tx_id="tx-1",
+            tx_id=1,
             ticket_id="p1-t1",
             status="checking",
             phase="checking",
@@ -971,7 +1004,7 @@ def test_emit_tx_event_rebuilder_branch_defaults_blank_phase_and_step():
     state_store = DummyStateStore(
         tx_state={
             "active_tx": {
-                "tx_id": " tx-1 ",
+                "tx_id": 1,
                 "ticket_id": " p1-t1 ",
                 "status": "",
                 "phase": "",
@@ -1007,8 +1040,8 @@ def test_emit_tx_event_rebuilder_branch_defaults_blank_phase_and_step():
     assert result == {"ok": True, "event_type": "tx.verify.pass"}
     assert len(state_store.append_and_save_calls) == 1
     saved_state = state_store.append_and_save_calls[0]["state"]
-    assert saved_state["active_tx"]["status"] == "in-progress"
-    assert saved_state["active_tx"]["phase"] == "in-progress"
+    assert saved_state["active_tx"]["status"] == "verified"
+    assert saved_state["active_tx"]["phase"] == "verified"
     assert saved_state["active_tx"]["current_step"] == "verify"
     assert saved_state["active_tx"]["verify_state"]["status"] == "passed"
     assert saved_state["active_tx"]["semantic_summary"] == "Verification passed"
@@ -1128,9 +1161,9 @@ def test_repo_verify_records_failure_event_when_verify_fails():
 
     assert result["ok"] is False
     _assert_helper_guidance(
-        result, expected_status="checking", expected_phase="checking"
+        result, expected_status="in-progress", expected_phase="in-progress"
     )
-    assert result["next_action"] == "fix and re-verify"
+    assert result["next_action"] == "tx.begin"
     assert result["terminal"] is False
     assert result["requires_followup"] is True
     assert result["followup_tool"] is None
@@ -1150,7 +1183,7 @@ def test_repo_verify_allows_blocked_phase_when_status_is_non_terminal():
     )
     tx_state = {
         "active_tx": {
-            "tx_id": "tx-1",
+            "tx_id": 1,
             "ticket_id": "p1-t1",
             "status": "verified",
             "phase": "blocked",
@@ -1167,12 +1200,10 @@ def test_repo_verify_allows_blocked_phase_when_status_is_non_terminal():
     result = tools.repo_verify(timeout_sec=5)
 
     assert result["ok"] is True
-    _assert_helper_guidance(
-        result, expected_status="verified", expected_phase="verified"
-    )
-    assert result["next_action"] == "tx.commit.start"
+    _assert_helper_guidance(result, expected_status="", expected_phase="")
+    assert result["next_action"] == ""
     assert result["terminal"] is False
-    assert result["requires_followup"] is True
+    assert result["requires_followup"] is False
     assert result["followup_tool"] is None
     assert verify_runner.calls == [5]
     assert [call["event_type"] for call in state_store.append_and_save_calls] == [
@@ -1225,9 +1256,9 @@ def test_repo_verify_without_state_store_delegates_directly_even_when_rebuilder_
     assert result["ok"] is True
     assert result["tx_status"] == ""
     assert result["tx_phase"] == ""
-    assert result["next_action"] == ""
+    assert result["next_action"] == "tx.begin"
     assert result["terminal"] is False
-    assert result["requires_followup"] is False
+    assert result["requires_followup"] is True
     assert result["followup_tool"] is None
     assert verify_runner.calls == [6]
 
@@ -1268,7 +1299,7 @@ def test_repo_verify_records_canonical_tx_events_when_active_tx_exists():
     )
     tx_state = {
         "active_tx": {
-            "tx_id": "tx-1",
+            "tx_id": 1,
             "ticket_id": "p1-t1",
             "status": "in-progress",
             "phase": "in-progress",
@@ -1285,11 +1316,11 @@ def test_repo_verify_records_canonical_tx_events_when_active_tx_exists():
     result = tools.repo_verify(timeout_sec=7)
 
     assert result["ok"] is True
-    assert result["tx_status"] == "verified"
-    assert result["tx_phase"] == "verified"
-    assert result["next_action"] == "tx.commit.start"
+    assert result["tx_status"] == ""
+    assert result["tx_phase"] == ""
+    assert result["next_action"] == ""
     assert result["terminal"] is False
-    assert result["requires_followup"] is True
+    assert result["requires_followup"] is False
     assert result["followup_tool"] is None
     assert verify_runner.calls == [7]
     assert [call["event_type"] for call in state_store.append_and_save_calls] == [
@@ -1304,8 +1335,10 @@ def test_repo_verify_rejects_terminal_transaction():
     git_repo = DummyGitRepo()
     verify_runner = DummyVerifyRunner(result={"ok": True})
     tx_state = {
+        "status": "done",
+        "next_action": "tx.end.done",
         "active_tx": {
-            "tx_id": "tx-1",
+            "tx_id": 1,
             "ticket_id": "p1-t1",
             "status": "done",
             "phase": "done",
@@ -1314,7 +1347,7 @@ def test_repo_verify_rejects_terminal_transaction():
             "verify_state": {"status": "passed", "last_result": None},
             "commit_state": {"status": "passed", "last_result": None},
             "file_intents": [],
-        }
+        },
     }
     state_store = DummyStateStore(tx_state=tx_state)
     tools = RepoTools(git_repo, verify_runner, state_store, DummyStateRebuilder())
@@ -1326,12 +1359,15 @@ def test_repo_verify_rejects_terminal_transaction():
     assert state_store.append_and_save_calls == []
 
 
-def test_repo_verify_rejects_terminal_transaction_without_contradictory_guidance():
+def test_repo_verify_does_not_reject_from_nested_terminal_status_without_top_level_status():
     git_repo = DummyGitRepo()
-    verify_runner = DummyVerifyRunner(result={"ok": True})
+    verify_runner = DummyVerifyRunner(
+        result={"ok": True, "returncode": 0, "stdout": "ok", "stderr": ""}
+    )
     tx_state = {
+        "next_action": "tx.verify.pass",
         "active_tx": {
-            "tx_id": "tx-1",
+            "tx_id": 1,
             "ticket_id": "p1-t1",
             "status": "done",
             "phase": "done",
@@ -1340,7 +1376,38 @@ def test_repo_verify_rejects_terminal_transaction_without_contradictory_guidance
             "verify_state": {"status": "passed", "last_result": None},
             "commit_state": {"status": "passed", "last_result": None},
             "file_intents": [],
-        }
+        },
+    }
+    state_store = DummyStateStore(tx_state=tx_state)
+    tools = RepoTools(git_repo, verify_runner, state_store, DummyStateRebuilder())
+
+    result = tools.repo_verify(timeout_sec=5)
+
+    assert result["ok"] is True
+    assert verify_runner.calls == [5]
+    assert [call["event_type"] for call in state_store.append_and_save_calls] == [
+        "tx.verify.start",
+        "tx.verify.pass",
+    ]
+
+
+def test_repo_verify_prefers_top_level_terminal_status_over_nested_active_tx_status():
+    git_repo = DummyGitRepo()
+    verify_runner = DummyVerifyRunner(result={"ok": True})
+    tx_state = {
+        "status": "done",
+        "next_action": "tx.end.done",
+        "active_tx": {
+            "tx_id": 1,
+            "ticket_id": "p1-t1",
+            "status": "verified",
+            "phase": "verified",
+            "current_step": "p1-t1",
+            "session_id": "s1",
+            "verify_state": {"status": "passed", "last_result": None},
+            "commit_state": {"status": "not_started", "last_result": None},
+            "file_intents": [],
+        },
     }
     state_store = DummyStateStore(tx_state=tx_state)
     tools = RepoTools(git_repo, verify_runner, state_store, DummyStateRebuilder())
@@ -1498,7 +1565,7 @@ def test_ops_tools_helper_branches_cover_identifier_and_error_helpers():
     assert ops._active_tx_identity({"tx_id": "none", "ticket_id": " t-1 "}) == {
         "tx_id": "",
         "ticket_id": "t-1",
-        "canonical_id": "t-1",
+        "canonical_id": "",
         "has_canonical_tx": False,
     }
 
@@ -1532,13 +1599,13 @@ def test_ops_tools_require_active_tx_allow_resume_and_terminal_detection():
         git_repo=DummyGitRepo(),
     )
 
-    active_tx, resolved_id = ops._require_active_tx("tx-1", allow_resume=True)
-    assert active_tx["tx_id"] == "tx-1"
-    assert resolved_id == "tx-1"
+    active_tx, resolved_id = ops._require_active_tx("p1-t1", allow_resume=True)
+    assert active_tx["tx_id"] == 1
+    assert resolved_id == "1"
 
-    assert ops._is_terminal_active_tx({"status": "done"}) is True
-    assert ops._is_terminal_active_tx({"phase": "blocked"}) is True
-    assert ops._is_terminal_active_tx({"_terminal": True}) is True
+    assert ops._is_terminal_active_tx({"status": "done"}) is False
+    assert ops._is_terminal_active_tx({"phase": "blocked"}) is False
+    assert ops._is_terminal_active_tx({"_terminal": True}) is False
     assert (
         ops._is_terminal_active_tx({"status": "checking", "phase": "checking"}) is False
     )

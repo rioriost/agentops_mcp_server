@@ -481,33 +481,57 @@ class StateStore:
             return
 
         if event_type in {"tx.verify.pass", "tx.verify.fail"}:
+            state = self.read_json_file(self.repo_context.tx_state)
             verify_state = (
-                active_tx.get("verify_state")
-                if isinstance(active_tx.get("verify_state"), dict)
+                state.get("verify_state")
+                if isinstance(state, dict)
+                and isinstance(state.get("verify_state"), dict)
                 else {}
             )
             if verify_state.get("status") != "running":
-                raise ValueError("verify result requires verify.start")
+                last_event = self.read_last_json_line(self.repo_context.tx_event_log)
+                if not (
+                    isinstance(last_event, dict)
+                    and last_event.get("tx_id") == tx_id
+                    and last_event.get("event_type") == "tx.verify.start"
+                ):
+                    raise ValueError("verify result requires verify.start")
             return
 
         if event_type == "tx.commit.start":
+            state = self.read_json_file(self.repo_context.tx_state)
             verify_state = (
-                active_tx.get("verify_state")
-                if isinstance(active_tx.get("verify_state"), dict)
+                state.get("verify_state")
+                if isinstance(state, dict)
+                and isinstance(state.get("verify_state"), dict)
                 else {}
             )
             if verify_state.get("status") != "passed":
-                raise ValueError("commit.start requires verify.pass")
+                last_event = self.read_last_json_line(self.repo_context.tx_event_log)
+                if not (
+                    isinstance(last_event, dict)
+                    and last_event.get("tx_id") == tx_id
+                    and last_event.get("event_type") == "tx.verify.pass"
+                ):
+                    raise ValueError("commit.start requires verify.pass")
             return
 
         if event_type in {"tx.commit.done", "tx.commit.fail"}:
+            state = self.read_json_file(self.repo_context.tx_state)
             commit_state = (
-                active_tx.get("commit_state")
-                if isinstance(active_tx.get("commit_state"), dict)
+                state.get("commit_state")
+                if isinstance(state, dict)
+                and isinstance(state.get("commit_state"), dict)
                 else {}
             )
             if commit_state.get("status") != "running":
-                raise ValueError("commit result requires commit.start")
+                last_event = self.read_last_json_line(self.repo_context.tx_event_log)
+                if not (
+                    isinstance(last_event, dict)
+                    and last_event.get("tx_id") == tx_id
+                    and last_event.get("event_type") == "tx.commit.start"
+                ):
+                    raise ValueError("commit result requires commit.start")
             return
 
     def next_tx_event_seq(self) -> int:
@@ -609,18 +633,8 @@ class StateStore:
             if not isinstance(ticket_id, str) or not ticket_id.strip():
                 raise ValueError("active_tx.ticket_id is required")
 
-            phase = active_tx.get("phase")
-            if not isinstance(phase, str) or phase not in TX_STATUS_VALUES:
-                raise ValueError("active_tx.phase is invalid")
-
             if not isinstance(status, str) or status not in TX_STATUS_VALUES:
                 raise ValueError("status is invalid")
-
-            current_step = active_tx.get("current_step")
-            if not isinstance(current_step, str) or not current_step.strip():
-                raise ValueError("active_tx.current_step is required")
-            if not isinstance(active_tx.get("file_intents"), list):
-                raise ValueError("active_tx.file_intents is required")
 
             if not isinstance(next_action, str) or not next_action.strip():
                 raise ValueError("next_action is required")
@@ -628,29 +642,25 @@ class StateStore:
             if not isinstance(semantic_summary, str) or not semantic_summary.strip():
                 raise ValueError("semantic_summary is required")
 
-            if "user_intent" not in active_tx:
-                raise ValueError("active_tx.user_intent is required")
-            user_intent = active_tx.get("user_intent")
-            if user_intent is not None and not isinstance(user_intent, str):
-                raise ValueError("active_tx.user_intent must be string or null")
+            if verify_state is not None:
+                if not isinstance(verify_state, dict):
+                    raise ValueError("verify_state must be an object or null")
+                verify_status = verify_state.get("status")
+                if (
+                    not isinstance(verify_status, str)
+                    or verify_status not in VERIFY_STATUS_VALUES
+                ):
+                    raise ValueError("verify_state.status is invalid")
 
-            if not isinstance(verify_state, dict):
-                raise ValueError("verify_state is required")
-            verify_status = verify_state.get("status")
-            if (
-                not isinstance(verify_status, str)
-                or verify_status not in VERIFY_STATUS_VALUES
-            ):
-                raise ValueError("verify_state.status is invalid")
-
-            if not isinstance(commit_state, dict):
-                raise ValueError("commit_state is required")
-            commit_status = commit_state.get("status")
-            if (
-                not isinstance(commit_status, str)
-                or commit_status not in COMMIT_STATUS_VALUES
-            ):
-                raise ValueError("commit_state.status is invalid")
+            if commit_state is not None:
+                if not isinstance(commit_state, dict):
+                    raise ValueError("commit_state must be an object or null")
+                commit_status = commit_state.get("status")
+                if (
+                    not isinstance(commit_status, str)
+                    or commit_status not in COMMIT_STATUS_VALUES
+                ):
+                    raise ValueError("commit_state.status is invalid")
 
         integrity = state.get("integrity")
         if not isinstance(integrity, dict):

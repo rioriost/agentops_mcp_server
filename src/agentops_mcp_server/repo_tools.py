@@ -21,6 +21,52 @@ class RepoTools:
         self.state_store = state_store
         self.state_rebuilder = state_rebuilder
 
+    def _apply_verify_event_state(
+        self,
+        *,
+        active_tx: Dict[str, Any],
+        event_type: str,
+        payload: Dict[str, Any],
+        phase: str,
+        step_id: str,
+        session_id: str,
+        tx_id: int,
+        ticket_id: str,
+    ) -> None:
+        active_tx["tx_id"] = tx_id
+        active_tx["ticket_id"] = ticket_id
+        active_tx["session_id"] = session_id
+
+        if event_type == "tx.verify.start":
+            active_tx["status"] = "checking"
+            active_tx["phase"] = "checking"
+            active_tx["current_step"] = step_id
+            active_tx["verify_state"] = {
+                "status": "running",
+                "last_result": payload,
+            }
+            active_tx["next_action"] = "tx.verify.pass"
+        elif event_type == "tx.verify.pass":
+            active_tx["status"] = "verified"
+            active_tx["phase"] = "verified"
+            active_tx["current_step"] = step_id
+            active_tx["verify_state"] = {
+                "status": "passed",
+                "last_result": payload,
+            }
+            active_tx["semantic_summary"] = "Verification passed"
+            active_tx["next_action"] = "tx.commit.start"
+        elif event_type == "tx.verify.fail":
+            active_tx["status"] = "checking"
+            active_tx["phase"] = "checking"
+            active_tx["current_step"] = step_id
+            active_tx["verify_state"] = {
+                "status": "failed",
+                "last_result": payload,
+            }
+            active_tx["semantic_summary"] = "Verification failed"
+            active_tx["next_action"] = "fix and re-verify"
+
     def _load_tx_context(self) -> Optional[Dict[str, Any]]:
         if self.state_store is None:
             return None
@@ -36,8 +82,7 @@ class RepoTools:
         tx_id = active_tx.get("tx_id")
         ticket_id = active_tx.get("ticket_id")
         session_id = active_tx.get("session_id")
-        phase = active_tx.get("phase") or "in-progress"
-        step_id = active_tx.get("current_step") or "verify"
+        next_action = tx_state.get("next_action")
 
         if isinstance(tx_id, bool) or not isinstance(tx_id, int):
             return None
@@ -45,17 +90,14 @@ class RepoTools:
             return None
         if not isinstance(session_id, str) or not session_id.strip():
             return None
-        if not isinstance(phase, str) or not phase.strip():
-            phase = "in-progress"
-        if not isinstance(step_id, str) or not step_id.strip():
-            step_id = "verify"
+        if not isinstance(next_action, str) or not next_action.strip():
+            next_action = "tx.begin"
 
         return {
             "tx_id": tx_id,
             "ticket_id": ticket_id.strip(),
             "session_id": session_id.strip(),
-            "phase": phase.strip(),
-            "step_id": step_id.strip(),
+            "next_action": next_action.strip(),
         }
 
     def _emit_tx_event(
@@ -70,8 +112,8 @@ class RepoTools:
         if not context or self.state_store is None:
             return None
 
-        phase = phase_override or context["phase"]
-        step_id = step_id_override or context["step_id"]
+        phase = phase_override or context["next_action"]
+        step_id = step_id_override or "verify"
         actor = {"tool": "repo_tools"}
 
         tx_state = self.state_store.read_json_file(
@@ -80,11 +122,16 @@ class RepoTools:
         if isinstance(tx_state, dict):
             active_tx = tx_state.get("active_tx")
             if isinstance(active_tx, dict):
-                active_tx["tx_id"] = context["tx_id"]
-                active_tx["ticket_id"] = context["ticket_id"]
-                active_tx["phase"] = phase
-                active_tx["current_step"] = step_id
-                active_tx["session_id"] = context["session_id"]
+                self._apply_verify_event_state(
+                    active_tx=active_tx,
+                    event_type=event_type,
+                    payload=payload,
+                    phase=phase,
+                    step_id=step_id,
+                    session_id=context["session_id"],
+                    tx_id=context["tx_id"],
+                    ticket_id=context["ticket_id"],
+                )
             return self.state_store.tx_event_append_and_state_save(
                 tx_id=context["tx_id"],
                 ticket_id=context["ticket_id"],
@@ -109,11 +156,16 @@ class RepoTools:
                 if integrity.get("drift_detected") is not True:
                     active_tx = state.get("active_tx")
                     if isinstance(active_tx, dict):
-                        active_tx["tx_id"] = context["tx_id"]
-                        active_tx["ticket_id"] = context["ticket_id"]
-                        active_tx["phase"] = phase
-                        active_tx["current_step"] = step_id
-                        active_tx["session_id"] = context["session_id"]
+                        self._apply_verify_event_state(
+                            active_tx=active_tx,
+                            event_type=event_type,
+                            payload=payload,
+                            phase=phase,
+                            step_id=step_id,
+                            session_id=context["session_id"],
+                            tx_id=context["tx_id"],
+                            ticket_id=context["ticket_id"],
+                        )
                     return self.state_store.tx_event_append_and_state_save(
                         tx_id=context["tx_id"],
                         ticket_id=context["ticket_id"],
@@ -139,17 +191,16 @@ class RepoTools:
 
     def _workflow_guidance(self) -> Dict[str, Any]:
         if self.state_store is None:
-            response = build_success_response(
-                tx_state={
-                    "active_tx": None,
-                    "status": None,
-                    "next_action": "tx.begin",
-                    "verify_state": None,
-                    "commit_state": None,
-                    "semantic_summary": None,
-                    "integrity": {},
-                }
-            )
+            tx_state = {
+                "active_tx": None,
+                "status": None,
+                "next_action": "tx.begin",
+                "verify_state": None,
+                "commit_state": None,
+                "semantic_summary": None,
+                "integrity": {},
+            }
+            response = build_success_response(tx_state=tx_state)
         else:
             tx_state = self.state_store.read_json_file(
                 self.state_store.repo_context.tx_state
@@ -166,7 +217,7 @@ class RepoTools:
                 }
             response = build_success_response(tx_state=tx_state)
 
-        active_tx = response.get("active_tx")
+        active_tx = tx_state.get("active_tx") if isinstance(tx_state, dict) else None
         if not isinstance(active_tx, dict):
             active_tx = {}
         return {
@@ -196,20 +247,22 @@ class RepoTools:
             result.update(self._workflow_guidance())
             return result
 
-        active_tx = self.state_store.read_json_file(
+        tx_state = self.state_store.read_json_file(
             self.state_store.repo_context.tx_state
         )
-        active = active_tx.get("active_tx") if isinstance(active_tx, dict) else {}
-        if isinstance(active, dict):
-            status = active.get("status")
-            if isinstance(status, str) and status.strip() in {"done", "blocked"}:
-                raise ValueError("cannot verify a terminal transaction")
+        canonical_status = (
+            tx_state.get("status") if isinstance(tx_state, dict) else None
+        )
+        if isinstance(canonical_status, str) and canonical_status.strip() in {
+            "done",
+            "blocked",
+        }:
+            raise ValueError("cannot verify a terminal transaction")
 
         self._emit_tx_event(
             event_type="tx.verify.start",
             payload={"command": str(self.state_store.repo_context.verify)},
             phase_override="checking",
-            step_id_override=context["step_id"],
         )
 
         result = self.verify_runner.run_verify(timeout_sec=timeout_sec)
@@ -223,7 +276,6 @@ class RepoTools:
                     "summary": result.get("stdout") or "verify passed",
                 },
                 phase_override="verified",
-                step_id_override=context["step_id"],
             )
         else:
             details = (
@@ -239,7 +291,6 @@ class RepoTools:
                     "error": details,
                 },
                 phase_override="checking",
-                step_id_override=context["step_id"],
             )
 
         result.update(self._workflow_guidance())

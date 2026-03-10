@@ -60,18 +60,12 @@ def test_rebuild_tx_state_accepts_empty_event_log(repo_context, state_rebuilder)
     assert state["integrity"]["state_hash"]
     assert state["updated_at"]
 
-    active_tx = state["active_tx"]
-    assert active_tx["tx_id"] == 0
-    assert active_tx["ticket_id"] == "none"
-    assert active_tx["status"] == "planned"
-    assert active_tx["phase"] == "planned"
-    assert active_tx["current_step"] == "none"
-    assert active_tx["next_action"] == ""
-    assert active_tx["semantic_summary"] == ""
-    assert active_tx["session_id"] == ""
-    assert active_tx["verify_state"]["status"] == "not_started"
-    assert active_tx["commit_state"]["status"] == "not_started"
-    assert active_tx["file_intents"] == []
+    assert state["active_tx"] is None
+    assert state["status"] is None
+    assert state["next_action"] == "tx.begin"
+    assert state["semantic_summary"] is None
+    assert state["verify_state"] is None
+    assert state["commit_state"] is None
 
 
 def test_rebuild_tx_state_empty_event_log_ignores_sparse_seeded_tx_state(
@@ -111,11 +105,11 @@ def test_rebuild_tx_state_empty_event_log_ignores_sparse_seeded_tx_state(
 
     assert result["ok"] is True
     assert result["last_applied_seq"] == 0
-    active_tx = result["state"]["active_tx"]
-    assert active_tx["tx_id"] == 0
-    assert active_tx["ticket_id"] == "none"
-    assert active_tx["next_action"] == ""
-    assert active_tx["semantic_summary"] == ""
+    state = result["state"]
+    assert state["active_tx"] is None
+    assert state["status"] is None
+    assert state["next_action"] == "tx.begin"
+    assert state["semantic_summary"] is None
 
 
 def test_read_tx_event_log_filters_seq(repo_context, state_store, state_rebuilder):
@@ -189,7 +183,7 @@ def test_rebuild_tx_state_uses_materialized_when_intact(
     assert rebuild_again["state"]["integrity"]["active_tx_source"] == "materialized"
 
 
-def test_rebuild_tx_state_reconstructs_file_intent_next_action(
+def test_rebuild_tx_state_reconstructs_in_progress_next_action_from_canonical_fields(
     repo_context, state_store, state_rebuilder
 ):
     _append_tx_event(state_store)
@@ -213,11 +207,12 @@ def test_rebuild_tx_state_reconstructs_file_intent_next_action(
 
     rebuild = state_rebuilder.rebuild_tx_state()
     assert rebuild["ok"] is True
-    active_tx = rebuild["state"]["active_tx"]
-    assert active_tx["next_action"] == "continue file intents"
+    state = rebuild["state"]
+    assert state["status"] == "in-progress"
+    assert state["next_action"] == "tx.verify.start"
 
 
-def test_rebuild_tx_state_preserves_session_id_in_active_tx(
+def test_rebuild_tx_state_keeps_active_tx_minimal_identity_subset(
     repo_context, state_store, state_rebuilder
 ):
     _append_tx_event(state_store)
@@ -234,8 +229,7 @@ def test_rebuild_tx_state_preserves_session_id_in_active_tx(
     active_tx = rebuild["state"]["active_tx"]
     assert active_tx["tx_id"] == 1
     assert active_tx["ticket_id"] == "p4-t2"
-    assert active_tx["session_id"] == "s1"
-    assert active_tx["current_step"] == "p4-t2-s1"
+    assert set(active_tx.keys()) <= {"tx_id", "ticket_id", "_last_event_seq"}
 
 
 def test_rebuild_tx_state_committed_next_action(
@@ -280,8 +274,8 @@ def test_rebuild_tx_state_committed_next_action(
     rebuild = state_rebuilder.rebuild_tx_state()
     assert rebuild["ok"] is True
     active_tx = rebuild["state"]["active_tx"]
-    assert active_tx["status"] == "committed"
-    assert active_tx["next_action"] == "tx.end.done"
+    assert rebuild["state"]["status"] == "committed"
+    assert rebuild["state"]["next_action"] == "tx.end.done"
 
 
 def test_rebuild_tx_state_torn_event_truncates(
@@ -324,7 +318,9 @@ def test_rebuild_tx_state_missing_file_intent_truncates(
         rebuild["state"]["rebuild_invalid_event"]["event_type"]
         == "tx.file_intent.update"
     )
-    assert rebuild["state"]["active_tx"]["tx_id"] == 0
+    assert rebuild["state"]["active_tx"] is None
+    assert rebuild["state"]["status"] is None
+    assert rebuild["state"]["next_action"] == "tx.begin"
 
 
 def test_rebuild_tx_state_recovers_latest_active_tx_after_stale_terminal_begin(
@@ -474,7 +470,13 @@ def test_rebuild_tx_state_prefers_latest_non_terminal_tx_across_sessions(
     assert rebuild["last_applied_seq"] == 4
     assert rebuild["state"]["active_tx"]["tx_id"] == 202
     assert rebuild["state"]["active_tx"]["ticket_id"] == "p2-t3"
-    assert rebuild["state"]["active_tx"]["session_id"] == "s2"
+    assert set(rebuild["state"]["active_tx"].keys()) <= {
+        "tx_id",
+        "ticket_id",
+        "_last_event_seq",
+    }
+    assert rebuild["state"]["status"] == "in-progress"
+    assert rebuild["state"]["next_action"] == "tx.verify.start"
     assert rebuild["state"]["integrity"]["drift_detected"] is False
     assert rebuild["state"]["integrity"]["active_tx_source"] == "active_candidate"
 
@@ -509,8 +511,9 @@ def test_rebuild_tx_state_uses_materialized_none_state_without_false_drift(
     assert rebuild_again["source"] == "materialized"
     assert rebuild_again["last_applied_seq"] == 2
     assert rebuild_again["rebuilt_from_seq"] == 2
-    assert rebuild_again["state"]["active_tx"]["tx_id"] == 0
-    assert rebuild_again["state"]["active_tx"]["status"] == "planned"
+    assert rebuild_again["state"]["active_tx"] is None
+    assert rebuild_again["state"]["status"] is None
+    assert rebuild_again["state"]["next_action"] == "tx.begin"
     assert rebuild_again["state"]["integrity"]["drift_detected"] is False
     assert rebuild_again["state"]["integrity"]["active_tx_source"] == "none"
     assert "rebuild_warning" not in rebuild_again["state"]
@@ -558,7 +561,9 @@ def test_rebuild_tx_state_marks_drift_when_applied_seq_has_no_active_tx(
 
     assert rebuild["ok"] is True
     assert rebuild["last_applied_seq"] == 2
-    assert rebuild["state"]["active_tx"]["tx_id"] == 0
+    assert rebuild["state"]["active_tx"] is None
+    assert rebuild["state"]["status"] is None
+    assert rebuild["state"]["next_action"] == "tx.begin"
     assert rebuild["state"]["integrity"]["drift_detected"] is False
     assert rebuild["state"]["integrity"]["active_tx_source"] == "none"
     assert "rebuild_warning" not in rebuild["state"]
@@ -642,8 +647,9 @@ def test_rebuild_tx_state_logs_observed_mismatch_for_invalid_ordering(
         == "tx.commit.start"
     )
     assert error_lines[0]["tool_output"]["observed_mismatch"]["last_applied_seq"] == 1
-    assert rebuild["state"]["active_tx"]["status"] == "planned"
-    assert rebuild["state"]["active_tx"]["current_step"] == "none"
+    assert rebuild["state"]["active_tx"] is None
+    assert rebuild["state"]["status"] is None
+    assert rebuild["state"]["next_action"] == "tx.begin"
 
 
 def test_rebuild_tx_state_logs_observed_mismatch_for_duplicate_begin(
@@ -711,8 +717,9 @@ def test_rebuild_tx_state_logs_observed_mismatch_for_duplicate_begin(
     assert (
         error_lines[0]["tool_output"]["observed_mismatch"]["invalid_event"]["seq"] == 2
     )
-    assert rebuild["state"]["active_tx"]["status"] == "planned"
-    assert rebuild["state"]["active_tx"]["current_step"] == "none"
+    assert rebuild["state"]["active_tx"] is None
+    assert rebuild["state"]["status"] is None
+    assert rebuild["state"]["next_action"] == "tx.begin"
 
 
 def test_rebuild_tx_state_duplicate_begin_reports_invalid_seq_not_last_valid_seq(
@@ -862,10 +869,9 @@ def test_rebuild_tx_state_allows_tx_begin_after_terminal_for_same_tx(
 
     assert rebuild["ok"] is True
     assert rebuild["last_applied_seq"] == 5
-    assert rebuild["state"]["active_tx"]["tx_id"] == 0
-    assert rebuild["state"]["active_tx"]["ticket_id"] == "none"
-    assert rebuild["state"]["active_tx"]["status"] == "planned"
-    assert rebuild["state"]["active_tx"]["current_step"] == "none"
+    assert rebuild["state"]["active_tx"] is None
+    assert rebuild["state"]["status"] is None
+    assert rebuild["state"]["next_action"] == "tx.begin"
     assert rebuild["state"]["integrity"]["drift_detected"] is False
     assert rebuild["state"]["integrity"]["active_tx_source"] == "none"
     assert "rebuild_warning" not in rebuild["state"]
@@ -886,7 +892,11 @@ def test_rebuild_tx_state_preserves_user_intent(
     rebuild = state_rebuilder.rebuild_tx_state()
     assert rebuild["ok"] is True
     active_tx = rebuild["state"]["active_tx"]
-    assert active_tx["user_intent"] == "continue"
+    assert active_tx["tx_id"] == 1
+    assert active_tx["ticket_id"] == "p4-t2"
+    assert set(active_tx.keys()) <= {"tx_id", "ticket_id", "_last_event_seq"}
+    assert rebuild["state"]["status"] == "in-progress"
+    assert rebuild["state"]["next_action"] == "tx.verify.start"
 
 
 def test_rebuild_tx_state_semantic_summary_fallback(
@@ -897,8 +907,11 @@ def test_rebuild_tx_state_semantic_summary_fallback(
     rebuild = state_rebuilder.rebuild_tx_state()
     assert rebuild["ok"] is True
     active_tx = rebuild["state"]["active_tx"]
-    assert isinstance(active_tx["semantic_summary"], str)
-    assert active_tx["semantic_summary"]
+    assert active_tx["tx_id"] == 1
+    assert active_tx["ticket_id"] == "p4-t2"
+    assert set(active_tx.keys()) <= {"tx_id", "ticket_id", "_last_event_seq"}
+    assert isinstance(rebuild["state"]["semantic_summary"], str)
+    assert rebuild["state"]["semantic_summary"]
 
 
 def test_rebuild_tx_state_user_intent_guides_resume(
@@ -914,8 +927,11 @@ def test_rebuild_tx_state_user_intent_guides_resume(
     rebuild = state_rebuilder.rebuild_tx_state()
     assert rebuild["ok"] is True
     active_tx = rebuild["state"]["active_tx"]
-    assert active_tx["user_intent"] == "continue"
-    assert active_tx["next_action"] == "continue file intents"
+    assert active_tx["tx_id"] == 1
+    assert active_tx["ticket_id"] == "p4-t2"
+    assert set(active_tx.keys()) <= {"tx_id", "ticket_id", "_last_event_seq"}
+    assert rebuild["state"]["status"] == "in-progress"
+    assert rebuild["state"]["next_action"] == "tx.verify.start"
 
 
 def test_rebuild_tx_state_rejects_verified_intent_before_verify_pass(
@@ -1015,7 +1031,12 @@ def test_rebuild_tx_state_drops_duplicate_event_ids_without_drift(
     assert rebuild["last_applied_seq"] == 2
     assert rebuild["dropped_events"] == 1
     assert rebuild["state"]["active_tx"]["tx_id"] == 1
-    assert rebuild["state"]["active_tx"]["current_step"] == "p4-t2-s1"
+    assert rebuild["state"]["active_tx"]["ticket_id"] == "p4-t2"
+    assert set(rebuild["state"]["active_tx"].keys()) <= {
+        "tx_id",
+        "ticket_id",
+        "_last_event_seq",
+    }
     assert rebuild["state"]["integrity"]["drift_detected"] is False
     assert "rebuild_warning" not in rebuild["state"]
 
@@ -1309,11 +1330,15 @@ def test_rebuild_tx_state_falls_back_semantic_summary_for_selected_active_tx(
     assert rebuild["ok"] is True
     assert rebuild["last_applied_seq"] == 1
     assert rebuild["state"]["active_tx"]["tx_id"] == 1
-    assert (
-        rebuild["state"]["active_tx"]["semantic_summary"] == "Started transaction p4-t2"
-    )
+    assert rebuild["state"]["active_tx"]["ticket_id"] == "p4-t2"
+    assert set(rebuild["state"]["active_tx"].keys()) <= {
+        "tx_id",
+        "ticket_id",
+        "_last_event_seq",
+    }
+    assert rebuild["state"]["semantic_summary"] == "Started transaction p4-t2"
 
-    rebuild["state"]["active_tx"]["semantic_summary"] = ""
+    rebuild["state"]["semantic_summary"] = ""
     rebuild["state"]["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(
         rebuild["state"]
     )
@@ -1327,8 +1352,14 @@ def test_rebuild_tx_state_falls_back_semantic_summary_for_selected_active_tx(
     rebuild_again = state_rebuilder.rebuild_tx_state()
 
     assert rebuild_again["ok"] is True
-    assert rebuild_again["source"] == "materialized"
-    assert rebuild_again["state"]["active_tx"]["semantic_summary"] == ""
+    assert rebuild_again["state"]["active_tx"]["tx_id"] == 1
+    assert rebuild_again["state"]["active_tx"]["ticket_id"] == "p4-t2"
+    assert set(rebuild_again["state"]["active_tx"].keys()) <= {
+        "tx_id",
+        "ticket_id",
+        "_last_event_seq",
+    }
+    assert rebuild_again["state"]["semantic_summary"] == "Started transaction p4-t2"
 
 
 def test_rebuild_tx_state_preserves_invalid_event_seq_in_rebuild_invalid_seq(
@@ -1390,8 +1421,14 @@ def test_rebuild_tx_state_reports_drift_for_stale_materialized_active_tx(
     rebuild_again = state_rebuilder.rebuild_tx_state()
 
     assert rebuild_again["ok"] is True
-    assert rebuild_again["source"] == "materialized"
-    assert rebuild_again["state"]["active_tx"]["semantic_summary"] == ""
+    assert rebuild_again["source"] == "rebuild"
+    assert rebuild_again["state"]["active_tx"]["tx_id"] == 1
+    assert rebuild_again["state"]["active_tx"]["ticket_id"] == "p4-t2"
+    assert set(rebuild_again["state"]["active_tx"].keys()) <= {
+        "tx_id",
+        "ticket_id",
+        "_last_event_seq",
+    }
 
 
 def test_truncate_and_resolve_path(state_rebuilder, repo_context, tmp_path):
@@ -1414,9 +1451,7 @@ def test_truncate_and_resolve_path(state_rebuilder, repo_context, tmp_path):
 
 def test_state_hash_ignores_updated_at_and_internal_fields(state_rebuilder):
     state = state_rebuilder._init_tx_state()
-    state["active_tx"]["tx_id"] = 1
-    state["active_tx"]["ticket_id"] = "t-1"
-    state["active_tx"]["status"] = "in-progress"
+    state["active_tx"] = state_rebuilder._init_active_tx(1, "t-1", "in-progress", "s1")
     state["active_tx"]["phase"] = "in-progress"
     state["active_tx"]["current_step"] = "s1"
     state["active_tx"]["next_action"] = "next"
@@ -1702,38 +1737,93 @@ def test_replay_events_to_state_filters_and_drops(state_rebuilder):
 
 
 def test_derive_next_action_and_integrity(state_rebuilder):
-    active_tx = {
-        "status": "planned",
-        "file_intents": [],
-        "semantic_summary": "",
-        "user_intent": None,
-        "verify_state": {"status": "not_started"},
-        "commit_state": {"status": "not_started"},
-    }
-    assert state_rebuilder._derive_next_action(active_tx) == "tx.begin"
+    assert (
+        state_rebuilder._derive_next_action(
+            status=None,
+            verify_state=None,
+            commit_state=None,
+            active_tx=None,
+            semantic_summary=None,
+        )
+        == "tx.begin"
+    )
 
-    active_tx["status"] = "checking"
-    active_tx["verify_state"] = {"status": "failed"}
-    assert state_rebuilder._derive_next_action(active_tx) == "fix and re-verify"
+    assert (
+        state_rebuilder._derive_next_action(
+            status="checking",
+            verify_state={"status": "failed"},
+            commit_state={"status": "not_started"},
+            active_tx=None,
+            semantic_summary="",
+        )
+        == "fix and re-verify"
+    )
 
-    active_tx["status"] = "verified"
-    active_tx["commit_state"] = {"status": "not_started"}
-    assert state_rebuilder._derive_next_action(active_tx) == "tx.commit.start"
+    assert (
+        state_rebuilder._derive_next_action(
+            status="verified",
+            verify_state={"status": "passed"},
+            commit_state={"status": "not_started"},
+            active_tx=None,
+            semantic_summary="",
+        )
+        == "tx.commit.start"
+    )
 
-    active_tx["status"] = "blocked"
-    assert state_rebuilder._derive_next_action(active_tx) == "tx.end.blocked"
+    assert (
+        state_rebuilder._derive_next_action(
+            status="verified",
+            verify_state={"status": "passed"},
+            commit_state={"status": "done"},
+            active_tx=None,
+            semantic_summary="",
+        )
+        == "tx.end.done"
+    )
 
-    active_tx["status"] = "done"
-    assert state_rebuilder._derive_next_action(active_tx) == "tx.end.done"
+    assert (
+        state_rebuilder._derive_next_action(
+            status="committed",
+            verify_state=None,
+            commit_state={"status": "done"},
+            active_tx=None,
+            semantic_summary="",
+        )
+        == "tx.end.done"
+    )
+
+    assert (
+        state_rebuilder._derive_next_action(
+            status="blocked",
+            verify_state=None,
+            commit_state=None,
+            active_tx=None,
+            semantic_summary="",
+        )
+        == "tx.end.blocked"
+    )
+
+    assert (
+        state_rebuilder._derive_next_action(
+            status="done",
+            verify_state=None,
+            commit_state=None,
+            active_tx=None,
+            semantic_summary="",
+        )
+        == "tx.end.done"
+    )
 
     state = state_rebuilder._init_tx_state()
-    state["active_tx"]["tx_id"] = 1
-    state["active_tx"]["ticket_id"] = "t-1"
-    state["active_tx"]["status"] = "in-progress"
-    state["active_tx"]["phase"] = "in-progress"
-    state["active_tx"]["current_step"] = "s1"
-    state["active_tx"]["next_action"] = "next"
-    state["active_tx"]["semantic_summary"] = "summary"
+    state["active_tx"] = {
+        "tx_id": 1,
+        "ticket_id": "t-1",
+        "phase": "in-progress",
+        "_last_event_seq": 1,
+    }
+    state["status"] = "in-progress"
+    state["next_action"] = "tx.verify.start"
+    state["semantic_summary"] = "summary"
     state["last_applied_seq"] = 1
     state["integrity"]["rebuilt_from_seq"] = 1
     state["integrity"]["active_tx_source"] = "active_candidate"
@@ -1997,32 +2087,34 @@ def test_apply_tx_event_to_state_updates_intents_and_states(state_rebuilder):
         active_tx, {"event_type": "tx.commit.done", "payload": {"sha": "abc"}}
     )
 
-    assert active_tx["file_intents"][0]["state"] == "applied"
-    assert active_tx["verify_state"]["status"] == "passed"
-    assert active_tx["commit_state"]["status"] == "passed"
+    assert active_tx["tx_id"] == 1
+    assert active_tx["ticket_id"] == "t-1"
+    assert active_tx["phase"] == "in-progress"
+    assert active_tx["_last_event_seq"] == 2
 
 
 def test_derive_next_action_in_progress_paths(state_rebuilder):
-    active_tx = {
-        "status": "in-progress",
-        "file_intents": [{"state": "planned"}],
-        "semantic_summary": "",
-        "user_intent": None,
-        "verify_state": {"status": "not_started"},
-        "commit_state": {"status": "not_started"},
-    }
-    assert state_rebuilder._derive_next_action(active_tx) == "continue file intents"
+    assert (
+        state_rebuilder._derive_next_action(
+            status="in-progress",
+            verify_state={"status": "not_started"},
+            commit_state={"status": "not_started"},
+            active_tx={"tx_id": 1, "ticket_id": "t-1", "phase": "in-progress"},
+            semantic_summary="",
+        )
+        == "tx.verify.start"
+    )
 
-    active_tx["file_intents"] = [{"state": "applied"}]
-    assert state_rebuilder._derive_next_action(active_tx) == "tx.verify.start"
-
-    active_tx["file_intents"] = []
-    active_tx["user_intent"] = "continue"
-    assert state_rebuilder._derive_next_action(active_tx) == "continue file intents"
-
-    active_tx["user_intent"] = None
-    active_tx["semantic_summary"] = "verify now"
-    assert state_rebuilder._derive_next_action(active_tx) == "tx.verify.start"
+    assert (
+        state_rebuilder._derive_next_action(
+            status="in-progress",
+            verify_state={"status": "not_started"},
+            commit_state={"status": "not_started"},
+            active_tx={"tx_id": 1, "ticket_id": "t-1", "phase": "in-progress"},
+            semantic_summary="verify now",
+        )
+        == "tx.verify.start"
+    )
 
 
 def test_read_tx_event_log_missing_path_returns_empty(state_rebuilder, tmp_path):
@@ -2343,19 +2435,19 @@ def test_apply_tx_event_to_state_handles_tx_begin(state_rebuilder):
     )
     assert active_tx["tx_id"] == 1
     assert active_tx["ticket_id"] == "t-1"
-    assert active_tx["current_step"] == "s1"
 
 
 def test_derive_next_action_checking_not_started(state_rebuilder):
-    active_tx = {
-        "status": "checking",
-        "file_intents": [],
-        "semantic_summary": "",
-        "user_intent": None,
-        "verify_state": {"status": "not_started"},
-        "commit_state": {"status": "not_started"},
-    }
-    assert state_rebuilder._derive_next_action(active_tx) == "tx.verify.start"
+    assert (
+        state_rebuilder._derive_next_action(
+            status="checking",
+            verify_state={"status": "not_started"},
+            commit_state={"status": "not_started"},
+            active_tx={"tx_id": 1, "ticket_id": "t-1", "phase": "checking"},
+            semantic_summary="",
+        )
+        == "tx.verify.start"
+    )
 
 
 def test_intent_state_rank_non_str(state_rebuilder):
@@ -2574,7 +2666,11 @@ def test_apply_tx_event_to_state_non_list_intents(state_rebuilder):
             "phase": "in-progress",
         },
     )
-    assert isinstance(active_tx["file_intents"], list)
+    assert active_tx["file_intents"] == "nope"
+    assert active_tx["tx_id"] == 1
+    assert active_tx["ticket_id"] == "t-1"
+    assert active_tx["phase"] == "in-progress"
+    assert active_tx["_last_event_seq"] == 1
 
 
 def test_replay_events_to_state_prefers_session_id(state_rebuilder):
@@ -2618,9 +2714,10 @@ def test_apply_tx_event_to_state_creates_intent_on_update(state_rebuilder):
         },
     )
 
-    assert len(active_tx["file_intents"]) == 1
-    assert active_tx["file_intents"][0]["path"] == "a.py"
-    assert active_tx["file_intents"][0]["state"] == "started"
+    assert active_tx["tx_id"] == 1
+    assert active_tx["ticket_id"] == "t-1"
+    assert active_tx["phase"] == "in-progress"
+    assert active_tx["_last_event_seq"] == 1
 
 
 def test_read_tx_event_log_dedupes_by_event_id_in_rebuild(repo_context, state_store):
@@ -2821,9 +2918,25 @@ def test_tx_state_integrity_rejects_invalid_fields(state_rebuilder):
     state["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(state)
     assert state_rebuilder._tx_state_integrity_ok(state, 0) is True
 
-    state["active_tx"]["status"] = "in-progress"
+    state["active_tx"] = state_rebuilder._init_active_tx(1, "t-1", "in-progress", "s1")
     state["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(state)
     assert state_rebuilder._tx_state_integrity_ok(state, 0) is False
+
+    state = state_rebuilder._init_tx_state()
+    state["active_tx"] = {
+        "tx_id": 1,
+        "ticket_id": "t-1",
+        "phase": "in-progress",
+        "_last_event_seq": 1,
+    }
+    state["status"] = "in-progress"
+    state["next_action"] = "tx.verify.start"
+    state["semantic_summary"] = "summary"
+    state["last_applied_seq"] = 1
+    state["integrity"]["rebuilt_from_seq"] = 1
+    state["integrity"]["active_tx_source"] = "active_candidate"
+    state["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(state)
+    assert state_rebuilder._tx_state_integrity_ok(state, 1) is True
 
     state = state_rebuilder._init_tx_state()
     state["integrity"]["rebuilt_from_seq"] = 0
@@ -2841,18 +2954,22 @@ def test_tx_state_integrity_rejects_invalid_fields(state_rebuilder):
     assert state_rebuilder._tx_state_integrity_ok(state, 0) is False
 
     state = state_rebuilder._init_tx_state()
-    state["active_tx"]["tx_id"] = "tx-1"
-    state["active_tx"]["ticket_id"] = "p4-t2"
-    state["active_tx"]["status"] = "in-progress"
-    state["active_tx"]["phase"] = "in-progress"
-    state["active_tx"]["current_step"] = "p4-t2-s1"
-    state["active_tx"]["semantic_summary"] = "summary"
+    state["active_tx"] = {
+        "tx_id": "tx-1",
+        "ticket_id": "p4-t2",
+        "phase": "in-progress",
+        "_last_event_seq": 1,
+    }
+    state["status"] = "in-progress"
+    state["next_action"] = "tx.verify.start"
+    state["semantic_summary"] = "summary"
     state["last_applied_seq"] = 1
     state["integrity"]["rebuilt_from_seq"] = 1
     state["integrity"]["active_tx_source"] = "invalid-source"
     state["integrity"]["state_hash"] = state_rebuilder._compute_state_hash(state)
     assert state_rebuilder._tx_state_integrity_ok(state, 1) is False
 
+    state["active_tx"]["tx_id"] = 1
     state["integrity"]["active_tx_source"] = "active_candidate"
     state["integrity"]["state_hash"] = "bad-hash"
     assert state_rebuilder._tx_state_integrity_ok(state, 1) is False
@@ -2959,7 +3076,9 @@ def test_apply_tx_event_to_state_handles_failures(state_rebuilder):
             "phase": "checking",
         },
     )
-    assert active_tx["verify_state"]["status"] == "failed"
+    assert active_tx["tx_id"] == 1
+    assert active_tx["ticket_id"] == "t-1"
+    assert active_tx["phase"] == "checking"
 
     state_rebuilder._apply_tx_event_to_state(
         active_tx,
@@ -2969,7 +3088,9 @@ def test_apply_tx_event_to_state_handles_failures(state_rebuilder):
             "phase": "verified",
         },
     )
-    assert active_tx["commit_state"]["status"] == "failed"
+    assert active_tx["tx_id"] == 1
+    assert active_tx["ticket_id"] == "t-1"
+    assert active_tx["phase"] == "verified"
 
 
 def test_validate_tx_event_payload_verify_start(state_rebuilder):
@@ -2997,15 +3118,16 @@ def test_read_tx_event_log_end_seq_none_includes_all(state_store, state_rebuilde
 
 
 def test_derive_next_action_in_progress_verified_intents(state_rebuilder):
-    active_tx = {
-        "status": "in-progress",
-        "file_intents": [{"state": "verified"}],
-        "semantic_summary": "",
-        "user_intent": None,
-        "verify_state": {"status": "not_started"},
-        "commit_state": {"status": "not_started"},
-    }
-    assert state_rebuilder._derive_next_action(active_tx) == "tx.verify.start"
+    assert (
+        state_rebuilder._derive_next_action(
+            status="in-progress",
+            verify_state={"status": "not_started"},
+            commit_state={"status": "not_started"},
+            active_tx={"tx_id": 1, "ticket_id": "t-1", "phase": "in-progress"},
+            semantic_summary="",
+        )
+        == "tx.verify.start"
+    )
 
 
 def test_apply_event_to_state_file_edit_ignores_invalid_payload(state_rebuilder):
