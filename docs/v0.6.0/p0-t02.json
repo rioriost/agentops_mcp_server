@@ -2,7 +2,7 @@
   "ticket_id": "p0-t02",
   "phase_id": "p0",
   "title": "Map persistence artifacts and their read/write code paths",
-  "status": "planned",
+  "status": "done",
   "source_plan": "docs/v0.6.0/plan.md",
   "plan_sections": [
     "Persistence Model",
