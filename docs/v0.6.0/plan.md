@@ -1,4 +1,4 @@
-# Implementation Plan: 0.6.0 Redesign the work loop as a resumable transactional protocol
+# Implementation Plan: 0.6.0 Redesign the work loop as a resumable transactional protocol (!!DO NOT UPDATE!!)
 
 ## Objectives
 - Redefine the canonical meaning of a transaction in this project as a durable execution attempt for completing one ticket.
