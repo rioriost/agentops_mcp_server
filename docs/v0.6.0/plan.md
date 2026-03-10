@@ -16,7 +16,8 @@
 - Make `next_action` sufficient for deterministic continuation of interrupted work.
 - Keep repository commit distinct from terminal transaction completion.
 - Preserve compatibility for historical logs without requiring in-place rewrite.
-- Preserve bounded compatibility for terminal materialized snapshots and post-terminal active-slot clearing shapes without reinterpreting them as replacement lifecycle events.
+- Preserve bounded compatibility for historical materialized snapshots and legacy historical formats without allowing them to redefine the new canonical protocol.
+- Minimize the canonical continuation surface to only the fields required for deterministic resume, explicit lifecycle control, replay integrity, and transaction ID issuance.
 
 ## Background
 The current system already treats tickets as the only unit of work and requires agents to resume a non-terminal active transaction before starting new work.
@@ -71,6 +72,10 @@ That creates avoidable complexity in:
 - compatibility handling
 - implementation and test design
 
+The redesign should prefer removing unnecessary continuation concepts over redefining them.
+
+If a field is not required for exact active-transaction selection, deterministic continuation, replay integrity, or explicit terminal completion, it should not be part of the canonical protocol surface.
+
 ## Core Design Goal
 Version `0.6.0` should redefine the work loop so that it behaves like a **true resumable transaction protocol for ticket completion**.
 
@@ -79,7 +84,7 @@ After `0.6.0`, the canonical model should make the following true:
 1. A transaction is one durable execution attempt for one ticket.
 2. A workspace may have at most one non-terminal active transaction at a time.
 3. Resume always targets the exact active transaction, not a heuristically reconstructed replacement.
-4. Current resumable state is explicit and materialized.
+4. Current resumable state is explicit, materialized, and intentionally minimal.
 5. Event history remains append-only and authoritative for rebuild and audit.
 6. `next_action` is the primary machine-readable continuation guide.
 7. Repository commit is not terminal success by itself.
@@ -114,9 +119,9 @@ A transaction is the canonical unit of resumable work.
 
 It represents:
 - work started for one ticket
-- current execution phase
-- current resumable checkpoint
-- current next required action
+- the current lifecycle state
+- the current resumable checkpoint
+- the current next required action
 - the active runtime unit that must be resumed before new work begins
 
 ### Important consequences
@@ -140,37 +145,58 @@ Events provide:
 `seq` remains the canonical global append order for events.
 
 ## 4. Session
-`session_id` may remain available as runtime context, but it should not be the primary organizing concept for correctness in `0.6.0`.
+`session_id` may remain available as secondary runtime context, but it is not part of the canonical identity or continuation contract for `0.6.0`.
 
 ### Role
 - observability
 - correlation
 - handoff continuity
-- runtime context when useful
+- helper-call continuity when needed
 
-### Bounded role
-Transaction correctness and resumability should not depend primarily on session-parent modeling.
-
-For `0.6.0`, the design should prioritize:
-- active transaction correctness
-- explicit transaction state
-- deterministic continuation
-
-over a more elaborate session hierarchy.
+### Non-role
+`session_id` must not determine:
+- active transaction identity
+- active transaction selection
+- deterministic resume correctness
 
 ## Server-owned transaction variables vs client-managed inputs
 
 The runtime implementation under `src/` needs a stricter boundary between:
-- **server-owned transaction variables**
-- **client-managed inputs**
+- **server-owned canonical protocol state**
+- **server-owned replay / integrity support**
+- **client-managed inputs and labels**
 
-This distinction is necessary because `0.6.0` is defining a resumable transaction protocol, not a client-managed ticket database.
+This distinction is necessary because `0.6.0` defines a resumable transaction protocol, not a client-managed ticket database.
 
-### 1. Server-owned transaction variables
-These values are part of the canonical transaction protocol.
-They may be written into artifacts and exposed in responses, but clients should treat them as **read only** unless the protocol explicitly defines a server tool that owns their update path.
+### 1. Canonical continuation fields
+These values define the minimal canonical continuation contract.
+They are the fields required to resume the exact active transaction deterministically.
 
-#### Canonical transaction identity and ordering
+- `active_tx`
+  - the currently active non-terminal transaction snapshot, or `null`
+  - when non-null, it includes the exact active transaction identity, including `tx_id`
+  - it is an identity-bearing active-transaction snapshot, not the canonical lifecycle-classification field
+- `status`
+  - the canonical lifecycle classification
+  - it is represented only at the top level of the materialized continuation contract
+  - one of the canonical status values when an active transaction exists, and `null` only in the no-active baseline representation
+- `next_action`
+  - the canonical machine-readable continuation directive
+- `verify_state`
+  - canonical verification checkpoint state
+- `commit_state`
+  - canonical commit checkpoint state
+- `semantic_summary`
+  - required concise summary of the current non-terminal work state
+- `last_applied_seq`
+  - the last event sequence durably materialized into current state
+
+The canonical continuation contract is intentionally minimal.
+Fields not required for exact active-transaction selection, deterministic continuation, replay integrity, or explicit terminal completion must not be treated as part of this contract.
+
+### 2. Canonical replay, issuance, and integrity fields
+These values support replay, issuance correctness, and integrity validation.
+
 - `tx_id`
   - canonical runtime transaction identity
   - server-issued
@@ -182,127 +208,74 @@ They may be written into artifacts and exposed in responses, but clients should 
   - event record identifier when present
 - `last_issued_id`
   - issuance counter state for new canonical transaction IDs
-- `last_applied_seq`
-  - last event sequence materialized into transaction state
 - `rebuilt_from_seq`
   - rebuild checkpoint origin for current materialized state
-
-#### Canonical active transaction state
-- `active_tx`
-- `status`
-- `phase`
-- `current_step`
-- `last_completed_step`
-- `next_action`
-- `terminal`
-- `_terminal`
-- `_last_event_seq`
-- `schema_version`
-- `updated_at`
-
-#### Canonical verification and commit state
-- `verify_state`
-- `verify_state.status`
-- `verify_state.last_result`
-- `commit_state`
-- `commit_state.status`
-- `commit_state.last_result`
-
-#### Canonical file-intent state
-- `file_intents`
-- `planned_step`
-- file-intent `state`
-- `last_event_seq` within file-intent records
-
-#### Canonical integrity and rebuild state
 - `integrity`
 - `state_hash`
 - `drift_detected`
-- `active_tx_source`
-- `rebuild_warning`
-- `rebuild_invalid_seq`
-- `rebuild_observed_mismatch`
-- `drift_reason`
-- `invalid_reason`
-- `invalid_event`
 
-#### Server-generated diagnostics and derived workflow guidance
-These may be returned to the client, but they are still server-authored protocol outputs rather than client-owned state:
-- `integrity_status`
-- `canonical_status`
-- `canonical_phase`
+These fields support correctness of replay, issuance, and validation, but they do not replace the canonical continuation role of `active_tx`, `status`, and `next_action`.
+
+### 3. Derived diagnostics and workflow guidance
+The server may return additional diagnostics and workflow guidance fields such as:
 - `requires_followup`
 - `followup_tool`
-- `can_start_new_ticket`
-- `resume_required`
-- `active_tx_id`
-- `active_ticket_id`
-- `current_step`
-- `verify_status`
-- `commit_status`
 - `recommended_next_tool`
 - `recommended_action`
 - `recoverable`
 - `blocked`
-- `error_code`
-- `validation_point`
-- `event_sequence`
-- `active_tx_context`
 - `session_context`
-- `expected_state`
-- `observed_state`
-- `observed_mismatch`
+- `active_tx_context`
 
-### 2. Client-managed inputs
-These values may be supplied by the client and may be persisted by the server as part of transaction history or metadata, but they are not the canonical runtime transaction identity.
+These fields are derived outputs.
+They may help operators or clients, but they must not redefine canonical transaction identity, canonical lifecycle state, or deterministic continuation.
+
+### 4. Client-managed inputs
+These values may be supplied by the client and may be persisted as metadata, but they are not the canonical runtime transaction identity.
 
 #### Planning and human-facing identifiers
 - `ticket_id`
   - planning/work-item identifier
   - client-managed
-  - may be stored in canonical history as transaction metadata
+  - may be stored as transaction metadata
   - not the canonical runtime execution identifier
 - `task_id`
-  - currently used by helper-style APIs
-  - not part of the core `0.6.0` transaction definition
-  - should be treated as a client-managed label unless and until the protocol defines a stricter role
+  - helper-API compatibility label
+  - client-managed
+  - not part of the canonical `0.6.0` transaction identity model
+  - must not be used to infer, reconstruct, or replace `tx_id`
 - `title`
   - human-facing task title
 
 #### Client-provided runtime context
 - `session_id`
-  - client may provide it
-  - server may recover it from artifacts when needed
-  - useful runtime context, but not the primary correctness anchor
+  - may be provided by the client
+  - may be recovered when useful for observability, correlation, handoff continuity, or helper-call continuity
+  - must not determine active transaction identity, active transaction selection, or deterministic resume correctness
 - `agent_id`
 - `user_intent`
 
-#### Client-provided lifecycle and helper inputs
-- `status` as an API input
+#### Client-provided helper inputs
+The server may accept helper-style request inputs such as:
+- `status`
 - `note`
 - `summary`
-- `next_action` as an API input where allowed
 - `path`
 - `operation`
 - `purpose`
-- file-intent update `state`
-- helper controls such as `timeout_sec`, `max_chars`, `max_events`, `include_diff`, `log`, `diff`, `failures`, `files`, and similar request parameters
+- helper controls such as `timeout_sec`, `max_chars`, `max_events`, `include_diff`, `log`, `diff`, `failures`, and similar request parameters
 
-### 3. Design consequence for `ops_tools`
-The current implementation exposes signs that transaction management and client-side helper semantics are still too intermingled.
+Such inputs do not by themselves redefine canonical transaction identity or canonical lifecycle validity.
 
-In particular:
-- `tx_id` is server-owned canonical execution identity
-- `ticket_id` is client-managed planning identity
-- `task_id` is not part of the core canonical transaction model and should not be allowed to blur the boundary between planning identity and runtime transaction identity
+### 5. Design consequence for `ops_tools`
+The intended `0.6.0` direction is:
 
-The intended `0.6.0` direction is therefore:
 1. transaction correctness is anchored on server-owned canonical transaction state
 2. new transaction creation may accept client-managed planning inputs such as `ticket_id` and `title`
 3. once a transaction exists, continuation should be anchored on the exact canonical transaction identity and canonical materialized state
 4. helper-style client labels must not be allowed to redefine, infer, or reverse-map canonical transaction identity
 
-### 4. Practical rule for future implementation work
+### 6. Practical rule for future implementation work
 When reviewing or changing runtime code, use this boundary:
 
 - If a value determines canonical transaction identity, lifecycle ordering, replay integrity, materialized resumability, or issuance state, it is **server-owned**.
@@ -326,6 +299,8 @@ Transaction success is not:
 
 Transaction success is:
 - explicit terminal completion as `done`
+
+`done` is the only successful terminal outcome in the canonical transaction model.
 
 This preserves the rule that repository state and lifecycle state are related but distinct.
 
@@ -370,15 +345,14 @@ Terminal blocked completion requires:
 
 ## 5. Resume is deterministic
 Resuming an interrupted transaction should depend on:
-- canonical materialized transaction state
-- the top-level continuation surface in materialized state:
+- the minimal canonical continuation contract in materialized state:
+  - `active_tx`
   - `status`
-  - `phase`
   - `next_action`
-  - `terminal`
-  - `semantic_summary`
   - `verify_state`
   - `commit_state`
+  - `semantic_summary`
+  - `last_applied_seq`
 - canonical event history when rebuild is needed
 - exact active transaction identity
 
@@ -387,13 +361,20 @@ Resume should not depend on:
 - sentinel transaction identifiers
 - timestamp-first selection
 - planning-document status as a source of truth
+- optional phase-style or step-style metadata
 
 ## 6. Planning artifacts are derived
 Files under `docs/` are useful planning artifacts, but they are not canonical runtime state.
 
-When maintained, they should align with runtime progress, but resume and lifecycle decisions must use canonical transaction state and canonical event history.
+When maintained, they should align with runtime progress, but resume and lifecycle decisions must use the minimal canonical continuation contract and canonical event history.
 
 ## Canonical State Machine
+
+Status classifies lifecycle state.
+Canonical continuation dispatch is determined by `next_action`.
+
+No implementation should override a valid canonical `next_action` with status-derived heuristics.
+Status-specific “typical next action” text in this section is explanatory guidance only.
 
 ## Status set
 The canonical transaction status model should remain intentionally small:
@@ -425,7 +406,10 @@ Verification has succeeded for the current transaction state.
 
 Typical next action:
 - commit if repository changes exist
-- otherwise proceed toward explicit terminal completion if policy allows
+- otherwise proceed directly to explicit terminal completion
+
+A verified transaction does not require a commit checkpoint when there are no repository changes to commit.
+In that case, `verified -> done` is canonical and `committed` is not required as an intermediate status.
 
 ### `committed`
 Repository commit has completed successfully, but the lifecycle is still non-terminal.
@@ -461,12 +445,10 @@ A blocked path ends as:
 - `blocked`
 
 ## Canonical Checkpoints and Events
-The event model should be organized around resumable checkpoints, not unnecessary detail.
+The event model should be organized around the minimal resumable checkpoints required for deterministic continuation.
 
-Recommended core checkpoint events:
-
+Canonical core checkpoint events:
 - `tx.begin`
-- `tx.step.enter`
 - `tx.verify.start`
 - `tx.verify.pass`
 - `tx.verify.fail`
@@ -476,8 +458,13 @@ Recommended core checkpoint events:
 - `tx.end.done`
 - `tx.end.blocked`
 
-`tx.step.enter` is the canonical progress-checkpoint event for the 0.6.0 state-machine contract.
-Additional events such as file-intent activity may still exist, but the resumable protocol should be understandable primarily from checkpoint events and current materialized state.
+Commit checkpoint events are required only when an actual repository commit is attempted.
+
+If verification succeeds and there are no repository changes:
+- the transaction may proceed directly from `verified` to explicit terminal completion
+- omitting `tx.commit.start` / `tx.commit.done` is canonical behavior
+
+Additional progress events may exist for observability or tooling, but they are not required to define canonical resumable continuation.
 
 ## Persistence Model
 
@@ -489,31 +476,33 @@ This is the canonical resume entrypoint.
 
 It should capture at least:
 - `active_tx`, which is `null` when no active transaction exists
-- top-level current status
-- top-level current phase
+- top-level current `status`
 - top-level `next_action`
-- top-level terminal flag
-- top-level semantic summary
-- top-level verification checkpoint state
-- top-level commit checkpoint state
-- current integrity / workflow guidance fields needed for continuation
-- active transaction identity and local checkpoint context when `active_tx` is non-null
+- top-level `semantic_summary`
+- top-level `verify_state`
+- top-level `commit_state`
+- `last_applied_seq`
+- current integrity fields needed for safe continuation and validation
 
 ### Role
 - first source for resume
 - machine-readable continuation state
-- current canonical view of the active transaction
-- holder of the top-level continuation contract for `status`, `phase`, `next_action`, `terminal`, `semantic_summary`, `verify_state`, and `commit_state`
+- current canonical view of active transaction state, or the canonical no-active baseline representation
+
+The materialized continuation contract is intentionally minimal.
+Optional observability metadata may exist, but deterministic continuation must not depend on phase-style or step-style fields.
 
 When no active transaction exists, the canonical materialized representation is:
 - `active_tx: null`
 - `status: null`
-- `phase: null`
 - `next_action: tx.begin`
-- `terminal: false`
 - `semantic_summary: null`
 - `verify_state: null`
 - `commit_state: null`
+- `last_applied_seq`, retaining the last materialized event sequence when available
+
+In this no-active baseline, `status: null` is canonical and does not extend the active-transaction status set.
+In this no-active baseline, `verify_state` and `commit_state` are `null`.
 
 ## 2. Event log
 Retain canonical append-only history under `.agent/tx_event_log.jsonl`.
@@ -550,9 +539,9 @@ Introduce or stabilize `.agent/tx_id_counter.json`.
 - issued `tx_id` values are represented as integers in JSON-facing artifacts
 
 ## 4. Session metadata
-Session-related metadata may be retained or improved where useful, but it should not be required to understand which transaction to resume.
+Session-related metadata may be retained where useful for observability, correlation, handoff continuity, or helper-call continuity.
 
-Any session design in `0.6.0` must remain secondary to the simpler transaction-centered protocol.
+It is not required to determine the active transaction or deterministic continuation.
 
 ## Canonical Ordering and Durability
 
@@ -582,10 +571,9 @@ Resume should follow this logic:
 2. load canonical transaction state
 3. validate materialized state
 4. if state is missing or incomplete, rebuild from event log
-5. inspect active transaction
-6. if active transaction is terminal, no resumable work exists
-7. if active transaction is non-terminal, resume that exact transaction
-8. continue using canonical `next_action`
+5. if `active_tx` is `null`, no active transaction exists
+6. otherwise resume that exact active transaction
+7. continue using canonical `next_action`
 
 ## Resume source-of-truth order
 Resume decisions should prefer:
@@ -606,10 +594,14 @@ Resume must:
 - preserve explicit end-of-transaction handling
 - avoid duplicate logical completion when work was already committed or ended
 
+When valid canonical `next_action` is present, implementations must prefer it over status-derived heuristics, phase-style metadata, step-style metadata, or reconstructed continuation guesses.
+
 ## Post-terminal materialization
-After terminal completion, a terminal transaction snapshot may remain materialized briefly.
-A subsequent canonical materialized-state operation, `tx.clear_active`, clears the active slot after the terminal snapshot has been durably recorded.
-`tx.clear_active` is not a canonical event-log event.
+After terminal completion, the transaction is no longer active.
+
+Materialized state must not continue to expose that completed work as resumable active work.
+Once materialized state reaches the canonical no-active baseline, `verify_state` and `commit_state` are `null`.
+Terminal durability is preserved by canonical event history and any documented terminal snapshot handling, but terminal completion must not leave ambiguity about active resumability.
 
 ## Idempotent continuation requirements
 Repeated resume of the same interrupted state should not corrupt the lifecycle.
@@ -690,6 +682,11 @@ Historical logs may contain:
 
 These histories should remain replayable.
 
+Compatibility handling is intentionally bounded.
+
+It may normalize documented historical formats that remain deterministically replayable.
+It must not silently reinterpret malformed, ambiguous, or non-deterministically replayable persistence as healthy canonical state.
+
 ## Compatibility rule
 Historical data remains readable as historical state.
 
@@ -719,6 +716,7 @@ After `0.6.0`:
 - remove sentinel active-transaction semantics from normal flow
 - preserve strict ordering for verify, commit, and terminal completion
 - preserve compatibility for historical logs
+- reduce the canonical continuation contract to the minimum fields required for deterministic resume
 - update tests and docs around interruption and continuation behavior
 
 ## Out of scope
@@ -746,7 +744,7 @@ After `0.6.0`:
 - define commit as non-terminal
 - define the no-sentinel active-transaction policy
 - define canonical statuses and their meanings
-- define checkpoint events needed for continuation, including `tx.step.enter` as the canonical progress-checkpoint event
+- define the minimal checkpoint events required for deterministic continuation
 - define `next_action` semantics as the primary continuation guide
 - define the canonical role of `.agent/tx_state.json`
 - define the canonical role of `.agent/tx_event_log.jsonl`
@@ -754,6 +752,7 @@ After `0.6.0`:
 - define write-order guarantees
 - define rebuild responsibilities and fallback behavior
 - define malformed versus missing artifact behavior
+- remove or demote non-essential continuation concepts from the canonical protocol surface
 
 **Deliverables**
 - authoritative transaction protocol contract
@@ -772,7 +771,7 @@ After `0.6.0`:
 - the plan clearly states that commit is non-terminal and end is explicit
 - the plan clearly constrains active transaction behavior
 - every non-terminal state has a clear continuation meaning
-- resume can be described primarily in terms of canonical transaction state plus top-level `next_action`
+- resume can be described primarily in terms of the minimal canonical continuation contract plus top-level `next_action`
 - there is a clear canonical resume entrypoint
 - there is a clear authoritative append-only history source
 - there is a clear deterministic transaction issuance model
@@ -796,6 +795,8 @@ After `0.6.0`:
 - make materialized transaction state the primary resume anchor
 - use event-history rebuild only when materialized state is missing, incomplete, or inconsistent
 - bound the role of session context in correctness-sensitive logic
+- remove canonical dependence on non-essential fields such as phase-style or step-style progress metadata
+- restrict active-slot semantics to non-terminal active transactions only
 - define and implement historical compatibility behavior for legacy transaction IDs, sentinel-bearing histories, and older session-oriented assumptions
 
 **Deliverables**
@@ -829,9 +830,10 @@ After `0.6.0`:
 - add tests for interrupted post-commit pre-terminal flows
 - add tests for terminal re-entry and idempotent resume behavior
 - add tests for malformed versus missing issuance metadata
-- add tests for structural no-active representation and `tx.clear_active` behavior
+- add tests for structural no-active representation and terminal materialization behavior
 - add tests for compatibility with historical legacy logs
 - add tests for bounded compatibility behavior around legacy sentinel-bearing and older session-oriented histories
+- add tests proving deterministic continuation does not depend on optional observability metadata
 - update operator and developer guidance for the redesigned transaction protocol
 
 **Deliverables**
@@ -859,6 +861,7 @@ After `0.6.0`:
 - commit does not equal success
 - explicit terminal end closes the transaction
 - the system no longer relies on fragile identity heuristics to finish interrupted work
+- the system resumes correctly without requiring auxiliary phase or step metadata
 
 ## Recommended Ticket Breakdown
 The following ticket structure is recommended for `0.6.0` planning and execution.
