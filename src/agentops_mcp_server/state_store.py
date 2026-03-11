@@ -86,22 +86,22 @@ class StateStore:
         active_tx = self._load_active_tx()
         if not isinstance(active_tx, dict):
             return {
-                "tx_id": 0,
-                "ticket_id": "none",
-                "status": "unknown",
-                "phase": "unknown",
-                "current_step": "none",
-                "next_action": "",
-                "session_id": "",
+                "tx_id": None,
+                "ticket_id": None,
+                "status": None,
+                "phase": None,
+                "current_step": None,
+                "next_action": None,
+                "session_id": None,
             }
         return {
             "tx_id": active_tx.get("tx_id")
             if isinstance(active_tx.get("tx_id"), int)
             and not isinstance(active_tx.get("tx_id"), bool)
-            else 0,
+            else None,
             "ticket_id": active_tx.get("ticket_id")
             if isinstance(active_tx.get("ticket_id"), str)
-            else "none",
+            else None,
             "status": active_tx.get("status")
             if isinstance(active_tx.get("status"), str)
             else "unknown",
@@ -110,7 +110,7 @@ class StateStore:
             else "unknown",
             "current_step": active_tx.get("current_step")
             if isinstance(active_tx.get("current_step"), str)
-            else "none",
+            else None,
             "next_action": active_tx.get("next_action")
             if isinstance(active_tx.get("next_action"), str)
             else "",

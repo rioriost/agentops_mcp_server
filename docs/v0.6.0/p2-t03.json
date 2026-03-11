@@ -31,7 +31,8 @@
     "docs/v0.6.0/p1-t01.json",
     "docs/v0.6.0/p1-t02.json",
     "docs/v0.6.0/p1-t03.json",
-    "docs/v0.6.0/p2-t01-handoff-notes.md"
+    "docs/v0.6.0/p2-t01-handoff-notes.md",
+    "docs/v0.6.0/p2-t02-handoff-notes.md"
   ],
   "expected_outputs": [
     "Runtime changes that continue the exact active transaction deterministically.",

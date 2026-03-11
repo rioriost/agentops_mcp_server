@@ -296,12 +296,6 @@ class StateRebuilder:
                     return False, "duplicate tx.begin"
             context["seen_begin"] = True
         else:
-            if (
-                event.get("tx_id") == 0
-                and event.get("ticket_id") == "none"
-                and event_type in {"tx.step.enter", "tx.user_intent.set"}
-            ):
-                return True, ""
             if context.get("terminal"):
                 return False, "event after terminal"
             if not context.get("seen_begin"):
@@ -573,12 +567,12 @@ class StateRebuilder:
             "active_tx_id": (
                 selected_active_tx.get("tx_id")
                 if isinstance(selected_active_tx, dict)
-                else 0
+                else None
             ),
             "active_ticket_id": (
                 selected_active_tx.get("ticket_id")
                 if isinstance(selected_active_tx, dict)
-                else "none"
+                else None
             ),
             "terminal_tx_ids": sorted(terminal_tx_ids),
             "known_tx_ids": sorted(
@@ -736,16 +730,18 @@ class StateRebuilder:
             ticket_id = event.get("ticket_id")
             phase = event.get("phase")
             step_id = event.get("step_id")
-            tx_key = (
-                tx_id if isinstance(tx_id, int) and not isinstance(tx_id, bool) else 0
-            )
+            if isinstance(tx_id, bool) or not isinstance(tx_id, int):
+                invalid_reason = "missing tx_id"
+                invalid_event = event
+                break
+            tx_key = tx_id
             active_tx = tx_states.get(tx_key)
             if active_tx is None:
                 active_tx = self._init_active_tx(
                     tx_key,
                     ticket_id if isinstance(ticket_id, str) else "",
                     phase if isinstance(phase, str) else "planned",
-                    step_id if isinstance(step_id, str) else "none",
+                    step_id if isinstance(step_id, str) else "",
                 )
             event_type = event.get("event_type")
             payload = (
@@ -771,36 +767,24 @@ class StateRebuilder:
                 invalid_event = event
                 break
 
-            if (
-                tx_key == 0
-                and ticket_id == "none"
-                and event_type in {"tx.step.enter", "tx.user_intent.set"}
-            ):
-                if isinstance(event_id, str):
-                    applied_event_ids.add(event_id)
-                continue
-
             self._apply_tx_event_to_state(active_tx, event)
             seq_value = event.get("seq") if isinstance(event.get("seq"), int) else None
             if seq_value is not None:
                 active_tx["_last_event_seq"] = seq_value
                 last_valid_seq = seq_value
-                if tx_key != 0:
-                    last_seen_event_by_tx[str(tx_key)] = seq_value
-                    if event_type == "tx.begin":
-                        begin_seq_by_tx[str(tx_key)] = seq_value
+                last_seen_event_by_tx[str(tx_key)] = seq_value
+                if event_type == "tx.begin":
+                    begin_seq_by_tx[str(tx_key)] = seq_value
             if (
                 isinstance(event.get("session_id"), str)
                 and event.get("session_id").strip()
             ):
-                if tx_key != 0:
-                    last_session_by_tx[str(tx_key)] = event.get("session_id").strip()
+                last_session_by_tx[str(tx_key)] = event.get("session_id").strip()
             if isinstance(event.get("event_type"), str) and event.get(
                 "event_type"
             ).startswith("tx.end."):
                 active_tx["_terminal"] = True
-                if tx_key != 0:
-                    terminal_tx_ids.add(str(tx_key))
+                terminal_tx_ids.add(str(tx_key))
             tx_states[tx_key] = active_tx
             if isinstance(event_id, str):
                 applied_event_ids.add(event_id)
@@ -810,14 +794,15 @@ class StateRebuilder:
             state["rebuild_warning"] = invalid_reason
             if isinstance(invalid_event, dict):
                 invalid_tx_id = invalid_event.get("tx_id")
-                invalid_tx_key = (
-                    invalid_tx_id
-                    if isinstance(invalid_tx_id, int)
-                    and not isinstance(invalid_tx_id, bool)
-                    else 0
-                )
-                invalid_tx_name = str(invalid_tx_key)
-                if invalid_tx_key in tx_states:
+                if isinstance(invalid_tx_id, bool) or not isinstance(
+                    invalid_tx_id, int
+                ):
+                    invalid_tx_key = None
+                    invalid_tx_name = ""
+                else:
+                    invalid_tx_key = invalid_tx_id
+                    invalid_tx_name = str(invalid_tx_key)
+                if invalid_tx_key is not None and invalid_tx_key in tx_states:
                     tx_states.pop(invalid_tx_key, None)
                     tx_contexts.pop(invalid_tx_key, None)
                     last_seen_event_by_tx.pop(invalid_tx_name, None)

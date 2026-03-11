@@ -476,7 +476,7 @@ class OpsTools:
         if not isinstance(value, str):
             return ""
         normalized = value.strip()
-        if not normalized or normalized == "none":
+        if not normalized:
             return ""
         return normalized
 
