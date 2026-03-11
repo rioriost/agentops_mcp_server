@@ -119,11 +119,7 @@
             "Compatibility Policy",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "REQ-P1-IDENTITY",
-            "REQ-P1-CHECKPOINTS",
-            "REQ-P1-PERSISTENCE"
-          ]
+          "covered_requirements": ["REQ-P1-PERSISTENCE"]
         }
       ]
     },
@@ -331,7 +327,7 @@
       "ticket_id": "p1-t03",
       "phase_id": "p1",
       "title": "Define persistence, rebuild, and issuance responsibilities",
-      "status": "planned",
+      "status": "done",
       "path": "docs/v0.6.0/p1-t03.json",
       "source_plan_sections": [
         "Persistence Model",
@@ -341,11 +337,7 @@
         "Compatibility Policy",
         "Implementation Strategy"
       ],
-      "covered_requirements": [
-        "REQ-P1-IDENTITY",
-        "REQ-P1-CHECKPOINTS",
-        "REQ-P1-PERSISTENCE"
-      ]
+      "covered_requirements": ["REQ-P1-PERSISTENCE"]
     },
     {
       "ticket_id": "p2-t01",
@@ -487,7 +479,7 @@
               "Identity Model",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": ["p1-t01", "p1-t03"]
+            "allocated_ticket_ids": ["p1-t01"]
           },
           {
             "requirement_id": "REQ-P1-STATE-MACHINE",
@@ -508,7 +500,7 @@
               "Transaction Semantics",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": ["p1-t02", "p1-t03"]
+            "allocated_ticket_ids": ["p1-t02"]
           },
           {
             "requirement_id": "REQ-P1-PERSISTENCE",

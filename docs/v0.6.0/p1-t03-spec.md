@@ -25,8 +25,8 @@ This document is not a replacement for `docs/v0.6.0/plan.md`. When wording here 
 This ticket covers only the requirements allocated to `p1-t03`:
 
 - `REQ-P1-PERSISTENCE`
-- persistence-related portions of `REQ-P1-IDENTITY`
-- persistence-related portions of `REQ-P1-CHECKPOINTS`
+
+Within that scope, this ticket may restate persistence-relevant implications of identity and checkpoint semantics already defined by `plan.md`, but it does not redefine or newly allocate `REQ-P1-IDENTITY` or `REQ-P1-CHECKPOINTS`.
 
 This ticket does **not** define:
 - the transaction meaning and identity semantics already allocated to `p1-t01` except where needed for persistence interpretation
@@ -76,12 +76,10 @@ Planning and operator-support artifacts may still exist, but they are not canoni
 
 Examples of non-canonical or derived artifacts include:
 - files under `docs/`
-- handoff summaries
-- observability summaries
 - other convenience or client-managed metadata
 
 Review implication:
-- later implementation must not let planning artifacts or derived summaries redefine active transaction selection, resume truth, or issuance state
+- later implementation must not let planning artifacts or other derived artifacts redefine active transaction selection, resume truth, or issuance state
 
 ---
 
@@ -344,24 +342,22 @@ Once materialized state reaches the no-active baseline:
 - `verify_state` is `null`
 - `commit_state` is `null`
 
-Historical durability remains preserved by event history, but active resumability must not remain ambiguous.
+Historical durability remains preserved by canonical event history and any documented terminal snapshot handling, but active resumability must not remain ambiguous.
 
 ---
 
 ## 7. Missing, incomplete, inconsistent, and malformed behavior
 
 ## 7.1 Missing materialized state
-When materialized state is missing:
-- rebuild from canonical event history is allowed and expected
+The plan states that resume should rebuild from the event log if materialized state is missing or incomplete.
 
-This is different from malformed persistence.
+This is different from malformed canonical persistence, which must not be silently treated as healthy continuation state.
 
-## 7.2 Incomplete or inconsistent materialized state
-When materialized state is incomplete or inconsistent:
-- canonical rebuild from event history is the fallback path
+## 7.2 Incomplete materialized state
+The plan states that resume should rebuild from the event log if materialized state is incomplete.
 
 Review implication:
-- later implementation should distinguish repairable materialized-state issues from malformed historical persistence
+- later implementation should preserve the plan’s distinction between healthy materialized state, rebuild-triggering materialized-state problems, and malformed canonical persistence
 
 ## 7.3 Malformed canonical persistence
 Malformed canonical persistence must be treated as explicit failure rather than silent fallback.
@@ -439,7 +435,7 @@ Later implementation work should verify that:
 Later implementation work should verify that:
 
 - healthy materialized state is preferred over rebuild
-- rebuild occurs when materialized state is missing, incomplete, or inconsistent
+- rebuild occurs when materialized state is missing or incomplete, and remains the canonical fallback when materialized continuation cannot be safely used
 - rebuild preserves exact active transaction identity
 - rebuild does not mint replacement IDs
 - rebuild does not select active work via planning status or heuristic ticket substitution

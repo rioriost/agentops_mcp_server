@@ -12,11 +12,7 @@
     "Compatibility Policy",
     "Implementation Strategy"
   ],
-  "covered_requirements": [
-    "REQ-P1-IDENTITY",
-    "REQ-P1-CHECKPOINTS",
-    "REQ-P1-PERSISTENCE"
-  ],
+  "covered_requirements": ["REQ-P1-PERSISTENCE"],
   "goal": "Translate the plan-defined materialized-state contract, event-log role, issuance metadata role, write-order guarantees, rebuild order, and malformed-vs-missing behavior into a fully traceable implementation-facing specification.",
   "scope": [
     "Define the canonical role of tx_state.json exactly as written in plan.md.",
@@ -30,10 +26,7 @@
     "Weakening malformed-persistence failure semantics.",
     "Redefining historical compatibility beyond bounded behavior described in plan.md."
   ],
-  "inputs": [
-    "docs/v0.6.0/plan.md",
-    "docs/v0.6.0/phase0-implementation-map.md"
-  ],
+  "inputs": ["docs/v0.6.0/plan.md", "docs/v0.6.0/phase0-implementation-map.md"],
   "expected_outputs": [
     "A persistence-contract specification derived strictly from plan.md.",
     "A rebuild and durability specification derived strictly from plan.md.",
@@ -45,18 +38,8 @@
     "The issuance metadata contract preserves integer tx_id issuance semantics and clear malformed-file failure behavior.",
     "The artifact does not invent additional canonical persistence behavior beyond plan.md."
   ],
-  "dependencies": [
-    "p0-t02",
-    "p1-t01",
-    "p1-t02"
-  ],
-  "enables": [
-    "p2-t01",
-    "p2-t02",
-    "p2-t03",
-    "p2-t04",
-    "p3-t01"
-  ],
+  "dependencies": ["p0-t02", "p1-t01", "p1-t02"],
+  "enables": ["p2-t01", "p2-t02", "p2-t03", "p2-t04", "p3-t01"],
   "traceability_contract": {
     "requirement_sources": {
       "REQ-P1-PERSISTENCE": [
