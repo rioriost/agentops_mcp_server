@@ -22,6 +22,17 @@ def _build_registry(calls):
     def echo(value=None):
         return {"value": value, "blob": "x" * 5000}
 
+    def structured_failure(reason=None):
+        raise RuntimeError(
+            {
+                "ok": False,
+                "error_code": "resume_required",
+                "reason": reason or "resume exact active transaction",
+                "recommended_next_tool": "ops_update_task",
+                "recommended_action": "Resume the exact active transaction before switching work.",
+            }
+        )
+
     return {
         "workspace_initialize": {
             "description": "Bind workspace root for this MCP server session",
@@ -52,6 +63,15 @@ def _build_registry(calls):
                 "required": [],
             },
             "handler": echo,
+        },
+        "structured_failure": {
+            "description": "Raise structured failure payload",
+            "input_schema": {
+                "type": "object",
+                "properties": {"reason": {"type": ["string", "null"]}},
+                "required": [],
+            },
+            "handler": structured_failure,
         },
         "tests_suggest": {
             "description": "Suggest tests",
@@ -141,14 +161,20 @@ def test_tools_call_truncate_limit_summarizes(repo_context, state_store):
     assert "summary" in content
 
 
-def test_tools_call_unknown_tool_raises(repo_context, state_store):
+def test_tools_call_unknown_tool_returns_failure_payload(repo_context, state_store):
     tool_router = ToolRouter(_build_registry({}), repo_context, state_store)
 
-    with pytest.raises(ValueError, match="Unknown tool"):
-        tool_router.tools_call("missing.tool", {})
+    payload = tool_router.tools_call("missing.tool", {})
+    content = json.loads(payload["content"][0]["text"])
+
+    assert content["ok"] is False
+    assert content["error_code"] == "invalid_ordering"
+    assert content["reason"] == "Unknown tool: missing.tool"
 
 
-def test_tools_call_missing_required_arguments(repo_context, state_store):
+def test_tools_call_missing_required_arguments_returns_failure_payload(
+    repo_context, state_store
+):
     registry = {
         "needs_value": {
             "description": "Needs value",
@@ -162,11 +188,17 @@ def test_tools_call_missing_required_arguments(repo_context, state_store):
     }
     tool_router = ToolRouter(registry, repo_context, state_store)
 
-    with pytest.raises(ValueError, match="Missing required argument"):
-        tool_router.tools_call("needs_value", {})
+    payload = tool_router.tools_call("needs_value", {})
+    content = json.loads(payload["content"][0]["text"])
+
+    assert content["ok"] is False
+    assert content["error_code"] == "invalid_ordering"
+    assert content["reason"] == "Missing required argument(s): value"
 
 
-def test_tools_call_missing_required_field_in_arguments(repo_context, state_store):
+def test_tools_call_missing_required_field_in_arguments_returns_failure_payload(
+    repo_context, state_store
+):
     registry = {
         "needs_value": {
             "description": "Needs value",
@@ -180,8 +212,12 @@ def test_tools_call_missing_required_field_in_arguments(repo_context, state_stor
     }
     tool_router = ToolRouter(registry, repo_context, state_store)
 
-    with pytest.raises(ValueError, match="Missing required argument"):
-        tool_router.tools_call("needs_value", {"value": None})
+    payload = tool_router.tools_call("needs_value", {"value": None})
+    content = json.loads(payload["content"][0]["text"])
+
+    assert content["ok"] is False
+    assert content["error_code"] == "invalid_ordering"
+    assert content["reason"] == "Missing required argument(s): value"
 
 
 def test_tools_call_non_dict_result(repo_context, state_store):
@@ -209,11 +245,15 @@ def test_tools_call_blocks_file_backed_tool_when_uninitialized(tmp_path, state_s
         state_store.__class__(uninitialized_context),
     )
 
-    with pytest.raises(
-        ValueError,
-        match="project root is not initialized; call workspace_initialize\\(cwd\\)",
-    ):
-        tool_router.tools_call("ops_compact_context", {})
+    payload = tool_router.tools_call("ops_compact_context", {})
+    content = json.loads(payload["content"][0]["text"])
+
+    assert content["ok"] is False
+    assert content["error_code"] == "invalid_ordering"
+    assert (
+        content["reason"]
+        == "project root is not initialized; call workspace_initialize(cwd) before using file-backed tools"
+    )
 
 
 def test_tools_call_allows_tests_suggest_when_uninitialized(tmp_path, state_store):
@@ -231,3 +271,21 @@ def test_tools_call_allows_tests_suggest_when_uninitialized(tmp_path, state_stor
 
     assert content["diff"] == "a.py"
     assert content["failures"] == "boom"
+
+
+def test_tools_call_preserves_structured_failure_payload(repo_context, state_store):
+    tool_router = ToolRouter(_build_registry({}), repo_context, state_store)
+
+    payload = tool_router.tools_call(
+        "structured_failure", {"reason": "resume exact active transaction"}
+    )
+    content = json.loads(payload["content"][0]["text"])
+
+    assert content["ok"] is False
+    assert content["error_code"] == "resume_required"
+    assert content["reason"] == "resume exact active transaction"
+    assert content["recommended_next_tool"] == "ops_update_task"
+    assert (
+        content["recommended_action"]
+        == "Resume the exact active transaction before switching work."
+    )

@@ -1,10 +1,17 @@
+import json
+
 import pytest
 
 from agentops_mcp_server.workflow_response import (
     build_failure_response,
     build_guidance_from_active_tx,
+    build_resume_load_failure,
+    build_resume_load_runtime_error_adapter,
+    build_resume_load_value_error_adapter,
     build_success_response,
+    canonical_idle_baseline,
     derive_workflow_guidance,
+    load_resume_state_shared,
     merge_response_data,
 )
 
@@ -342,6 +349,382 @@ def test_build_guidance_from_active_tx_wraps_active_tx_state():
     assert guidance["active_ticket_id"] == "ticket-9"
     assert guidance["canonical_status"] == ""
     assert guidance["current_step"] is None
+
+
+def test_build_resume_load_failure_returns_baseline_when_missing_and_rebuild_fails():
+    baseline = canonical_idle_baseline()
+
+    result = build_resume_load_failure(
+        tx_state=None,
+        is_valid_tx_state=lambda state: state == {"valid": True},
+        rebuild_tx_state=lambda: {"ok": False},
+        baseline=baseline,
+    )
+
+    assert result["ok"] is False
+    assert result["return_baseline"] is True
+    assert result["tx_state"] == baseline
+    assert result["failure"] is None
+    assert result["outcome_kind"] == "baseline"
+
+
+def test_build_resume_load_failure_returns_integrity_failure_for_drifted_rebuild():
+    rebuilt_state = {
+        **_tx_state(
+            status="checking",
+            phase="checking",
+            next_action="tx.verify.pass",
+        ),
+        "integrity": {
+            "state_hash": "hash",
+            "rebuilt_from_seq": 9,
+            "drift_detected": True,
+            "active_tx_source": "rebuild",
+        },
+        "rebuild_warning": "drift",
+        "rebuild_invalid_seq": 9,
+        "rebuild_observed_mismatch": {"expected": 8, "observed": 9},
+    }
+
+    result = build_resume_load_failure(
+        tx_state={
+            "active_tx": {
+                "tx_id": 1,
+                "ticket_id": "p1-t02",
+            },
+            "status": "checking",
+            "next_action": "",
+        },
+        is_valid_tx_state=lambda state: state == {"valid": True},
+        rebuild_tx_state=lambda: {"ok": True, "state": rebuilt_state},
+    )
+
+    assert result["ok"] is False
+    assert result["return_baseline"] is False
+    assert result["tx_state"] is None
+    assert result["outcome_kind"] == "integrity_failure"
+    assert result["failure"]["error_code"] == "integrity_blocked"
+    assert (
+        result["failure"]["reason"]
+        == "resume blocked by ambiguous canonical persistence"
+    )
+    assert result["failure"]["rebuild_warning"] == "drift"
+    assert result["failure"]["rebuild_invalid_seq"] == 9
+    assert result["failure"]["rebuild_observed_mismatch"] == {
+        "expected": 8,
+        "observed": 9,
+    }
+
+
+def test_build_resume_load_failure_returns_incomplete_failure_for_invalid_rebuild():
+    rebuilt_state = {
+        "active_tx": {
+            "tx_id": 1,
+            "ticket_id": "p1-t02",
+        },
+        "status": "checking",
+        "next_action": "",
+    }
+
+    result = build_resume_load_failure(
+        tx_state={
+            "active_tx": {
+                "tx_id": 1,
+                "ticket_id": "p1-t02",
+            },
+            "status": "checking",
+            "next_action": "",
+        },
+        is_valid_tx_state=lambda state: bool(
+            isinstance(state, dict) and state.get("next_action") == "tx.verify.pass"
+        ),
+        rebuild_tx_state=lambda: {"ok": True, "state": rebuilt_state},
+    )
+
+    assert result["ok"] is False
+    assert result["return_baseline"] is False
+    assert result["outcome_kind"] == "incomplete_failure"
+    assert result["failure"]["error_code"] == "invalid_ordering"
+    assert (
+        result["failure"]["reason"]
+        == "resume blocked because rebuilt canonical state is incomplete"
+    )
+
+
+def test_build_resume_load_failure_returns_materialized_malformed_failure():
+    tx_state = {
+        "active_tx": None,
+        "status": None,
+        "next_action": "tx.verify.start",
+    }
+
+    result = build_resume_load_failure(
+        tx_state=tx_state,
+        is_valid_tx_state=lambda _state: False,
+        rebuild_tx_state=lambda: {"ok": False},
+    )
+
+    assert result["ok"] is False
+    assert result["return_baseline"] is False
+    assert result["outcome_kind"] == "malformed_materialized_failure"
+    assert result["failure"]["error_code"] == "invalid_ordering"
+    assert (
+        result["failure"]["reason"]
+        == "resume blocked because materialized canonical state is malformed"
+    )
+    assert result["failure"]["recommended_next_tool"] == "ops_capture_state"
+
+
+def test_build_resume_load_failure_returns_rebuild_malformed_failure():
+    tx_state = {
+        "active_tx": {
+            "tx_id": 1,
+            "ticket_id": "p1-t02",
+        },
+        "status": "checking",
+        "next_action": "",
+    }
+
+    result = build_resume_load_failure(
+        tx_state=tx_state,
+        is_valid_tx_state=lambda _state: False,
+        rebuild_tx_state=lambda: {"ok": False},
+    )
+
+    assert result["ok"] is False
+    assert result["return_baseline"] is False
+    assert result["outcome_kind"] == "malformed_rebuild_failure"
+    assert result["failure"]["error_code"] == "invalid_ordering"
+    assert (
+        result["failure"]["reason"]
+        == "resume blocked by malformed canonical persistence"
+    )
+    assert result["failure"]["recommended_next_tool"] == "tx_state_rebuild"
+
+
+def test_load_resume_state_shared_returns_rebuilt_state_when_valid():
+    rebuilt_state = _tx_state(
+        status="checking",
+        phase="checking",
+        next_action="tx.verify.pass",
+    )
+
+    result = load_resume_state_shared(
+        read_tx_state=lambda: {
+            "active_tx": {
+                "tx_id": 1,
+                "ticket_id": "p1-t02",
+            },
+            "status": "checking",
+            "next_action": "",
+        },
+        rebuild_tx_state=lambda: {"ok": True, "state": rebuilt_state},
+        is_valid_tx_state=lambda state: bool(
+            isinstance(state, dict) and state.get("next_action") == "tx.verify.pass"
+        ),
+        on_integrity_failure=lambda state: {
+            "kind": "integrity",
+            "state": state,
+        },
+        on_incomplete_failure=lambda state: {
+            "kind": "incomplete",
+            "state": state,
+        },
+        on_rebuild_malformed_failure=lambda state: {
+            "kind": "rebuild_malformed",
+            "state": state,
+        },
+        on_materialized_malformed_failure=lambda state: {
+            "kind": "materialized_malformed",
+            "state": state,
+        },
+        baseline=canonical_idle_baseline(),
+        rebuild_when_invalid=True,
+    )
+
+    assert result == rebuilt_state
+
+
+def test_load_resume_state_shared_routes_failures_to_matching_callbacks():
+    tx_state = {
+        "active_tx": {
+            "tx_id": 1,
+            "ticket_id": "p1-t02",
+        },
+        "status": "checking",
+        "next_action": "",
+    }
+
+    assert (
+        load_resume_state_shared(
+            read_tx_state=lambda: tx_state,
+            rebuild_tx_state=lambda: {
+                "ok": True,
+                "state": {
+                    **_tx_state(
+                        status="checking",
+                        phase="checking",
+                        next_action="tx.verify.pass",
+                    ),
+                    "integrity": {
+                        "state_hash": "hash",
+                        "rebuilt_from_seq": 9,
+                        "drift_detected": True,
+                        "active_tx_source": "rebuild",
+                    },
+                },
+            },
+            is_valid_tx_state=lambda state: bool(
+                isinstance(state, dict) and state.get("next_action") == "tx.verify.pass"
+            ),
+            on_integrity_failure=lambda state: ("integrity", state),
+            on_incomplete_failure=lambda state: ("incomplete", state),
+            on_rebuild_malformed_failure=lambda state: ("rebuild_malformed", state),
+            on_materialized_malformed_failure=lambda state: (
+                "materialized_malformed",
+                state,
+            ),
+            baseline=canonical_idle_baseline(),
+            rebuild_when_invalid=True,
+        )[0]
+        == "integrity"
+    )
+
+    assert (
+        load_resume_state_shared(
+            read_tx_state=lambda: tx_state,
+            rebuild_tx_state=lambda: {
+                "ok": True,
+                "state": {
+                    "active_tx": {
+                        "tx_id": 1,
+                        "ticket_id": "p1-t02",
+                    },
+                    "status": "checking",
+                    "next_action": "",
+                },
+            },
+            is_valid_tx_state=lambda state: bool(
+                isinstance(state, dict) and state.get("next_action") == "tx.verify.pass"
+            ),
+            on_integrity_failure=lambda state: ("integrity", state),
+            on_incomplete_failure=lambda state: ("incomplete", state),
+            on_rebuild_malformed_failure=lambda state: ("rebuild_malformed", state),
+            on_materialized_malformed_failure=lambda state: (
+                "materialized_malformed",
+                state,
+            ),
+            baseline=canonical_idle_baseline(),
+            rebuild_when_invalid=True,
+        )[0]
+        == "incomplete"
+    )
+
+    assert (
+        load_resume_state_shared(
+            read_tx_state=lambda: tx_state,
+            rebuild_tx_state=lambda: {"ok": False},
+            is_valid_tx_state=lambda _state: False,
+            on_integrity_failure=lambda state: ("integrity", state),
+            on_incomplete_failure=lambda state: ("incomplete", state),
+            on_rebuild_malformed_failure=lambda state: ("rebuild_malformed", state),
+            on_materialized_malformed_failure=lambda state: (
+                "materialized_malformed",
+                state,
+            ),
+            baseline=canonical_idle_baseline(),
+            rebuild_when_invalid=True,
+        )[0]
+        == "rebuild_malformed"
+    )
+
+    assert (
+        load_resume_state_shared(
+            read_tx_state=lambda: {
+                "active_tx": None,
+                "status": None,
+                "next_action": "tx.verify.start",
+            },
+            rebuild_tx_state=lambda: {"ok": False},
+            is_valid_tx_state=lambda _state: False,
+            on_integrity_failure=lambda state: ("integrity", state),
+            on_incomplete_failure=lambda state: ("incomplete", state),
+            on_rebuild_malformed_failure=lambda state: ("rebuild_malformed", state),
+            on_materialized_malformed_failure=lambda state: (
+                "materialized_malformed",
+                state,
+            ),
+            baseline=canonical_idle_baseline(),
+            rebuild_when_invalid=False,
+        )[0]
+        == "materialized_malformed"
+    )
+
+
+def test_build_resume_load_value_error_adapter_raises_json_encoded_failure():
+    adapter = build_resume_load_value_error_adapter(
+        integrity_failure_action="custom integrity action",
+    )
+    state = _tx_state(drift_detected=True)
+
+    with pytest.raises(ValueError) as excinfo:
+        adapter["on_integrity_failure"](state)
+
+    payload = json.loads(str(excinfo.value))
+    assert payload["ok"] is False
+    assert payload["error_code"] == "integrity_blocked"
+    assert payload["recommended_next_tool"] == "tx_state_rebuild"
+    assert payload["recommended_action"] == "custom integrity action"
+
+
+def test_build_resume_load_runtime_error_adapter_raises_structured_failure():
+    adapter = build_resume_load_runtime_error_adapter(
+        materialized_malformed_action="custom malformed action",
+    )
+
+    with pytest.raises(RuntimeError) as excinfo:
+        adapter["on_materialized_malformed_failure"](
+            {
+                "active_tx": None,
+                "status": None,
+                "next_action": "tx.verify.start",
+            }
+        )
+
+    payload = excinfo.value.args[0]
+    assert payload["ok"] is False
+    assert payload["error_code"] == "invalid_ordering"
+    assert (
+        payload["reason"]
+        == "resume blocked because materialized canonical state is malformed"
+    )
+    assert payload["recommended_next_tool"] == "ops_capture_state"
+    assert payload["recommended_action"] == "custom malformed action"
+
+
+def test_build_resume_load_runtime_error_adapter_builds_rebuild_malformed_failure():
+    adapter = build_resume_load_runtime_error_adapter(
+        rebuild_malformed_action="custom rebuild malformed action",
+    )
+
+    with pytest.raises(RuntimeError) as excinfo:
+        adapter["on_rebuild_malformed_failure"](
+            {
+                "active_tx": {
+                    "tx_id": 1,
+                    "ticket_id": "p1-t02",
+                },
+                "status": "checking",
+                "next_action": "",
+            }
+        )
+
+    payload = excinfo.value.args[0]
+    assert payload["ok"] is False
+    assert payload["error_code"] == "invalid_ordering"
+    assert payload["reason"] == "resume blocked by malformed canonical persistence"
+    assert payload["recommended_next_tool"] == "tx_state_rebuild"
+    assert payload["recommended_action"] == "custom rebuild malformed action"
 
 
 def test_merge_response_data_merges_extra_fields():

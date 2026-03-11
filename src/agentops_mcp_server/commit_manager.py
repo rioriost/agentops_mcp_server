@@ -8,7 +8,24 @@ from .git_repo import GitRepo
 from .state_rebuilder import StateRebuilder
 from .state_store import StateStore
 from .verify_runner import VerifyRunner
-from .workflow_response import build_structured_helper_failure, build_success_response
+from .workflow_response import (
+    build_bootstrap_integrity_failure,
+    build_bootstrap_invalid_resume_failure,
+    build_commit_no_changes_failure,
+    build_commit_no_files_failure,
+    build_commit_verify_failed_failure,
+    build_resume_load_runtime_error_adapter,
+    build_success_response,
+    build_verify_start_begin_required_failure,
+    build_verify_start_missing_active_tx_failure,
+    build_verify_start_missing_next_action_failure,
+    build_verify_start_missing_tx_state_failure,
+    build_verify_start_not_persisted_failure,
+    build_verify_start_not_resumable_failure,
+    canonical_idle_baseline,
+    is_valid_exact_resume_tx_state,
+    load_resume_state_shared,
+)
 
 
 class CommitManager:
@@ -27,145 +44,18 @@ class CommitManager:
         self._verify_started_in_call = False
 
     def _is_valid_materialized_tx_state(self, tx_state: Any) -> bool:
-        if not isinstance(tx_state, dict):
-            return False
-
-        active_tx = tx_state.get("active_tx")
-        status = tx_state.get("status")
-        next_action = tx_state.get("next_action")
-        verify_state = tx_state.get("verify_state")
-        commit_state = tx_state.get("commit_state")
-        semantic_summary = tx_state.get("semantic_summary")
-
-        if active_tx is None:
-            return (
-                status is None
-                and isinstance(next_action, str)
-                and bool(next_action.strip())
-                and verify_state is None
-                and commit_state is None
-                and semantic_summary is None
-            )
-
-        if not isinstance(active_tx, dict):
-            return False
-        if not isinstance(status, str) or not status.strip():
-            return False
-        if not isinstance(next_action, str) or not next_action.strip():
-            return False
-        if not isinstance(verify_state, dict):
-            return False
-        if not isinstance(commit_state, dict):
-            return False
-        if not isinstance(semantic_summary, str) or not semantic_summary.strip():
-            return False
-
-        tx_id = active_tx.get("tx_id")
-        ticket_id = active_tx.get("ticket_id")
-        if isinstance(tx_id, bool) or not isinstance(tx_id, int):
-            return False
-        if not isinstance(ticket_id, str) or not ticket_id.strip():
-            return False
-
-        session_id = active_tx.get("session_id")
-        if session_id is not None and not isinstance(session_id, str):
-            return False
-
-        return True
+        return is_valid_exact_resume_tx_state(tx_state)
 
     def _load_resume_state(self) -> Dict[str, Any]:
-        baseline = {
-            "active_tx": None,
-            "status": None,
-            "next_action": "tx.begin",
-            "verify_state": None,
-            "commit_state": None,
-            "semantic_summary": None,
-            "integrity": {},
-        }
-
-        tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
-        if self._is_valid_materialized_tx_state(tx_state):
-            return tx_state
-
-        materialized_state = tx_state if isinstance(tx_state, dict) else {}
-        materialized_active_tx = (
-            materialized_state.get("active_tx")
-            if isinstance(materialized_state.get("active_tx"), dict)
-            else None
-        )
-        materialized_status = materialized_state.get("status")
-        materialized_next_action = materialized_state.get("next_action")
-        materialized_requests_rebuild = (
-            tx_state is None
-            or materialized_active_tx is None
-            or not isinstance(materialized_status, str)
-            or not materialized_status.strip()
-            or not isinstance(materialized_next_action, str)
-            or not materialized_next_action.strip()
-        )
-
-        if materialized_requests_rebuild:
-            rebuild = self.state_rebuilder.rebuild_tx_state()
-            if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
-                rebuilt_state = rebuild["state"]
-                integrity = (
-                    rebuilt_state.get("integrity")
-                    if isinstance(rebuilt_state.get("integrity"), dict)
-                    else {}
-                )
-                if integrity.get("drift_detected") is True:
-                    raise RuntimeError(
-                        build_structured_helper_failure(
-                            error_code="integrity_blocked",
-                            reason="resume blocked by ambiguous canonical persistence",
-                            tx_state=rebuilt_state,
-                            recommended_next_tool="tx_state_rebuild",
-                            recommended_action="Repair the invalid canonical history before resuming the exact active transaction.",
-                            recoverable=False,
-                            blocked=True,
-                            rebuild_warning=rebuilt_state.get("rebuild_warning"),
-                            rebuild_invalid_seq=rebuilt_state.get(
-                                "rebuild_invalid_seq"
-                            ),
-                            rebuild_observed_mismatch=rebuilt_state.get(
-                                "rebuild_observed_mismatch"
-                            ),
-                        )
-                    )
-                if self._is_valid_materialized_tx_state(rebuilt_state):
-                    return rebuilt_state
-                raise RuntimeError(
-                    build_structured_helper_failure(
-                        error_code="invalid_ordering",
-                        reason="resume blocked because rebuilt canonical state is incomplete",
-                        tx_state=rebuilt_state,
-                        recommended_next_tool="tx_state_rebuild",
-                        recommended_action="Repair canonical persistence so rebuild yields a complete exact active transaction state with top-level next_action.",
-                    )
-                )
-
-            if tx_state is None:
-                return baseline
-
-            raise RuntimeError(
-                build_structured_helper_failure(
-                    error_code="invalid_ordering",
-                    reason="resume blocked by malformed canonical persistence",
-                    tx_state=materialized_state or None,
-                    recommended_next_tool="tx_state_rebuild",
-                    recommended_action="Repair malformed canonical persistence before resuming the exact active transaction.",
-                )
-            )
-
-        raise RuntimeError(
-            build_structured_helper_failure(
-                error_code="invalid_ordering",
-                reason="resume blocked because materialized canonical state is malformed",
-                tx_state=materialized_state or None,
-                recommended_next_tool="ops_capture_state",
-                recommended_action="Restore canonical top-level status and next_action before resuming the exact active transaction.",
-            )
+        return load_resume_state_shared(
+            read_tx_state=lambda: self.state_store.read_json_file(
+                self.repo_context.tx_state
+            ),
+            rebuild_tx_state=self.state_rebuilder.rebuild_tx_state,
+            is_valid_tx_state=self._is_valid_materialized_tx_state,
+            baseline=canonical_idle_baseline(),
+            rebuild_when_invalid=True,
+            **build_resume_load_runtime_error_adapter(),
         )
 
     def _load_tx_context(self) -> Optional[Dict[str, Any]]:
@@ -327,47 +217,18 @@ class CommitManager:
             self._matching_active_context_from_rebuild(context)
         )
         if rebuild_context:
-            tx_state = self._load_resume_state()
             if self._is_valid_materialized_tx_state(rebuilt_state):
-                tx_state = rebuilt_state
-            if isinstance(tx_state, dict):
-                active_tx = tx_state.get("active_tx")
-                if not isinstance(active_tx, dict):
-                    active_tx = {}
-                    tx_state["active_tx"] = active_tx
-                active_tx["tx_id"] = rebuild_context["tx_id"]
-                active_tx["ticket_id"] = rebuild_context["ticket_id"]
-                active_tx["phase"] = "in-progress"
-                active_tx["current_step"] = "none"
-                active_tx["session_id"] = rebuild_context["session_id"]
-                self.state_store.tx_state_save(tx_state)
-            return
+                return
+            raise RuntimeError(
+                build_bootstrap_invalid_resume_failure(
+                    tx_state=rebuilt_state,
+                )
+            )
 
         if isinstance(integrity, dict) and integrity.get("drift_detected") is True:
             raise RuntimeError(
-                build_structured_helper_failure(
-                    error_code="integrity_blocked",
-                    reason="helper bootstrap blocked by canonical integrity drift",
+                build_bootstrap_integrity_failure(
                     tx_state=rebuilt_state,
-                    recommended_next_tool="tx_state_rebuild",
-                    recommended_action="Repair the invalid canonical history before allowing helper bootstrap to emit tx.begin.",
-                    recoverable=False,
-                    blocked=True,
-                    rebuild_warning=(
-                        rebuilt_state.get("rebuild_warning")
-                        if isinstance(rebuilt_state, dict)
-                        else None
-                    ),
-                    rebuild_invalid_seq=(
-                        rebuilt_state.get("rebuild_invalid_seq")
-                        if isinstance(rebuilt_state, dict)
-                        else None
-                    ),
-                    rebuild_observed_mismatch=(
-                        rebuilt_state.get("rebuild_observed_mismatch")
-                        if isinstance(rebuilt_state, dict)
-                        else None
-                    ),
                 )
             )
 
@@ -377,12 +238,8 @@ class CommitManager:
         tx_state = self._load_resume_state()
         if not self._is_valid_materialized_tx_state(tx_state):
             raise RuntimeError(
-                build_structured_helper_failure(
-                    error_code="invalid_ordering",
-                    reason="verify.start not recorded; tx_state missing",
+                build_verify_start_missing_tx_state_failure(
                     tx_state=None,
-                    recommended_next_tool="repo_verify",
-                    recommended_action="Ensure canonical transaction state is materialized before returning verify results.",
                 )
             )
         canonical_status = tx_state.get("status")
@@ -390,12 +247,8 @@ class CommitManager:
         active_tx = tx_state.get("active_tx")
         if not isinstance(active_tx, dict):
             raise RuntimeError(
-                build_structured_helper_failure(
-                    error_code="invalid_ordering",
-                    reason="verify.start not recorded; active_tx missing",
+                build_verify_start_missing_active_tx_failure(
                     tx_state=tx_state,
-                    recommended_next_tool="repo_verify",
-                    recommended_action="Restore the exact active transaction state before returning verify results.",
                 )
             )
         if (
@@ -404,12 +257,8 @@ class CommitManager:
             or canonical_status.strip() in {"done", "blocked"}
         ):
             raise RuntimeError(
-                build_structured_helper_failure(
-                    error_code="invalid_ordering",
-                    reason="verify.start not recorded; active transaction is not resumable",
+                build_verify_start_not_resumable_failure(
                     tx_state=tx_state,
-                    recommended_next_tool="ops_update_task",
-                    recommended_action="Resume the exact active non-terminal transaction before returning verify results.",
                 )
             )
         if (
@@ -417,12 +266,8 @@ class CommitManager:
             or not canonical_next_action.strip()
         ):
             raise RuntimeError(
-                build_structured_helper_failure(
-                    error_code="invalid_ordering",
-                    reason="verify.start not recorded; canonical next_action missing",
+                build_verify_start_missing_next_action_failure(
                     tx_state=tx_state,
-                    recommended_next_tool="ops_update_task",
-                    recommended_action="Restore the exact active transaction with a valid top-level next_action before returning verify results.",
                 )
             )
         verify_state = (
@@ -453,21 +298,13 @@ class CommitManager:
                             self.state_store.tx_state_save(rebuilt_state)
                             return
             raise RuntimeError(
-                build_structured_helper_failure(
-                    error_code="invalid_ordering",
-                    reason="verify.start emitted but tx_state was not updated to running",
+                build_verify_start_not_persisted_failure(
                     tx_state=tx_state,
-                    recommended_next_tool="repo_verify",
-                    recommended_action="Repair state persistence so verify.start updates canonical verify_state before continuing.",
                 )
             )
         raise RuntimeError(
-            build_structured_helper_failure(
-                error_code="begin_required",
-                reason="verify.start not recorded; tx.begin required before verify results",
+            build_verify_start_begin_required_failure(
                 tx_state=tx_state,
-                recommended_next_tool="ops_start_task",
-                recommended_action="Start or resume the canonical transaction before returning verify results.",
             )
         )
 
@@ -630,15 +467,7 @@ class CommitManager:
     def _workflow_guidance(self) -> Dict[str, Any]:
         tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
         if not isinstance(tx_state, dict):
-            tx_state = {
-                "active_tx": None,
-                "status": None,
-                "next_action": "tx.begin",
-                "verify_state": None,
-                "commit_state": None,
-                "semantic_summary": None,
-                "integrity": {},
-            }
+            tx_state = canonical_idle_baseline()
 
         response = build_success_response(tx_state=tx_state)
         active_tx = response.get("active_tx")
@@ -689,14 +518,11 @@ class CommitManager:
                 phase_override="checking",
             )
             raise RuntimeError(
-                build_structured_helper_failure(
-                    error_code="verify_failed",
+                build_commit_verify_failed_failure(
                     reason=f"verify failed (code={verify_result['returncode']}): {verify_result['stderr']}",
                     tx_state=self.state_store.read_json_file(
                         self.repo_context.tx_state
                     ),
-                    recommended_next_tool="repo_verify",
-                    recommended_action="Repair the verification failure and rerun verification before attempting commit.",
                 )
             )
         self._emit_tx_event(
@@ -762,14 +588,11 @@ class CommitManager:
                     phase_override="checking",
                 )
                 raise RuntimeError(
-                    build_structured_helper_failure(
-                        error_code="verify_failed",
+                    build_commit_verify_failed_failure(
                         reason=f"verify failed (code={verify_result['returncode']}): {details}",
                         tx_state=self.state_store.read_json_file(
                             self.repo_context.tx_state
                         ),
-                        recommended_next_tool="repo_verify",
-                        recommended_action="Repair the verification failure and rerun verification before attempting commit.",
                     )
                 )
             self._emit_tx_event(
@@ -808,12 +631,8 @@ class CommitManager:
                 },
                 phase_override="verified",
             )
-            result = build_structured_helper_failure(
-                error_code="invalid_ordering",
-                reason="no changes to commit",
+            result = build_commit_no_changes_failure(
                 tx_state=self.state_store.read_json_file(self.repo_context.tx_state),
-                recommended_next_tool="ops_end_task",
-                recommended_action="If work is already verified and nothing remains to commit, close the transaction explicitly or make additional changes before retrying commit.",
             )
             result.update(self._workflow_guidance())
             return result
@@ -842,14 +661,10 @@ class CommitManager:
                     },
                     phase_override="verified",
                 )
-                result = build_structured_helper_failure(
-                    error_code="invalid_ordering",
-                    reason="no files specified",
+                result = build_commit_no_files_failure(
                     tx_state=self.state_store.read_json_file(
                         self.repo_context.tx_state
                     ),
-                    recommended_next_tool="repo_commit",
-                    recommended_action="Specify commit paths or use auto staging before retrying commit.",
                 )
                 result.update(self._workflow_guidance())
                 return result

@@ -1,9 +1,18 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping, Optional
+import json
+from typing import Any, Callable, Dict, Literal, Mapping, Optional, TypeAlias, TypedDict
 
 TERMINAL_STATUSES = {"done", "blocked"}
 END_TASK_ACTIONS = {"tx.end.done", "tx.end.blocked"}
+CANONICAL_IDLE_BASELINE = {
+    "active_tx": None,
+    "status": None,
+    "next_action": "tx.begin",
+    "verify_state": None,
+    "commit_state": None,
+    "semantic_summary": None,
+}
 DEFAULT_FAILURE_ACTIONS = {
     "begin_required": {
         "recoverable": True,
@@ -51,6 +60,197 @@ DEFAULT_FAILURE_ACTIONS = {
         "recommended_action": "Historical repair is required before resume-safe automation can continue. Preserve the invalid event metadata, repair or replace the damaged canonical history, and avoid reusing human ticket labels as canonical tx_id values.",
     },
 }
+
+
+class FailurePayload(TypedDict, total=False):
+    error_code: str
+    reason: str
+    tx_state: Any
+    recoverable: bool
+    blocked: bool
+    recommended_next_tool: str
+    recommended_action: str
+    integrity_status: str
+    rebuild_warning: Any
+    rebuild_invalid_seq: Any
+    rebuild_observed_mismatch: Any
+
+
+class ResumeLoadFailureResult(TypedDict):
+    ok: bool
+    tx_state: Any
+    failure: Optional[FailurePayload]
+    return_baseline: bool
+    outcome_kind: ResumeLoadFailureResultKind
+
+
+ResumeLoadOutcomeKind: TypeAlias = Literal[
+    "integrity_failure",
+    "rebuilt_state",
+    "incomplete_failure",
+    "baseline",
+    "malformed_rebuild_failure",
+    "malformed_materialized_failure",
+]
+ResumeLoadFailureResultKind: TypeAlias = Literal[
+    "materialized_state",
+    "integrity_failure",
+    "rebuilt_state",
+    "incomplete_failure",
+    "baseline",
+    "malformed_rebuild_failure",
+    "malformed_materialized_failure",
+]
+
+
+class ResumeLoadOutcome(TypedDict):
+    kind: ResumeLoadOutcomeKind
+    state: Any
+    rebuild_requested: bool
+
+
+ResumeLoadRaiseFailure: TypeAlias = Callable[[FailurePayload], None]
+ResumeLoadFailureHandler: TypeAlias = Callable[[Any], Any]
+ResumeLoadStateValidator: TypeAlias = Callable[[Any], bool]
+ResumeLoadStateRebuilder: TypeAlias = Callable[[], Any]
+ResumeLoadStateReader: TypeAlias = Callable[[], Any]
+ResumeLoadSharedReturn: TypeAlias = Any
+ResumeLoadFailureAdapterMap: TypeAlias = Dict[str, ResumeLoadFailureHandler]
+
+
+# Resume-load result builders
+
+
+def _resume_load_success_result(
+    *,
+    tx_state: Any,
+    outcome_kind: ResumeLoadFailureResultKind,
+) -> ResumeLoadFailureResult:
+    return {
+        "ok": True,
+        "tx_state": tx_state,
+        "failure": None,
+        "return_baseline": False,
+        "outcome_kind": outcome_kind,
+    }
+
+
+def _resume_load_baseline_result(
+    *,
+    tx_state: Any,
+    promote_to_success: bool,
+) -> ResumeLoadFailureResult:
+    return {
+        "ok": bool(promote_to_success),
+        "tx_state": tx_state,
+        "failure": None,
+        "return_baseline": not bool(promote_to_success),
+        "outcome_kind": "baseline",
+    }
+
+
+def _resume_load_failure_result(
+    *,
+    failure: FailurePayload,
+    outcome_kind: ResumeLoadFailureResultKind,
+) -> ResumeLoadFailureResult:
+    return {
+        "ok": False,
+        "tx_state": None,
+        "failure": failure,
+        "return_baseline": False,
+        "outcome_kind": outcome_kind,
+    }
+
+
+# Resume-load failure dispatch
+
+
+def _resume_load_dispatch_failure(
+    *,
+    result: ResumeLoadFailureResult,
+    tx_state: Any,
+    on_integrity_failure: ResumeLoadFailureHandler,
+    on_incomplete_failure: ResumeLoadFailureHandler,
+    on_rebuild_malformed_failure: ResumeLoadFailureHandler,
+    on_materialized_malformed_failure: ResumeLoadFailureHandler,
+) -> ResumeLoadSharedReturn:
+    failure = result["failure"]
+    if not isinstance(failure, dict):
+        return result["tx_state"]
+
+    outcome_kind = result.get("outcome_kind")
+
+    if outcome_kind == "integrity_failure":
+        return on_integrity_failure(failure.get("tx_state") or tx_state)
+    if outcome_kind == "incomplete_failure":
+        return on_incomplete_failure(failure.get("tx_state") or tx_state)
+    if outcome_kind == "malformed_rebuild_failure":
+        return on_rebuild_malformed_failure(failure.get("tx_state"))
+    return on_materialized_malformed_failure(failure.get("tx_state"))
+
+
+# Resume-load raise helpers
+
+
+def _resume_load_raise_integrity_failure(
+    *,
+    raise_failure: ResumeLoadRaiseFailure,
+    state: Any,
+    recommended_action: Any,
+) -> None:
+    raise_failure(
+        build_resume_load_integrity_failure(
+            tx_state=state,
+            recommended_action=recommended_action,
+        )
+    )
+
+
+def _resume_load_raise_incomplete_failure(
+    *,
+    raise_failure: ResumeLoadRaiseFailure,
+    state: Any,
+    recommended_action: Any,
+) -> None:
+    raise_failure(
+        build_resume_load_incomplete_failure(
+            tx_state=state,
+            recommended_action=recommended_action,
+        )
+    )
+
+
+def _resume_load_raise_rebuild_malformed_failure(
+    *,
+    raise_failure: ResumeLoadRaiseFailure,
+    tx_state: Any,
+    recommended_action: Any,
+) -> None:
+    raise_failure(
+        build_resume_load_malformed_failure(
+            tx_state=tx_state,
+            recommended_next_tool="tx_state_rebuild",
+            recommended_action=recommended_action,
+            reason="resume blocked by malformed canonical persistence",
+        )
+    )
+
+
+def _resume_load_raise_materialized_malformed_failure(
+    *,
+    raise_failure: ResumeLoadRaiseFailure,
+    tx_state: Any,
+    recommended_action: Any,
+) -> None:
+    raise_failure(
+        build_resume_load_malformed_failure(
+            tx_state=tx_state,
+            recommended_next_tool="ops_capture_state",
+            recommended_action=recommended_action,
+            reason="resume blocked because materialized canonical state is malformed",
+        )
+    )
 
 
 def _clean_str(value: Any) -> str:
@@ -118,309 +318,938 @@ def _failure_defaults(error_code: str) -> Dict[str, Any]:
     return dict(DEFAULT_FAILURE_ACTIONS.get(error_code, {}))
 
 
-def _integrity_from_state(tx_state: Any) -> Dict[str, Any]:
-    state = _as_dict(tx_state)
-    return _as_dict(state.get("integrity"))
-
-
-def _resolved_status_phase_next_action(
-    tx_state: Any,
-    active_tx: Mapping[str, Any],
-    *,
-    canonical_status: Any = None,
-    canonical_phase: Any = None,
-    next_action: Any = None,
-) -> tuple[str, str, str]:
-    state = _as_dict(tx_state)
-    tx_status = _clean_str(canonical_status) or _clean_str(state.get("status"))
-    resolved_next_action = _clean_str(next_action) or _clean_str(
-        state.get("next_action")
-    )
-    tx_phase = _clean_str(canonical_phase) or tx_status
-
-    has_exact_active_tx = (
-        _clean_optional_tx_id(active_tx.get("tx_id")) is not None
-        and _clean_optional_str(active_tx.get("ticket_id")) is not None
-    )
-    if has_exact_active_tx and not resolved_next_action:
-        tx_status = ""
-        tx_phase = ""
-
-    return tx_status, tx_phase, resolved_next_action
-
-
-def derive_workflow_guidance(
-    tx_state: Any,
-    *,
-    canonical_status: Any = None,
-    canonical_phase: Any = None,
-    next_action: Any = None,
-    followup_tool: Any = None,
-    terminal: Any = None,
-    requires_followup: Any = None,
-    can_start_new_ticket: Any = None,
-    resume_required: Any = None,
-    current_step: Any = None,
-    verify_status: Any = None,
-    commit_status: Any = None,
-    integrity_status: Any = None,
-    active_tx_id: Any = None,
-    active_ticket_id: Any = None,
+def canonical_idle_baseline(
+    *, include_integrity: bool = True, integrity: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
+    baseline = dict(CANONICAL_IDLE_BASELINE)
+    if include_integrity:
+        baseline["integrity"] = dict(integrity) if isinstance(integrity, dict) else {}
+    return baseline
+
+
+def _materialized_state_dict(tx_state: Any) -> Dict[str, Any]:
+    if isinstance(tx_state, dict):
+        return tx_state
+    return {}
+
+
+def _materialized_active_tx_dict(tx_state: Any) -> Optional[Dict[str, Any]]:
+    state = _materialized_state_dict(tx_state)
+    active_tx = state.get("active_tx")
+    if isinstance(active_tx, dict):
+        return active_tx
+    return None
+
+
+def requests_resume_state_rebuild(tx_state: Any) -> bool:
+    state = _materialized_state_dict(tx_state)
+    active_tx = _materialized_active_tx_dict(state)
+    status = state.get("status")
+    next_action = state.get("next_action")
+    return (
+        tx_state is None
+        or active_tx is None
+        or not isinstance(status, str)
+        or not status.strip()
+        or not isinstance(next_action, str)
+        or not next_action.strip()
+    )
+
+
+# Resume-load internals
+
+
+def _resume_load_integrity(tx_state: Any) -> Dict[str, Any]:
     state = _as_dict(tx_state)
-    active_tx = _active_tx_from_state(state)
-    integrity = _integrity_from_state(state)
-    verify_state = _verify_state_from_state(state, active_tx)
-    commit_state = _commit_state_from_state(state, active_tx)
+    integrity = state.get("integrity")
+    return dict(integrity) if isinstance(integrity, dict) else {}
 
-    tx_status, tx_phase, resolved_next_action = _resolved_status_phase_next_action(
-        state,
-        active_tx,
-        canonical_status=canonical_status,
-        canonical_phase=canonical_phase,
-        next_action=next_action,
-    )
 
-    resolved_terminal = _clean_bool(terminal)
-    if resolved_terminal is None:
-        resolved_terminal = tx_status in TERMINAL_STATUSES
+def _resume_load_materialized_state(tx_state: Any) -> Dict[str, Any]:
+    return tx_state if isinstance(tx_state, dict) else {}
 
-    resolved_followup_tool = _clean_optional_str(followup_tool)
-    if resolved_followup_tool is None and resolved_next_action in END_TASK_ACTIONS:
-        resolved_followup_tool = "ops_end_task"
 
-    resolved_requires_followup = _clean_bool(requires_followup)
-    if resolved_requires_followup is None:
-        resolved_requires_followup = (
-            bool(resolved_next_action) and not resolved_terminal
-        )
+def _resume_load_rebuilt_state(rebuild: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(rebuild, dict):
+        return None
+    state = rebuild.get("state")
+    return state if isinstance(state, dict) else None
 
-    resolved_active_tx_id = _clean_optional_tx_id(active_tx_id)
-    if resolved_active_tx_id is None:
-        resolved_active_tx_id = _clean_optional_tx_id(active_tx.get("tx_id"))
 
-    resolved_active_ticket_id = _clean_optional_str(active_ticket_id)
-    if resolved_active_ticket_id is None:
-        resolved_active_ticket_id = _clean_optional_str(active_tx.get("ticket_id"))
+def _resume_load_outcome(
+    *,
+    tx_state: Any,
+    rebuilt_state: Any,
+    is_valid_state: ResumeLoadStateValidator,
+    baseline: Optional[Dict[str, Any]] = None,
+) -> ResumeLoadOutcome:
+    materialized_state = _resume_load_materialized_state(tx_state)
+    rebuild_requested = requests_resume_state_rebuild(tx_state)
 
-    resolved_current_step = _clean_optional_str(current_step)
-
-    resolved_verify_status = _clean_optional_str(verify_status)
-    if resolved_verify_status is None:
-        resolved_verify_status = _clean_optional_str(verify_state.get("status"))
-
-    resolved_commit_status = _clean_optional_str(commit_status)
-    if resolved_commit_status is None:
-        resolved_commit_status = _clean_optional_str(commit_state.get("status"))
-
-    resolved_integrity_status = _clean_optional_str(integrity_status)
-    if resolved_integrity_status is None:
+    if isinstance(rebuilt_state, dict):
+        integrity = _resume_load_integrity(rebuilt_state)
         if integrity.get("drift_detected") is True:
-            resolved_integrity_status = "drift_detected"
-        elif integrity:
-            resolved_integrity_status = "ok"
+            return {
+                "kind": "integrity_failure",
+                "state": rebuilt_state,
+                "rebuild_requested": rebuild_requested,
+            }
+        if is_valid_state(rebuilt_state):
+            return {
+                "kind": "rebuilt_state",
+                "state": rebuilt_state,
+                "rebuild_requested": rebuild_requested,
+            }
+        return {
+            "kind": "incomplete_failure",
+            "state": rebuilt_state,
+            "rebuild_requested": rebuild_requested,
+        }
 
-    has_exact_active_tx = (
-        bool(active_tx)
-        and resolved_active_tx_id is not None
-        and resolved_active_ticket_id is not None
-    )
-    has_resumable_active_tx = (
-        has_exact_active_tx
-        and bool(tx_status)
-        and not resolved_terminal
-        and bool(resolved_next_action)
-    )
+    if tx_state is None:
+        return {
+            "kind": "baseline",
+            "state": dict(baseline)
+            if isinstance(baseline, dict)
+            else canonical_idle_baseline(),
+            "rebuild_requested": rebuild_requested,
+        }
 
-    resolved_resume_required = _clean_bool(resume_required)
-    if resolved_resume_required is None:
-        resolved_resume_required = has_resumable_active_tx
-
-    resolved_can_start_new_ticket = _clean_bool(can_start_new_ticket)
-    if resolved_can_start_new_ticket is None:
-        resolved_can_start_new_ticket = not has_resumable_active_tx
+    if rebuild_requested:
+        return {
+            "kind": "malformed_rebuild_failure",
+            "state": materialized_state or None,
+            "rebuild_requested": rebuild_requested,
+        }
 
     return {
-        "canonical_status": tx_status,
-        "canonical_phase": tx_phase,
-        "next_action": resolved_next_action,
-        "terminal": resolved_terminal,
-        "requires_followup": resolved_requires_followup,
-        "followup_tool": resolved_followup_tool,
-        "active_tx_id": resolved_active_tx_id,
-        "active_ticket_id": resolved_active_ticket_id,
-        "current_step": resolved_current_step,
-        "verify_status": resolved_verify_status,
-        "commit_status": resolved_commit_status,
-        "integrity_status": resolved_integrity_status,
-        "can_start_new_ticket": resolved_can_start_new_ticket,
-        "resume_required": resolved_resume_required,
+        "kind": "malformed_materialized_failure",
+        "state": materialized_state or None,
+        "rebuild_requested": rebuild_requested,
     }
 
 
-def build_success_response(
+def _resume_load_failure_kind(
+    outcome: Mapping[str, Any],
+) -> Optional[ResumeLoadOutcomeKind]:
+    kind = outcome.get("kind")
+    return kind if isinstance(kind, str) and kind.strip() else None
+
+
+# Resume-load failure payload builders
+#
+# Keep these ordered generic -> specific:
+# integrity drift, incomplete rebuilt state, then malformed-state variants.
+
+
+def _build_resume_load_integrity_failure_payload(
     *,
-    tx_state: Any = None,
-    payload: Optional[Mapping[str, Any]] = None,
-    event: Any = None,
-    ok: bool = True,
-    include_legacy_guidance: bool = True,
+    tx_state: Any,
+    recommended_next_tool: Any = "tx_state_rebuild",
+    recommended_action: Any = (
+        "Repair the invalid canonical history before resuming the exact active "
+        "transaction."
+    ),
+    reason: Any = "resume blocked by ambiguous canonical persistence",
+    blocked: bool = True,
     **guidance_overrides: Any,
-) -> Dict[str, Any]:
-    response: Dict[str, Any] = {"ok": ok}
-
-    if event is not None:
-        response["event"] = event
-    if payload is not None:
-        response["payload"] = dict(payload)
-
-    guidance = derive_workflow_guidance(tx_state, **guidance_overrides)
-    response.update(guidance)
-
-    if include_legacy_guidance:
-        response.update(
-            {
-                "tx_status": guidance["canonical_status"],
-                "tx_phase": guidance["canonical_phase"],
-            }
-        )
-
-    return response
-
-
-def build_failure_response(
-    *,
-    error_code: Any = None,
-    reason: Any = None,
-    tx_state: Any = None,
-    recoverable: bool = False,
-    recommended_next_tool: Any = None,
-    recommended_action: Any = None,
-    blocked: Any = None,
-    rebuild_warning: Any = None,
-    rebuild_invalid_seq: Any = None,
-    rebuild_observed_mismatch: Any = None,
-    include_legacy_guidance: bool = True,
-    **guidance_overrides: Any,
-) -> Dict[str, Any]:
-    cleaned_error_code = _clean_str(error_code)
-    if not cleaned_error_code:
-        raise ValueError("error_code is required")
-    cleaned_reason = _clean_str(reason)
-    if not cleaned_reason:
-        raise ValueError("reason is required")
-
-    defaults = _failure_defaults(cleaned_error_code)
-    resolved_recommended_next_tool = _clean_optional_str(recommended_next_tool)
-    if resolved_recommended_next_tool is None:
-        resolved_recommended_next_tool = _clean_optional_str(
-            defaults.get("recommended_next_tool")
-        )
-
-    resolved_recommended_action = _clean_optional_str(recommended_action)
-    if resolved_recommended_action is None:
-        resolved_recommended_action = _clean_optional_str(
-            defaults.get("recommended_action")
-        )
-
-    resolved_recoverable = (
-        recoverable
-        if isinstance(recoverable, bool)
-        else bool(defaults.get("recoverable", False))
-    )
-
-    guidance = derive_workflow_guidance(tx_state, **guidance_overrides)
-
-    response: Dict[str, Any] = {
-        "ok": False,
-        "error_code": cleaned_error_code,
-        "reason": cleaned_reason,
-        "recoverable": resolved_recoverable,
-        "recommended_next_tool": resolved_recommended_next_tool,
-        "recommended_action": resolved_recommended_action,
-        "canonical_status": guidance["canonical_status"],
-        "canonical_phase": guidance["canonical_phase"],
-        "next_action": guidance["next_action"],
-        "terminal": guidance["terminal"],
-        "active_tx_id": guidance["active_tx_id"],
-        "active_ticket_id": guidance["active_ticket_id"],
-        "current_step": guidance["current_step"],
-        "integrity_status": guidance["integrity_status"],
-        "blocked": bool(blocked) if isinstance(blocked, bool) else False,
-        "rebuild_warning": rebuild_warning,
-        "rebuild_invalid_seq": _clean_int(rebuild_invalid_seq),
-        "rebuild_observed_mismatch": (
-            dict(rebuild_observed_mismatch)
-            if isinstance(rebuild_observed_mismatch, dict)
-            else rebuild_observed_mismatch
-        ),
-    }
-
-    if include_legacy_guidance:
-        response.update(
-            {
-                "tx_status": guidance["canonical_status"],
-                "tx_phase": guidance["canonical_phase"],
-                "requires_followup": guidance["requires_followup"],
-                "followup_tool": guidance["followup_tool"],
-            }
-        )
-
-    return response
-
-
-def build_guidance_from_active_tx(active_tx: Mapping[str, Any]) -> Dict[str, Any]:
-    return derive_workflow_guidance({"active_tx": dict(active_tx)})
-
-
-def build_structured_helper_failure(
-    *,
-    error_code: Any,
-    reason: Any,
-    tx_state: Any = None,
-    recommended_next_tool: Any = None,
-    recommended_action: Any = None,
-    recoverable: Any = None,
-    blocked: Any = None,
-    rebuild_warning: Any = None,
-    rebuild_invalid_seq: Any = None,
-    rebuild_observed_mismatch: Any = None,
-    **guidance_overrides: Any,
-) -> Dict[str, Any]:
-    cleaned_error_code = _clean_str(error_code)
-    defaults = _failure_defaults(cleaned_error_code)
-    resolved_recoverable = (
-        recoverable
-        if isinstance(recoverable, bool)
-        else defaults.get("recoverable", False)
-    )
+) -> FailurePayload:
+    rebuilt_state = _as_dict(tx_state)
     return build_failure_response(
-        error_code=cleaned_error_code,
+        error_code="integrity_blocked",
         reason=reason,
-        tx_state=tx_state,
-        recoverable=bool(resolved_recoverable),
-        recommended_next_tool=(
-            recommended_next_tool
-            if recommended_next_tool is not None
-            else defaults.get("recommended_next_tool")
-        ),
-        recommended_action=(
-            recommended_action
-            if recommended_action is not None
-            else defaults.get("recommended_action")
-        ),
+        tx_state=rebuilt_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        recoverable=False,
         blocked=blocked,
-        rebuild_warning=rebuild_warning,
-        rebuild_invalid_seq=rebuild_invalid_seq,
-        rebuild_observed_mismatch=rebuild_observed_mismatch,
+        rebuild_warning=rebuilt_state.get("rebuild_warning"),
+        rebuild_invalid_seq=rebuilt_state.get("rebuild_invalid_seq"),
+        rebuild_observed_mismatch=rebuilt_state.get("rebuild_observed_mismatch"),
         **guidance_overrides,
     )
 
 
-def merge_response_data(
-    base: Mapping[str, Any], extra: Optional[Mapping[str, Any]] = None
-) -> Dict[str, Any]:
-    merged = dict(base)
-    if extra:
-        merged.update(dict(extra))
-    return merged
+def _build_resume_load_incomplete_failure_payload(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "tx_state_rebuild",
+    recommended_action: Any = (
+        "Repair canonical persistence so rebuild yields a complete exact active "
+        "transaction state with top-level next_action."
+    ),
+    reason: Any = "resume blocked because rebuilt canonical state is incomplete",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return build_failure_response(
+        error_code="invalid_ordering",
+        reason=reason,
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
+def _build_resume_load_malformed_failure_payload(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any,
+    recommended_action: Any,
+    reason: Any,
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return build_failure_response(
+        error_code="invalid_ordering",
+        reason=reason,
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
+# Resume-load public failure builders
+
+
+def build_resume_load_integrity_failure(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "tx_state_rebuild",
+    recommended_action: Any = (
+        "Repair the invalid canonical history before resuming the exact active "
+        "transaction."
+    ),
+    reason: Any = "resume blocked by ambiguous canonical persistence",
+    blocked: bool = True,
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_resume_load_integrity_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        blocked=blocked,
+        **guidance_overrides,
+    )
+
+
+def build_resume_load_incomplete_failure(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "tx_state_rebuild",
+    recommended_action: Any = (
+        "Repair canonical persistence so rebuild yields a complete exact active "
+        "transaction state with top-level next_action."
+    ),
+    reason: Any = "resume blocked because rebuilt canonical state is incomplete",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_resume_load_incomplete_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        **guidance_overrides,
+    )
+
+
+def build_resume_load_malformed_failure(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any,
+    recommended_action: Any,
+    reason: Any,
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_resume_load_malformed_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        **guidance_overrides,
+    )
+
+
+# Resume-load adapter builders
+
+
+def raise_runtime_error(payload: Dict[str, Any]) -> None:
+    raise RuntimeError(payload)
+
+
+def raise_value_error_json(payload: Dict[str, Any]) -> None:
+    raise ValueError(json.dumps(payload, ensure_ascii=False))
+
+
+def build_resume_load_raise_adapter(
+    *,
+    raise_failure: ResumeLoadRaiseFailure,
+    integrity_failure_action: Any = (
+        "Repair the invalid canonical history before resuming the exact active "
+        "transaction."
+    ),
+    incomplete_failure_action: Any = (
+        "Repair canonical persistence so rebuild yields a complete exact active "
+        "transaction state with top-level next_action."
+    ),
+    rebuild_malformed_action: Any = (
+        "Repair malformed canonical persistence before resuming the exact active "
+        "transaction."
+    ),
+    materialized_malformed_action: Any = (
+        "Restore canonical top-level status and next_action before resuming the "
+        "exact active transaction."
+    ),
+) -> ResumeLoadFailureAdapterMap:
+    return {
+        "on_integrity_failure": lambda state: _resume_load_raise_integrity_failure(
+            raise_failure=raise_failure,
+            state=state,
+            recommended_action=integrity_failure_action,
+        ),
+        "on_incomplete_failure": lambda state: _resume_load_raise_incomplete_failure(
+            raise_failure=raise_failure,
+            state=state,
+            recommended_action=incomplete_failure_action,
+        ),
+        "on_rebuild_malformed_failure": (
+            lambda tx_state: _resume_load_raise_rebuild_malformed_failure(
+                raise_failure=raise_failure,
+                tx_state=tx_state,
+                recommended_action=rebuild_malformed_action,
+            )
+        ),
+        "on_materialized_malformed_failure": (
+            lambda tx_state: _resume_load_raise_materialized_malformed_failure(
+                raise_failure=raise_failure,
+                tx_state=tx_state,
+                recommended_action=materialized_malformed_action,
+            )
+        ),
+    }
+
+
+def build_resume_load_runtime_error_adapter(
+    *,
+    integrity_failure_action: Any = (
+        "Repair the invalid canonical history before resuming the exact active "
+        "transaction."
+    ),
+    incomplete_failure_action: Any = (
+        "Repair canonical persistence so rebuild yields a complete exact active "
+        "transaction state with top-level next_action."
+    ),
+    rebuild_malformed_action: Any = (
+        "Repair malformed canonical persistence before resuming the exact active "
+        "transaction."
+    ),
+    materialized_malformed_action: Any = (
+        "Restore canonical top-level status and next_action before resuming the "
+        "exact active transaction."
+    ),
+) -> ResumeLoadFailureAdapterMap:
+    return build_resume_load_raise_adapter(
+        raise_failure=raise_runtime_error,
+        integrity_failure_action=integrity_failure_action,
+        incomplete_failure_action=incomplete_failure_action,
+        rebuild_malformed_action=rebuild_malformed_action,
+        materialized_malformed_action=materialized_malformed_action,
+    )
+
+
+def build_resume_load_value_error_adapter(
+    *,
+    integrity_failure_action: Any = (
+        "Repair the invalid canonical history before resuming the exact active "
+        "transaction."
+    ),
+    incomplete_failure_action: Any = (
+        "Repair canonical persistence so rebuild yields a complete exact active "
+        "transaction state with top-level next_action."
+    ),
+    rebuild_malformed_action: Any = (
+        "Repair malformed canonical persistence before resuming the exact active "
+        "transaction."
+    ),
+    materialized_malformed_action: Any = (
+        "Restore canonical top-level status and next_action before resuming the "
+        "exact active transaction."
+    ),
+) -> ResumeLoadFailureAdapterMap:
+    return build_resume_load_raise_adapter(
+        raise_failure=raise_value_error_json,
+        integrity_failure_action=integrity_failure_action,
+        incomplete_failure_action=incomplete_failure_action,
+        rebuild_malformed_action=rebuild_malformed_action,
+        materialized_malformed_action=materialized_malformed_action,
+    )
+
+
+# Resume-load public helpers
+
+
+def build_resume_load_failure(
+    *,
+    tx_state: Any,
+    is_valid_tx_state: ResumeLoadStateValidator,
+    rebuild_tx_state: ResumeLoadStateRebuilder,
+    baseline: Optional[Dict[str, Any]] = None,
+    promote_baseline_to_success: bool = False,
+    integrity_failure_action: Any = (
+        "Repair the invalid canonical history before resuming the exact active transaction."
+    ),
+    incomplete_failure_action: Any = (
+        "Repair canonical persistence so rebuild yields a complete exact active transaction state with top-level next_action."
+    ),
+    rebuild_malformed_action: Any = (
+        "Repair malformed canonical persistence before resuming the exact active transaction."
+    ),
+    materialized_malformed_action: Any = (
+        "Restore canonical top-level status and next_action before resuming the exact active transaction."
+    ),
+) -> ResumeLoadFailureResult:
+    if is_valid_tx_state(tx_state):
+        return _resume_load_success_result(
+            tx_state=tx_state,
+            outcome_kind="materialized_state",
+        )
+
+    rebuild = rebuild_tx_state()
+    rebuilt_state = _resume_load_rebuilt_state(rebuild)
+    outcome = _resume_load_outcome(
+        tx_state=tx_state,
+        rebuilt_state=rebuilt_state,
+        is_valid_state=is_valid_tx_state,
+        baseline=baseline,
+    )
+
+    kind = _resume_load_failure_kind(outcome)
+    state = outcome["state"]
+
+    if kind == "rebuilt_state":
+        return _resume_load_success_result(
+            tx_state=state,
+            outcome_kind=kind,
+        )
+
+    if kind == "baseline":
+        return _resume_load_baseline_result(
+            tx_state=state,
+            promote_to_success=promote_baseline_to_success,
+        )
+
+    if kind == "integrity_failure":
+        failure = build_resume_load_integrity_failure(
+            tx_state=state,
+            recommended_action=integrity_failure_action,
+        )
+    elif kind == "incomplete_failure":
+        failure = build_resume_load_incomplete_failure(
+            tx_state=state,
+            recommended_action=incomplete_failure_action,
+        )
+    elif kind == "malformed_rebuild_failure":
+        failure = build_resume_load_malformed_failure(
+            tx_state=state,
+            recommended_next_tool="tx_state_rebuild",
+            recommended_action=rebuild_malformed_action,
+            reason="resume blocked by malformed canonical persistence",
+        )
+    else:
+        failure = build_resume_load_malformed_failure(
+            tx_state=state,
+            recommended_next_tool="ops_capture_state",
+            recommended_action=materialized_malformed_action,
+            reason="resume blocked because materialized canonical state is malformed",
+        )
+
+    return _resume_load_failure_result(
+        failure=failure,
+        outcome_kind=kind or "malformed_materialized_failure",
+    )
+
+
+def load_resume_state_shared(
+    *,
+    read_tx_state: ResumeLoadStateReader,
+    rebuild_tx_state: ResumeLoadStateRebuilder,
+    is_valid_tx_state: ResumeLoadStateValidator,
+    on_integrity_failure: ResumeLoadFailureHandler,
+    on_incomplete_failure: ResumeLoadFailureHandler,
+    on_rebuild_malformed_failure: ResumeLoadFailureHandler,
+    on_materialized_malformed_failure: ResumeLoadFailureHandler,
+    baseline: Dict[str, Any],
+    rebuild_when_invalid: bool,
+) -> ResumeLoadSharedReturn:
+    tx_state = read_tx_state()
+    result = build_resume_load_failure(
+        tx_state=tx_state,
+        is_valid_tx_state=is_valid_tx_state,
+        rebuild_tx_state=(
+            rebuild_tx_state if rebuild_when_invalid else lambda: {"ok": False}
+        ),
+        baseline=baseline,
+        promote_baseline_to_success=True,
+    )
+
+    if result["ok"]:
+        return result["tx_state"]
+
+    return _resume_load_dispatch_failure(
+        result=result,
+        tx_state=tx_state,
+        on_integrity_failure=on_integrity_failure,
+        on_incomplete_failure=on_incomplete_failure,
+        on_rebuild_malformed_failure=on_rebuild_malformed_failure,
+        on_materialized_malformed_failure=on_materialized_malformed_failure,
+    )
+
+
+# Helper-bootstrap failure payload builders
+#
+# Keep these grouped from the generic invalid-resume payload to the more
+# specific integrity-drift payload.
+
+
+def _build_bootstrap_invalid_resume_failure_payload(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "tx_state_rebuild",
+    recommended_action: Any = (
+        "Repair canonical persistence so helper bootstrap resumes only from a "
+        "valid exact active transaction state."
+    ),
+    reason: Any = (
+        "helper bootstrap blocked because rebuilt canonical state is not a "
+        "valid exact-resume snapshot"
+    ),
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return build_failure_response(
+        error_code="invalid_ordering",
+        reason=reason,
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
+def _build_bootstrap_integrity_failure_payload(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "tx_state_rebuild",
+    recommended_action: Any = (
+        "Repair the invalid canonical history before allowing helper bootstrap "
+        "to emit tx.begin."
+    ),
+    reason: Any = "helper bootstrap blocked by canonical integrity drift",
+    blocked: bool = True,
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    rebuilt_state = _as_dict(tx_state)
+    return build_failure_response(
+        error_code="integrity_blocked",
+        reason=reason,
+        tx_state=rebuilt_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        recoverable=False,
+        blocked=blocked,
+        rebuild_warning=rebuilt_state.get("rebuild_warning"),
+        rebuild_invalid_seq=rebuilt_state.get("rebuild_invalid_seq"),
+        rebuild_observed_mismatch=rebuilt_state.get("rebuild_observed_mismatch"),
+        **guidance_overrides,
+    )
+
+
+# Helper-bootstrap public failure builders
+
+
+def build_bootstrap_invalid_resume_failure(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "tx_state_rebuild",
+    recommended_action: Any = (
+        "Repair canonical persistence so helper bootstrap resumes only from a "
+        "valid exact active transaction state."
+    ),
+    reason: Any = (
+        "helper bootstrap blocked because rebuilt canonical state is not a "
+        "valid exact-resume snapshot"
+    ),
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_bootstrap_invalid_resume_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        **guidance_overrides,
+    )
+
+
+def build_bootstrap_integrity_failure(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "tx_state_rebuild",
+    recommended_action: Any = (
+        "Repair the invalid canonical history before allowing helper bootstrap "
+        "to emit tx.begin."
+    ),
+    reason: Any = "helper bootstrap blocked by canonical integrity drift",
+    blocked: bool = True,
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_bootstrap_integrity_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        blocked=blocked,
+        **guidance_overrides,
+    )
+
+
+# Verify-start failure payload builders
+#
+# Keep these grouped generic -> specific:
+# missing state, missing active transaction, lifecycle prerequisite,
+# resumability/next-action details, then persistence failure.
+
+
+def _build_verify_start_missing_tx_state_failure_payload(
+    *,
+    tx_state: Any = None,
+    recommended_next_tool: Any = "repo_verify",
+    recommended_action: Any = (
+        "Ensure canonical transaction state is materialized before returning "
+        "verify results."
+    ),
+    reason: Any = "verify.start not recorded; tx_state missing",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return build_failure_response(
+        error_code="invalid_ordering",
+        reason=reason,
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
+def _build_verify_start_missing_active_tx_failure_payload(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "repo_verify",
+    recommended_action: Any = (
+        "Restore the exact active transaction state before returning verify results."
+    ),
+    reason: Any = "verify.start not recorded; active_tx missing",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return build_failure_response(
+        error_code="invalid_ordering",
+        reason=reason,
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
+def _build_verify_start_begin_required_failure_payload(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "ops_start_task",
+    recommended_action: Any = (
+        "Start or resume the canonical transaction before returning verify results."
+    ),
+    reason: Any = "verify.start not recorded; tx.begin required before verify results",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return build_failure_response(
+        error_code="begin_required",
+        reason=reason,
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
+def _build_verify_start_not_resumable_failure_payload(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "ops_update_task",
+    recommended_action: Any = (
+        "Resume the exact active non-terminal transaction before returning "
+        "verify results."
+    ),
+    reason: Any = "verify.start not recorded; active transaction is not resumable",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return build_failure_response(
+        error_code="invalid_ordering",
+        reason=reason,
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
+def _build_verify_start_missing_next_action_failure_payload(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "ops_update_task",
+    recommended_action: Any = (
+        "Restore the exact active transaction with a valid top-level "
+        "next_action before returning verify results."
+    ),
+    reason: Any = "verify.start not recorded; canonical next_action missing",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return build_failure_response(
+        error_code="invalid_ordering",
+        reason=reason,
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
+def _build_verify_start_not_persisted_failure_payload(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "repo_verify",
+    recommended_action: Any = (
+        "Repair state persistence so verify.start updates canonical verify_state "
+        "before continuing."
+    ),
+    reason: Any = "verify.start emitted but tx_state was not updated to running",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return build_failure_response(
+        error_code="invalid_ordering",
+        reason=reason,
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
+# Verify-start public failure builders
+
+
+def build_verify_start_missing_tx_state_failure(
+    *,
+    tx_state: Any = None,
+    recommended_next_tool: Any = "repo_verify",
+    recommended_action: Any = (
+        "Ensure canonical transaction state is materialized before returning "
+        "verify results."
+    ),
+    reason: Any = "verify.start not recorded; tx_state missing",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_verify_start_missing_tx_state_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        **guidance_overrides,
+    )
+
+
+def build_verify_start_missing_active_tx_failure(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "repo_verify",
+    recommended_action: Any = (
+        "Restore the exact active transaction state before returning verify results."
+    ),
+    reason: Any = "verify.start not recorded; active_tx missing",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_verify_start_missing_active_tx_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        **guidance_overrides,
+    )
+
+
+def build_verify_start_begin_required_failure(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "ops_start_task",
+    recommended_action: Any = (
+        "Start or resume the canonical transaction before returning verify results."
+    ),
+    reason: Any = "verify.start not recorded; tx.begin required before verify results",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_verify_start_begin_required_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        **guidance_overrides,
+    )
+
+
+def build_verify_start_not_resumable_failure(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "ops_update_task",
+    recommended_action: Any = (
+        "Resume the exact active non-terminal transaction before returning "
+        "verify results."
+    ),
+    reason: Any = "verify.start not recorded; active transaction is not resumable",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_verify_start_not_resumable_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        **guidance_overrides,
+    )
+
+
+def build_verify_start_missing_next_action_failure(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "ops_update_task",
+    recommended_action: Any = (
+        "Restore the exact active transaction with a valid top-level "
+        "next_action before returning verify results."
+    ),
+    reason: Any = "verify.start not recorded; canonical next_action missing",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_verify_start_missing_next_action_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        **guidance_overrides,
+    )
+
+
+def build_verify_start_not_persisted_failure(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "repo_verify",
+    recommended_action: Any = (
+        "Repair state persistence so verify.start updates canonical verify_state "
+        "before continuing."
+    ),
+    reason: Any = "verify.start emitted but tx_state was not updated to running",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_verify_start_not_persisted_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        **guidance_overrides,
+    )
+
+
+# Commit-helper failure payload builders
+#
+# Keep these grouped from verification prerequisite failure to post-verify
+# no-op commit rejection.
+
+
+def _build_commit_verify_failed_failure_payload(
+    *,
+    tx_state: Any,
+    reason: Any,
+    recommended_next_tool: Any = "repo_verify",
+    recommended_action: Any = (
+        "Repair the verification failure and rerun verification before "
+        "attempting commit."
+    ),
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return build_failure_response(
+        error_code="verify_failed",
+        reason=reason,
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
+def _build_commit_no_changes_failure_payload(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "ops_end_task",
+    recommended_action: Any = (
+        "If work is already verified and nothing remains to commit, close the "
+        "transaction explicitly or make additional changes before retrying commit."
+    ),
+    reason: Any = "no changes to commit",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return build_failure_response(
+        error_code="invalid_ordering",
+        reason=reason,
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
+# Commit-helper public failure builders
+
+
+def build_commit_verify_failed_failure(
+    *,
+    tx_state: Any,
+    reason: Any,
+    recommended_next_tool: Any = "repo_verify",
+    recommended_action: Any = (
+        "Repair the verification failure and rerun verification before "
+        "attempting commit."
+    ),
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_commit_verify_failed_failure_payload(
+        tx_state=tx_state,
+        reason=reason,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
+def build_commit_no_changes_failure(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "ops_end_task",
+    recommended_action: Any = (
+        "If work is already verified and nothing remains to commit, close the "
+        "transaction explicitly or make additional changes before retrying commit."
+    ),
+    reason: Any = "no changes to commit",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_commit_no_changes_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        **guidance_overrides,
+    )

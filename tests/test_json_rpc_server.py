@@ -24,6 +24,17 @@ def _build_registry():
     def fail_tool(reason=None):
         raise RuntimeError(reason or "boom")
 
+    def structured_fail_tool(reason=None):
+        raise RuntimeError(
+            {
+                "ok": False,
+                "error_code": "resume_required",
+                "reason": reason or "resume exact active transaction",
+                "recommended_next_tool": "ops_update_task",
+                "recommended_action": "Resume the exact active transaction before switching work.",
+            }
+        )
+
     return {
         "workspace_initialize": {
             "description": "Bind workspace root for this MCP server session",
@@ -51,6 +62,15 @@ def _build_registry():
                 "required": [],
             },
             "handler": fail_tool,
+        },
+        "structured_fail_tool": {
+            "description": "Fails with structured payload",
+            "input_schema": {
+                "type": "object",
+                "properties": {"reason": {"type": ["string", "null"]}},
+                "required": [],
+            },
+            "handler": structured_fail_tool,
         },
     }
 
@@ -178,8 +198,12 @@ def test_handle_request_logs_failed_tool_execution(tmp_path):
         "params": {"name": "fail_tool", "arguments": {"reason": "bad input"}},
     }
 
-    with pytest.raises(RuntimeError, match="bad input"):
-        server.handle_request(req)
+    resp = server.handle_request(req)
+
+    payload = resp["result"]["content"][0]["text"]
+    result = json.loads(payload)
+    assert result["ok"] is False
+    assert result["reason"] == "bad input"
 
     assert repo_context.errors is not None
     lines = [
@@ -190,7 +214,7 @@ def test_handle_request_logs_failed_tool_execution(tmp_path):
     assert len(lines) == 1
     assert lines[0]["tool_name"] == "fail_tool"
     assert lines[0]["tool_input"] == {"reason": "bad input"}
-    assert lines[0]["tool_output"]["error"] == "bad input"
+    assert lines[0]["tool_output"]["reason"] == "bad input"
     assert isinstance(lines[0]["ts"], str)
     assert lines[0]["ts"]
 
@@ -212,8 +236,12 @@ def test_handle_request_does_not_log_failed_tool_when_uninitialized(tmp_path):
         "params": {"name": "fail_tool", "arguments": {"reason": "bad input"}},
     }
 
-    with pytest.raises(ValueError, match="project root is not initialized"):
-        server.handle_request(req)
+    resp = server.handle_request(req)
+
+    payload = resp["result"]["content"][0]["text"]
+    result = json.loads(payload)
+    assert result["ok"] is False
+    assert "project root is not initialized" in result["reason"]
 
     assert repo_context.errors is None
 
@@ -323,7 +351,56 @@ def test_run_writes_error_response_with_request_id(
         {
             "jsonrpc": "2.0",
             "id": 14,
-            "error": {"code": -32000, "message": "Unknown method: nope"},
+            "error": {"code": -32602, "message": "Unknown method: nope"},
+        }
+    ]
+
+
+def test_run_writes_structured_error_data_when_exception_payload_is_structured(
+    repo_context, state_store, monkeypatch
+):
+    server = _build_server(repo_context, state_store)
+
+    def structured_boom(_req):
+        raise RuntimeError(
+            {
+                "ok": False,
+                "error_code": "resume_required",
+                "reason": "resume exact active transaction",
+                "recommended_next_tool": "ops_update_task",
+            }
+        )
+
+    monkeypatch.setattr(server, "handle_request", structured_boom)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO('{"jsonrpc":"2.0","id":15,"method":"tools/list"}\n'),
+    )
+
+    written = []
+
+    def fake_write_json(obj):
+        written.append(obj)
+
+    monkeypatch.setattr(json_rpc_mod, "_write_json", fake_write_json)
+
+    server.run()
+
+    assert written == [
+        {
+            "jsonrpc": "2.0",
+            "id": 15,
+            "error": {
+                "code": -32000,
+                "message": "resume exact active transaction",
+                "data": {
+                    "ok": False,
+                    "error_code": "resume_required",
+                    "reason": "resume exact active transaction",
+                    "recommended_next_tool": "ops_update_task",
+                },
+            },
         }
     ]
 
@@ -370,8 +447,12 @@ def test_handle_request_preserves_original_tool_error_when_logging_fails(
         "params": {"name": "fail_tool", "arguments": {"reason": "original failure"}},
     }
 
-    with pytest.raises(RuntimeError, match="original failure"):
-        server.handle_request(req)
+    resp = server.handle_request(req)
+
+    payload = resp["result"]["content"][0]["text"]
+    result = json.loads(payload)
+    assert result["ok"] is False
+    assert result["reason"] == "original failure"
 
 
 def test_run_emits_responses_and_logs_failed_tool(tmp_path, monkeypatch):
@@ -404,8 +485,11 @@ def test_run_emits_responses_and_logs_failed_tool(tmp_path, monkeypatch):
     assert first["id"] == 1
     assert "result" in first
     assert second["id"] == 2
-    assert "error" in second
-    assert second["error"]["message"] == "run failure"
+    assert "result" in second
+
+    tool_result = json.loads(second["result"]["content"][0]["text"])
+    assert tool_result["ok"] is False
+    assert tool_result["reason"] == "run failure"
 
     assert repo_context.errors is not None
     records = [
@@ -416,4 +500,4 @@ def test_run_emits_responses_and_logs_failed_tool(tmp_path, monkeypatch):
     assert len(records) == 1
     assert records[0]["tool_name"] == "fail_tool"
     assert records[0]["tool_input"] == {"reason": "run failure"}
-    assert records[0]["tool_output"]["error"] == "run failure"
+    assert records[0]["tool_output"]["reason"] == "run failure"

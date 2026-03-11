@@ -9,6 +9,12 @@ from agentops_mcp_server.ops_tools import (
     summarize_result,
     truncate_text,
 )
+from agentops_mcp_server.workflow_response import (
+    canonical_idle_baseline,
+    is_canonical_idle_baseline,
+    is_valid_active_exact_resume_tx_state,
+    is_valid_exact_resume_tx_state,
+)
 
 
 class DummyGitRepo:
@@ -243,6 +249,57 @@ def test_load_tx_state_falls_back_to_rebuild_when_materialized_missing(
     assert result["active_tx"]["ticket_id"] == "p1-t1"
 
 
+def test_load_tx_state_returns_canonical_idle_baseline_when_materialized_missing_and_rebuild_fails(
+    repo_context, state_store
+):
+    ops = _build_ops_tools(
+        repo_context,
+        state_store,
+        DummyStateRebuilder({"ok": False}),
+    )
+
+    result = ops._load_tx_state()
+
+    assert result == canonical_idle_baseline()
+    assert is_canonical_idle_baseline(result) is True
+    assert is_valid_exact_resume_tx_state(result) is True
+
+
+def test_shared_resume_helpers_accept_only_canonical_idle_baseline():
+    baseline = canonical_idle_baseline()
+
+    assert is_canonical_idle_baseline(baseline) is True
+    assert is_valid_exact_resume_tx_state(baseline) is True
+
+    noncanonical = {
+        **baseline,
+        "next_action": "tx.verify.start",
+    }
+
+    assert is_canonical_idle_baseline(noncanonical) is False
+    assert is_valid_exact_resume_tx_state(noncanonical) is False
+
+
+def test_shared_resume_helpers_validate_active_exact_resume_state():
+    state = _active_tx_state()
+
+    assert is_valid_active_exact_resume_tx_state(state) is True
+    assert is_valid_exact_resume_tx_state(state) is True
+
+    invalid_state = {
+        **state,
+        "next_action": "",
+    }
+
+    assert is_valid_active_exact_resume_tx_state(invalid_state) is False
+    assert is_valid_exact_resume_tx_state(invalid_state) is False
+        "verify_state": None,
+        "commit_state": None,
+        "semantic_summary": None,
+        "integrity": {},
+    }
+
+
 def test_load_tx_state_prefers_materialized_idle_state_over_drifted_rebuild(
     repo_context, state_store, state_rebuilder
 ):
@@ -295,6 +352,63 @@ def test_load_tx_state_prefers_materialized_idle_state_over_drifted_rebuild(
     assert result["active_tx"] is None
     assert result["status"] is None
     assert result["next_action"] == "tx.begin"
+
+
+def test_load_tx_state_rejects_malformed_no_active_materialized_state(
+    repo_context, state_store, state_rebuilder
+):
+    _write_json(
+        repo_context.tx_state,
+        {
+            "schema_version": "0.4.0",
+            "active_tx": None,
+            "status": None,
+            "next_action": "resume somehow",
+            "semantic_summary": None,
+            "verify_state": None,
+            "commit_state": None,
+            "last_applied_seq": 0,
+            "integrity": {
+                "state_hash": "idle-hash",
+                "rebuilt_from_seq": 0,
+                "drift_detected": False,
+                "active_tx_source": "none",
+            },
+            "updated_at": "2026-03-08T00:00:00+00:00",
+        },
+    )
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_event_log.write_text("", encoding="utf-8")
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    with pytest.raises(ValueError) as exc_info:
+        ops._load_tx_state()
+
+    payload = json.loads(str(exc_info.value))
+    assert payload["error_code"] == "invalid_ordering"
+    assert (
+        payload["reason"]
+        == "resume blocked because rebuilt canonical state is incomplete"
+    )
+
+
+def test_load_tx_state_accepts_rebuilt_no_active_baseline_when_materialized_missing(
+    repo_context, state_store, state_rebuilder
+):
+    repo_context.tx_state.parent.mkdir(parents=True, exist_ok=True)
+    if repo_context.tx_state.exists():
+        repo_context.tx_state.unlink()
+    repo_context.tx_event_log.parent.mkdir(parents=True, exist_ok=True)
+    repo_context.tx_event_log.write_text("", encoding="utf-8")
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    result = ops._load_tx_state()
+
+    assert result["active_tx"] is None
+    assert result["status"] is None
+    assert result["next_action"] == "tx.begin"
+    assert result["verify_state"] is None
+    assert result["commit_state"] is None
 
 
 def test_materialized_active_tx_returns_empty_for_non_dict_state(
