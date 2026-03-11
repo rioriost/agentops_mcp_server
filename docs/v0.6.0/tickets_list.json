@@ -77,7 +77,7 @@
           "ticket_id": "p1-t01",
           "phase_id": "p1",
           "title": "Define the canonical resumable work transaction model",
-          "status": "planned",
+          "status": "done",
           "path": "docs/v0.6.0/p1-t01.json",
           "source_plan_sections": [
             "Transaction Semantics",
@@ -92,7 +92,7 @@
           "ticket_id": "p1-t02",
           "phase_id": "p1",
           "title": "Define the canonical state machine and continuation rules",
-          "status": "planned",
+          "status": "done",
           "path": "docs/v0.6.0/p1-t02.json",
           "source_plan_sections": [
             "Canonical State Machine",
@@ -109,7 +109,7 @@
           "ticket_id": "p1-t03",
           "phase_id": "p1",
           "title": "Define persistence, rebuild, and issuance responsibilities",
-          "status": "planned",
+          "status": "done",
           "path": "docs/v0.6.0/p1-t03.json",
           "source_plan_sections": [
             "Persistence Model",
@@ -162,7 +162,7 @@
           "ticket_id": "p2-t03",
           "phase_id": "p2",
           "title": "Simplify resume logic to continue the exact active transaction",
-          "status": "planned",
+          "status": "checking",
           "path": "docs/v0.6.0/p2-t03.json",
           "source_plan_sections": [
             "Canonical Invariants",
@@ -372,7 +372,7 @@
       "ticket_id": "p2-t03",
       "phase_id": "p2",
       "title": "Simplify resume logic to continue the exact active transaction",
-      "status": "planned",
+      "status": "done",
       "path": "docs/v0.6.0/p2-t03.json",
       "source_plan_sections": [
         "Canonical Invariants",
@@ -554,7 +554,7 @@
           },
           {
             "requirement_id": "REQ-P2-EXACT-RESUME",
-            "summary": "Simplify resume behavior so it continues the exact active transaction from healthy materialized state using top-level next_action.",
+            "summary": "Simplify resume behavior so it continues the exact active transaction from healthy materialized state using top-level next_action as the primary continuation guide, with rebuild only when materialized state is missing, incomplete, or inconsistent, and with explicit failure when exact deterministic continuation is not safely possible.",
             "source_sections": [
               "Canonical Invariants",
               "Resume Model",
