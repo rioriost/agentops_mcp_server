@@ -133,7 +133,7 @@
           "ticket_id": "p2-t01",
           "phase_id": "p2",
           "title": "Replace ticket-derived tx_id generation with issued transaction IDs",
-          "status": "planned",
+          "status": "done",
           "path": "docs/v0.6.0/p2-t01.json",
           "source_plan_sections": [
             "Canonical Invariants",
