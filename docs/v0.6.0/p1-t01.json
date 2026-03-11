@@ -11,10 +11,7 @@
     "Identity Model",
     "Implementation Strategy"
   ],
-  "covered_requirements": [
-    "REQ-P1-SEMANTICS",
-    "REQ-P1-IDENTITY"
-  ],
+  "covered_requirements": ["REQ-P1-SEMANTICS", "REQ-P1-IDENTITY"],
   "goal": "Translate the plan-defined transaction meaning, lifecycle semantics, active-transaction invariants, and identity roles into implementation-facing documentation and executable review criteria without adding requirements beyond plan.md.",
   "scope": [
     "Capture the canonical meaning of a transaction exactly as specified in plan.md.",
@@ -30,36 +27,30 @@
   ],
   "inputs": [
     "docs/v0.6.0/plan.md",
-    "docs/v0.6.0/phase0-implementation-map.md"
+    "docs/v0.6.0/phase0-implementation-map.md",
+    "docs/v0.6.0/ops-tool-contract-alignment-plan.md",
+    "docs/v0.6.0/p1-t01-spec.md"
   ],
   "expected_outputs": [
     "A transaction-model specification derived strictly from the cited plan sections.",
     "A traceability table linking each requirement in scope to exact plan sections and exact implementation review targets.",
-    "A gap checklist for current code that distinguishes plan requirements from current observations."
+    "A gap checklist for current code that distinguishes plan requirements from current observations.",
+    "Implementation-facing guidance for how ops_* helper contracts must preserve the canonical boundary between server-owned runtime identity and client-managed helper inputs.",
+    "A completed ticket artifact at docs/v0.6.0/p1-t01-spec.md whose source usage is consistent with the ticket inputs."
   ],
   "acceptance_criteria": [
     "Every requirement in scope is traceable to explicit plan.md sections listed in source_plan_sections.",
     "The ticket artifact does not add canonical requirements that are absent from plan.md.",
     "The ticket artifact clearly separates plan requirements from current-code observations and future implementation work.",
-    "The output is detailed enough that later implementation tickets can validate runtime behavior without inventing new semantics."
+    "The output is detailed enough that later implementation tickets can validate runtime behavior without inventing new semantics.",
+    "When ops_* helper contracts are updated in downstream implementation work, they reference docs/v0.6.0/ops-tool-contract-alignment-plan.md for identity-boundary alignment without promoting task_id or session_id into canonical runtime identity.",
+    "The completed p1-t01 artifact explicitly checks that the ticket inputs are complete, non-contradictory, and sufficient for the ticket scope."
   ],
-  "dependencies": [
-    "p0-t01",
-    "p0-t03"
-  ],
-  "enables": [
-    "p1-t02",
-    "p1-t03",
-    "p2-t01",
-    "p2-t03",
-    "p2-t04"
-  ],
+  "dependencies": ["p0-t01", "p0-t03"],
+  "enables": ["p1-t02", "p1-t03", "p2-t01", "p2-t03", "p2-t04"],
   "traceability_contract": {
     "requirement_sources": {
-      "REQ-P1-SEMANTICS": [
-        "Transaction Semantics",
-        "Canonical Invariants"
-      ],
+      "REQ-P1-SEMANTICS": ["Transaction Semantics", "Canonical Invariants"],
       "REQ-P1-IDENTITY": [
         "Canonical Runtime Model",
         "Server-owned transaction variables vs client-managed inputs",

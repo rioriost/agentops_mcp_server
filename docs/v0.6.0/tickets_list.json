@@ -35,9 +35,7 @@
             "Compatibility Policy",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "PHASE0-ANALYSIS-IMPLEMENTATION-MAP"
-          ]
+          "covered_requirements": ["PHASE0-ANALYSIS-IMPLEMENTATION-MAP"]
         },
         {
           "ticket_id": "p0-t02",
@@ -51,9 +49,7 @@
             "Compatibility Policy",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "PHASE0-ANALYSIS-PERSISTENCE-MAP"
-          ]
+          "covered_requirements": ["PHASE0-ANALYSIS-PERSISTENCE-MAP"]
         },
         {
           "ticket_id": "p0-t03",
@@ -67,9 +63,7 @@
             "Timestamp Policy",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "PHASE0-ANALYSIS-RESUME-MAP"
-          ]
+          "covered_requirements": ["PHASE0-ANALYSIS-RESUME-MAP"]
         }
       ]
     },
@@ -92,10 +86,7 @@
             "Identity Model",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "REQ-P1-SEMANTICS",
-            "REQ-P1-IDENTITY"
-          ]
+          "covered_requirements": ["REQ-P1-SEMANTICS", "REQ-P1-IDENTITY"]
         },
         {
           "ticket_id": "p1-t02",
@@ -112,10 +103,7 @@
             "Resume Model",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "REQ-P1-STATE-MACHINE",
-            "REQ-P1-CHECKPOINTS"
-          ]
+          "covered_requirements": ["REQ-P1-STATE-MACHINE", "REQ-P1-CHECKPOINTS"]
         },
         {
           "ticket_id": "p1-t03",
@@ -158,9 +146,7 @@
             "Compatibility Policy",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "REQ-P2-ISSUED-TXID"
-          ]
+          "covered_requirements": ["REQ-P2-ISSUED-TXID"]
         },
         {
           "ticket_id": "p2-t02",
@@ -174,9 +160,7 @@
             "Sentinel elimination",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "REQ-P2-NO-SENTINEL"
-          ]
+          "covered_requirements": ["REQ-P2-NO-SENTINEL"]
         },
         {
           "ticket_id": "p2-t03",
@@ -191,9 +175,7 @@
             "Post-terminal materialization",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "REQ-P2-EXACT-RESUME"
-          ]
+          "covered_requirements": ["REQ-P2-EXACT-RESUME"]
         },
         {
           "ticket_id": "p2-t04",
@@ -208,9 +190,7 @@
             "Compatibility Policy",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "REQ-P2-SESSION-COMPAT"
-          ]
+          "covered_requirements": ["REQ-P2-SESSION-COMPAT"]
         }
       ]
     },
@@ -232,9 +212,7 @@
             "Compatibility Policy",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "REQ-P3-INTERRUPTION"
-          ]
+          "covered_requirements": ["REQ-P3-INTERRUPTION"]
         },
         {
           "ticket_id": "p3-t02",
@@ -248,9 +226,7 @@
             "Idempotent continuation requirements",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "REQ-P3-IDEMPOTENT"
-          ]
+          "covered_requirements": ["REQ-P3-IDEMPOTENT"]
         },
         {
           "ticket_id": "p3-t03",
@@ -262,9 +238,7 @@
             "Success Criteria",
             "Implementation Strategy"
           ],
-          "covered_requirements": [
-            "REQ-P3-GUIDANCE"
-          ]
+          "covered_requirements": ["REQ-P3-GUIDANCE"]
         }
       ]
     }
@@ -289,9 +263,7 @@
         "Compatibility Policy",
         "Implementation Strategy"
       ],
-      "covered_requirements": [
-        "PHASE0-ANALYSIS-IMPLEMENTATION-MAP"
-      ]
+      "covered_requirements": ["PHASE0-ANALYSIS-IMPLEMENTATION-MAP"]
     },
     {
       "ticket_id": "p0-t02",
@@ -306,9 +278,7 @@
         "Compatibility Policy",
         "Implementation Strategy"
       ],
-      "covered_requirements": [
-        "PHASE0-ANALYSIS-PERSISTENCE-MAP"
-      ]
+      "covered_requirements": ["PHASE0-ANALYSIS-PERSISTENCE-MAP"]
     },
     {
       "ticket_id": "p0-t03",
@@ -323,15 +293,13 @@
         "Timestamp Policy",
         "Implementation Strategy"
       ],
-      "covered_requirements": [
-        "PHASE0-ANALYSIS-RESUME-MAP"
-      ]
+      "covered_requirements": ["PHASE0-ANALYSIS-RESUME-MAP"]
     },
     {
       "ticket_id": "p1-t01",
       "phase_id": "p1",
       "title": "Define the canonical resumable work transaction model",
-      "status": "planned",
+      "status": "verified",
       "path": "docs/v0.6.0/p1-t01.json",
       "source_plan_sections": [
         "Transaction Semantics",
@@ -340,10 +308,7 @@
         "Identity Model",
         "Implementation Strategy"
       ],
-      "covered_requirements": [
-        "REQ-P1-SEMANTICS",
-        "REQ-P1-IDENTITY"
-      ]
+      "covered_requirements": ["REQ-P1-SEMANTICS", "REQ-P1-IDENTITY"]
     },
     {
       "ticket_id": "p1-t02",
@@ -360,10 +325,7 @@
         "Resume Model",
         "Implementation Strategy"
       ],
-      "covered_requirements": [
-        "REQ-P1-STATE-MACHINE",
-        "REQ-P1-CHECKPOINTS"
-      ]
+      "covered_requirements": ["REQ-P1-STATE-MACHINE", "REQ-P1-CHECKPOINTS"]
     },
     {
       "ticket_id": "p1-t03",
@@ -398,9 +360,7 @@
         "Compatibility Policy",
         "Implementation Strategy"
       ],
-      "covered_requirements": [
-        "REQ-P2-ISSUED-TXID"
-      ]
+      "covered_requirements": ["REQ-P2-ISSUED-TXID"]
     },
     {
       "ticket_id": "p2-t02",
@@ -414,9 +374,7 @@
         "Sentinel elimination",
         "Implementation Strategy"
       ],
-      "covered_requirements": [
-        "REQ-P2-NO-SENTINEL"
-      ]
+      "covered_requirements": ["REQ-P2-NO-SENTINEL"]
     },
     {
       "ticket_id": "p2-t03",
@@ -431,9 +389,7 @@
         "Post-terminal materialization",
         "Implementation Strategy"
       ],
-      "covered_requirements": [
-        "REQ-P2-EXACT-RESUME"
-      ]
+      "covered_requirements": ["REQ-P2-EXACT-RESUME"]
     },
     {
       "ticket_id": "p2-t04",
@@ -448,9 +404,7 @@
         "Compatibility Policy",
         "Implementation Strategy"
       ],
-      "covered_requirements": [
-        "REQ-P2-SESSION-COMPAT"
-      ]
+      "covered_requirements": ["REQ-P2-SESSION-COMPAT"]
     },
     {
       "ticket_id": "p3-t01",
@@ -464,9 +418,7 @@
         "Compatibility Policy",
         "Implementation Strategy"
       ],
-      "covered_requirements": [
-        "REQ-P3-INTERRUPTION"
-      ]
+      "covered_requirements": ["REQ-P3-INTERRUPTION"]
     },
     {
       "ticket_id": "p3-t02",
@@ -480,9 +432,7 @@
         "Idempotent continuation requirements",
         "Implementation Strategy"
       ],
-      "covered_requirements": [
-        "REQ-P3-IDEMPOTENT"
-      ]
+      "covered_requirements": ["REQ-P3-IDEMPOTENT"]
     },
     {
       "ticket_id": "p3-t03",
@@ -490,13 +440,8 @@
       "title": "Update documentation and operator guidance for the redesigned protocol",
       "status": "planned",
       "path": "docs/v0.6.0/p3-t03.json",
-      "source_plan_sections": [
-        "Success Criteria",
-        "Implementation Strategy"
-      ],
-      "covered_requirements": [
-        "REQ-P3-GUIDANCE"
-      ]
+      "source_plan_sections": ["Success Criteria", "Implementation Strategy"],
+      "covered_requirements": ["REQ-P3-GUIDANCE"]
     }
   ],
   "notes": [
@@ -520,11 +465,7 @@
         "title": "Define the resumable transaction protocol contracts from plan.md",
         "source": {
           "plan_phase": "Implementation Strategy / Phase 1",
-          "recommended_ticket_breakdown": [
-            "p1-t01",
-            "p1-t02",
-            "p1-t03"
-          ]
+          "recommended_ticket_breakdown": ["p1-t01", "p1-t02", "p1-t03"]
         },
         "requirements": [
           {
@@ -535,9 +476,7 @@
               "Canonical Invariants",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": [
-              "p1-t01"
-            ]
+            "allocated_ticket_ids": ["p1-t01"]
           },
           {
             "requirement_id": "REQ-P1-IDENTITY",
@@ -548,10 +487,7 @@
               "Identity Model",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": [
-              "p1-t01",
-              "p1-t03"
-            ]
+            "allocated_ticket_ids": ["p1-t01", "p1-t03"]
           },
           {
             "requirement_id": "REQ-P1-STATE-MACHINE",
@@ -562,9 +498,7 @@
               "Meaning of each status",
               "State-machine constraints"
             ],
-            "allocated_ticket_ids": [
-              "p1-t02"
-            ]
+            "allocated_ticket_ids": ["p1-t02"]
           },
           {
             "requirement_id": "REQ-P1-CHECKPOINTS",
@@ -574,10 +508,7 @@
               "Transaction Semantics",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": [
-              "p1-t02",
-              "p1-t03"
-            ]
+            "allocated_ticket_ids": ["p1-t02", "p1-t03"]
           },
           {
             "requirement_id": "REQ-P1-PERSISTENCE",
@@ -589,9 +520,7 @@
               "Compatibility Policy",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": [
-              "p1-t03"
-            ]
+            "allocated_ticket_ids": ["p1-t03"]
           }
         ]
       },
@@ -618,9 +547,7 @@
               "Compatibility Policy",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": [
-              "p2-t01"
-            ]
+            "allocated_ticket_ids": ["p2-t01"]
           },
           {
             "requirement_id": "REQ-P2-NO-SENTINEL",
@@ -631,9 +558,7 @@
               "Sentinel elimination",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": [
-              "p2-t02"
-            ]
+            "allocated_ticket_ids": ["p2-t02"]
           },
           {
             "requirement_id": "REQ-P2-EXACT-RESUME",
@@ -645,9 +570,7 @@
               "Canonical State Machine",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": [
-              "p2-t03"
-            ]
+            "allocated_ticket_ids": ["p2-t03"]
           },
           {
             "requirement_id": "REQ-P2-SESSION-COMPAT",
@@ -659,9 +582,7 @@
               "Timestamp Policy",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": [
-              "p2-t04"
-            ]
+            "allocated_ticket_ids": ["p2-t04"]
           }
         ]
       },
@@ -670,11 +591,7 @@
         "title": "Harden with interruption-focused regression coverage and guidance from plan.md",
         "source": {
           "plan_phase": "Implementation Strategy / Phase 3",
-          "recommended_ticket_breakdown": [
-            "p3-t01",
-            "p3-t02",
-            "p3-t03"
-          ]
+          "recommended_ticket_breakdown": ["p3-t01", "p3-t02", "p3-t03"]
         },
         "requirements": [
           {
@@ -686,9 +603,7 @@
               "Post-terminal materialization",
               "Compatibility Policy"
             ],
-            "allocated_ticket_ids": [
-              "p3-t01"
-            ]
+            "allocated_ticket_ids": ["p3-t01"]
           },
           {
             "requirement_id": "REQ-P3-IDEMPOTENT",
@@ -699,20 +614,13 @@
               "Canonical Invariants",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": [
-              "p3-t02"
-            ]
+            "allocated_ticket_ids": ["p3-t02"]
           },
           {
             "requirement_id": "REQ-P3-GUIDANCE",
             "summary": "Update operator and developer guidance for the redesigned protocol without redefining canonical runtime truth away from plan.md.",
-            "source_sections": [
-              "Implementation Strategy",
-              "Success Criteria"
-            ],
-            "allocated_ticket_ids": [
-              "p3-t03"
-            ]
+            "source_sections": ["Implementation Strategy", "Success Criteria"],
+            "allocated_ticket_ids": ["p3-t03"]
           }
         ]
       },
@@ -721,11 +629,7 @@
         "title": "Analysis and implementation mapping as reusable evidence",
         "source": {
           "plan_phase": "Pre-implementation evidence derived from plan.md",
-          "recommended_ticket_breakdown": [
-            "p0-t01",
-            "p0-t02",
-            "p0-t03"
-          ]
+          "recommended_ticket_breakdown": ["p0-t01", "p0-t02", "p0-t03"]
         },
         "requirements": [
           {
@@ -744,9 +648,7 @@
               "Compatibility Policy",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": [
-              "p0-t01"
-            ]
+            "allocated_ticket_ids": ["p0-t01"]
           },
           {
             "requirement_id": "PHASE0-ANALYSIS-PERSISTENCE-MAP",
@@ -758,9 +660,7 @@
               "Compatibility Policy",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": [
-              "p0-t02"
-            ]
+            "allocated_ticket_ids": ["p0-t02"]
           },
           {
             "requirement_id": "PHASE0-ANALYSIS-RESUME-MAP",
@@ -772,9 +672,7 @@
               "Timestamp Policy",
               "Implementation Strategy"
             ],
-            "allocated_ticket_ids": [
-              "p0-t03"
-            ]
+            "allocated_ticket_ids": ["p0-t03"]
           }
         ]
       }
