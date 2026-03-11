@@ -11,3 +11,6 @@ coverage.xml
 initial-dot-agent/
 .zed/prompt_for_release
 .zed/scripts/sync
+.zed/
+.rules
+.gitignore

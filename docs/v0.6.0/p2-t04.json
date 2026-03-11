@@ -11,9 +11,7 @@
     "Compatibility Policy",
     "Implementation Strategy"
   ],
-  "covered_requirements": [
-    "REQ-P2-SESSION-COMPAT"
-  ],
+  "covered_requirements": ["REQ-P2-SESSION-COMPAT"],
   "goal": "Implement the plan-defined rule that session context remains secondary to deterministic correctness while historical compatibility remains bounded and does not weaken strict new semantics.",
   "scope": [
     "Bound session-sensitive logic so it is not the primary basis for active transaction identity or deterministic continuation.",
@@ -28,26 +26,23 @@
   "inputs": [
     "docs/v0.6.0/plan.md",
     "docs/v0.6.0/phase0-implementation-map.md",
+    "docs/v0.6.0/ops-tool-contract-alignment-plan.md",
     "docs/v0.6.0/p1-t01.json",
     "docs/v0.6.0/p1-t03.json"
   ],
   "expected_outputs": [
     "Runtime changes that demote session context from correctness-sensitive logic.",
     "Runtime changes that preserve bounded compatibility behavior for historical data.",
-    "Verification evidence showing malformed persistence fails clearly and timestamp/session heuristics do not displace canonical continuation."
+    "Verification evidence showing malformed persistence fails clearly and timestamp/session heuristics do not displace canonical continuation.",
+    "Implementation changes that align ops_* helper contracts with bounded session-context recovery and non-heuristic canonical continuation."
   ],
   "acceptance_criteria": [
     "session_id is not the primary basis for active transaction identity, active transaction selection, or deterministic continuation.",
     "timestamps are not used as the primary canonical ordering key or primary active transaction selector.",
     "Documented historical formats remain readable under bounded compatibility rules.",
-    "Malformed or ambiguous canonical persistence does not silently degrade into healthy canonical state."
+    "Malformed or ambiguous canonical persistence does not silently degrade into healthy canonical state.",
+    "When ops_* helper contracts are adjusted in scope for this ticket, they reference docs/v0.6.0/ops-tool-contract-alignment-plan.md and preserve bounded helper-context recovery without promoting helper inputs into canonical runtime identity."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t03"
-  ],
-  "enables": [
-    "p3-t01",
-    "p3-t03"
-  ]
+  "dependencies": ["p1-t01", "p1-t03"],
+  "enables": ["p3-t01", "p3-t03"]
 }

@@ -11,9 +11,7 @@
     "Post-terminal materialization",
     "Implementation Strategy"
   ],
-  "covered_requirements": [
-    "REQ-P2-EXACT-RESUME"
-  ],
+  "covered_requirements": ["REQ-P2-EXACT-RESUME"],
   "goal": "Implement the plan-defined rule that resume continues the exact active transaction from healthy materialized state using top-level next_action, with rebuild only when materialized state is missing, incomplete, or inconsistent.",
   "scope": [
     "Make healthy materialized state the primary resume anchor.",
@@ -29,6 +27,7 @@
   "inputs": [
     "docs/v0.6.0/plan.md",
     "docs/v0.6.0/phase0-implementation-map.md",
+    "docs/v0.6.0/ops-tool-contract-alignment-plan.md",
     "docs/v0.6.0/p1-t01.json",
     "docs/v0.6.0/p1-t02.json",
     "docs/v0.6.0/p1-t03.json"
@@ -36,23 +35,16 @@
   "expected_outputs": [
     "Runtime changes that continue the exact active transaction deterministically.",
     "Verification evidence showing resume prefers healthy materialized state and valid next_action.",
-    "A code-to-plan traceability summary for exact resume behavior."
+    "A code-to-plan traceability summary for exact resume behavior.",
+    "Implementation changes that align ops_* helper contracts with exact-active-transaction continuation and next_action-first resume behavior."
   ],
   "acceptance_criteria": [
     "Resume never mints a new tx_id for an existing active transaction.",
     "Resume never replaces the active transaction with a heuristic candidate when exact active state is available.",
     "Valid canonical next_action is preferred over status-derived heuristics and reconstructed guesses.",
-    "Post-terminal work is not resumed as active work."
+    "Post-terminal work is not resumed as active work.",
+    "When ops_* helper contracts are updated in scope for exact-resume behavior, they reference docs/v0.6.0/ops-tool-contract-alignment-plan.md and do not introduce heuristic active-transaction replacement or status-over-next_action continuation."
   ],
-  "dependencies": [
-    "p1-t01",
-    "p1-t02",
-    "p1-t03",
-    "p2-t01",
-    "p2-t02"
-  ],
-  "enables": [
-    "p3-t01",
-    "p3-t02"
-  ]
+  "dependencies": ["p1-t01", "p1-t02", "p1-t03", "p2-t01", "p2-t02"],
+  "enables": ["p3-t01", "p3-t02"]
 }
