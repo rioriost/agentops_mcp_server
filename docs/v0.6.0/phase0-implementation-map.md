@@ -1,5 +1,14 @@
 # Phase 0 Implementation Map for 0.6.0
 
+## Evidence labeling rules
+
+- **Plan requirement**: a statement that directly reflects canonical requirements from `docs/v0.6.0/plan.md`.
+- **Current observation**: a statement describing the codebase as observed during phase 0 analysis.
+- **Gap against plan**: a statement describing where current observed behavior does not yet match `plan.md`.
+- **Derived recommendation**: a non-canonical suggestion for how later plan-derived tickets may use this evidence.
+
+Unless stated otherwise, the body of this document is primarily **current observation** plus **gap against plan** material. It is not a replacement for `plan.md`.
+
 ## Purpose
 
 This document is the phase 0 analysis artifact for the `0.6.0` redesign described in `docs/v0.6.0/plan.md`. It consolidates the outputs expected by:
@@ -10,9 +19,54 @@ This document is the phase 0 analysis artifact for the `0.6.0` redesign describe
 
 It is intentionally descriptive only. It does not propose runtime changes as committed facts, and it does not alter protocol behavior.
 
+## Phase 0 coverage matrix
+
+**Derived recommendation:** This matrix shows where the current phase 0 evidence artifact satisfies the expected outputs of `p0-t01`, `p0-t02`, and `p0-t03`. It is an audit aid for traceability and does not add canonical requirements beyond `plan.md`.
+
+### `p0-t01` Review all Python files under `src` and build an implementation map
+
+- `implementation_map`
+  - satisfied by:
+    - `File-by-file implementation map`
+- `high_impact_file_list`
+  - satisfied by:
+    - `High-impact file shortlist`
+- `concern_to_file_matrix`
+  - satisfied by:
+    - `Concern-to-file matrix`
+
+### `p0-t02` Map persistence artifacts and their read/write code paths
+
+- `Persistence artifact inventory`
+  - satisfied by:
+    - `Persistence artifact inventory`
+- `Read/write code-path map`
+  - satisfied by:
+    - `Read/write code-path map`
+- `Plan-alignment notes`
+  - satisfied by:
+    - `Mismatches and risks relative to the 0.6.0 plan`
+
+### `p0-t03` Map begin, resume, and active-transaction selection code paths
+
+- `begin_resume_codepath_map`
+  - satisfied by:
+    - `Begin, resume, and active-transaction selection map`
+- `resume_risk_inventory`
+  - satisfied by:
+    - `Mismatches and risks relative to the 0.6.0 plan`
+- `downstream_impact_list`
+  - satisfied by:
+    - `High-impact file shortlist`
+    - `Ticket-to-file impact map`
+
+---
+
 ---
 
 ## High-level codebase map
+
+**Current observation:** The following sections summarize the current codebase structure and likely impact areas observed during phase 0 analysis.
 
 ### Runtime composition
 
@@ -683,7 +737,7 @@ Primary files:
 
 ## Persistence artifact inventory
 
-This section satisfies the core artifact mapping expected by `p0-t02`.
+**Current observation:** This section satisfies the core artifact mapping expected by `p0-t02` by describing the currently observed persistence artifacts and code paths.
 
 ### Canonical artifacts
 
@@ -925,7 +979,7 @@ These are not part of the core canonical artifact set, but they affect runtime b
 
 ## Begin, resume, and active-transaction selection map
 
-This section satisfies the code-path mapping expected by `p0-t03`.
+**Current observation:** This section satisfies the code-path mapping expected by `p0-t03` by describing currently observed begin, resume, and active-selection behavior.
 
 ## Begin entrypoints
 
@@ -1026,7 +1080,7 @@ Implications:
 
 - Selection is heuristic / computed from replay ordering.
 - It is not purely “resume exactly the known active_tx identity” in the stricter sense described by the plan.
-- This file is therefore central to `p2-t02`, `p2-t03`, `p2-t05`, and `p2-t06`.
+- This file is therefore central to `p2-t02`, `p2-t03`, and `p2-t04`.
 
 ## No-active representation
 
@@ -1058,7 +1112,7 @@ Implications:
 
 - Session context currently influences continuation.
 - This is broader than the minimal canonical continuation contract.
-- Relevant future target for `p2-t07`.
+- Relevant future target for `p2-t04`.
 
 ## Workflow guidance and resume advice
 
@@ -1157,7 +1211,7 @@ Missing file default:
 
 ## Mismatches and risks relative to the 0.6.0 plan
 
-These are descriptive alignment notes for later tickets.
+**Gap against plan:** These are descriptive alignment notes for later plan-derived tickets. They do not redefine canonical requirements.
 
 ### 1. Identity typing is inconsistent across files
 
@@ -1203,7 +1257,7 @@ Observed behavior:
 Impact:
 
 - Useful operationally, but broader than the plan’s “minimal canonical continuation fields” approach.
-- Relevant to `p1-t02` and `p2-t07`.
+- Relevant to `p1-t02` and `p2-t04`.
 
 ### 5. Begin can be synthesized from helper paths
 
@@ -1214,7 +1268,7 @@ Observed behavior:
 Impact:
 
 - Begin ownership is not isolated to lifecycle start.
-- Relevant to `p0-t03`, `p1-t04`, and possibly `p2-t05`.
+- Relevant to `p0-t03`, `p1-t02`, and possibly `p2-t03`.
 
 ### 6. State schema is broader than the minimal continuation contract
 
@@ -1236,7 +1290,7 @@ Observed behavior:
 
 Impact:
 
-- Relevant to `p1-t03` and `p2-t05`.
+- Relevant to `p1-t02` and `p2-t03`.
 
 ### 8. Missing event log and empty event log already differ
 
@@ -1248,13 +1302,13 @@ Observed behavior:
 Impact:
 
 - This aligns well with the stricter rules and should be preserved intentionally.
-- Relevant to `p2-t08`.
+- Relevant to `p2-t04`.
 
 ---
 
 ## High-impact file shortlist
 
-These are the strongest expected edit targets for later implementation tickets.
+**Derived recommendation:** These are the strongest expected edit targets for later plan-derived implementation tickets, based on the observed current codebase.
 
 ### Tier 1: almost certainly modified
 
@@ -1300,44 +1354,52 @@ Reasons:
 
 ## Ticket-to-file impact map
 
-## `p1-t01` Define and enforce identity boundary
+**Derived recommendation:** This section maps phase-0 evidence to the current plan-derived ticket structure and should be used only as implementation guidance, not as a source of canonical requirements.
+
+## `p1-t01` Define the canonical resumable work transaction model
 
 Primary files:
 
 - `state_store.py`
 - `state_rebuilder.py`
 - `ops_tools.py`
-- `repo_tools.py`
 - `workflow_response.py`
 - `commit_manager.py`
+- `repo_tools.py`
 
-## `p1-t02` Define minimal canonical continuation contract
+Why:
 
-Primary files:
+- this ticket defines the canonical transaction meaning, identity boundaries, single-active behavior, begin-versus-resume rules, commit non-terminal behavior, and explicit terminal completion semantics that are currently spread across lifecycle, persistence, replay, helper, and response layers
 
-- `state_store.py`
-- `state_rebuilder.py`
-- `ops_tools.py`
-- `workflow_response.py`
-
-## `p1-t03` Separate status classification from next_action dispatch
+## `p1-t02` Define the canonical state machine and continuation rules
 
 Primary files:
 
 - `workflow_response.py`
-- `state_store.py`
-- `state_rebuilder.py`
-- `ops_tools.py`
-
-## `p1-t04` Align checkpoint events with canonical core event set
-
-Primary files:
-
 - `state_store.py`
 - `state_rebuilder.py`
 - `ops_tools.py`
 - `commit_manager.py`
 - `repo_tools.py`
+
+Why:
+
+- this ticket defines status meanings, next_action-first continuation, and canonical checkpoint semantics, which currently span response guidance, state mutation, replay derivation, and helper-driven verify/commit flows
+
+## `p1-t03` Define persistence, rebuild, and issuance responsibilities
+
+Primary files:
+
+- `state_store.py`
+- `state_rebuilder.py`
+- `repo_context.py`
+- `ops_tools.py`
+- `commit_manager.py`
+- `repo_tools.py`
+
+Why:
+
+- this ticket defines the minimal materialized-state contract, event-log role, issuance metadata role, write-order guarantees, rebuild order, and malformed-versus-missing behavior, all of which are centered on persistence and replay code paths
 
 ## `p2-t01` Replace ticket-derived tx_id generation with issued tx IDs
 
@@ -1347,75 +1409,59 @@ Primary files:
 - `ops_tools.py`
 - `commit_manager.py`
 - `repo_tools.py`
+- `workflow_response.py`
 
-Note:
+Why:
 
-- issuance metadata already exists, so this should extend an existing mechanism rather than invent a new one.
+- issued transaction identity already exists in persistence code, but identity handling still touches lifecycle begin, helper loading, verification helpers, and response normalization
 
-## `p2-t02` Unify active transaction selection around exact active_tx identity
+## `p2-t02` Remove sentinel active-transaction semantics from normal flow
+
+Primary files:
+
+- `state_rebuilder.py`
+- `state_store.py`
+- `workflow_response.py`
+- `ops_tools.py`
+
+Why:
+
+- sentinel no-active behavior currently appears in rebuild defaults, persistence assumptions, workflow exposure, and lifecycle helpers
+
+## `p2-t03` Simplify resume logic to continue the exact active transaction
 
 Primary files:
 
 - `state_rebuilder.py`
 - `ops_tools.py`
+- `workflow_response.py`
 - `commit_manager.py`
-
-## `p2-t03` Remove sentinel active-transaction semantics
-
-Primary files:
-
-- `state_rebuilder.py`
+- `repo_tools.py`
 - `state_store.py`
-- `workflow_response.py`
-- `ops_tools.py`
 
-## `p2-t04` Align materialized state with minimal continuation contract
+Why:
 
-Primary files:
+- exact resume behavior depends on active transaction selection, materialized-state loading, next_action-driven continuation, and helper orchestration across runtime and repo-facing flows
 
-- `state_store.py`
-- `state_rebuilder.py`
-- `ops_tools.py`
-
-## `p2-t05` Make canonical next_action the sole continuation dispatcher
-
-Primary files:
-
-- `workflow_response.py`
-- `state_store.py`
-- `state_rebuilder.py`
-- `ops_tools.py`
-- `commit_manager.py`
-
-## `p2-t06` Normalize post-terminal handling into canonical no-active baseline
+## `p2-t04` Bound session context and define historical compatibility behavior
 
 Primary files:
 
 - `ops_tools.py`
-- `state_rebuilder.py`
-- `state_store.py`
-- `workflow_response.py`
-
-## `p2-t07` Bound session context to a secondary runtime role
-
-Primary files:
-
-- `ops_tools.py`
-- `state_rebuilder.py`
-- `state_store.py`
-
-## `p2-t08` Bounded historical compatibility and malformed persistence behavior
-
-Primary files:
-
 - `state_rebuilder.py`
 - `state_store.py`
 - `repo_context.py`
 - `workflow_response.py`
+- `repo_tools.py`
+- `commit_manager.py`
 
-## `p3-*` regression coverage and guidance
+Why:
 
-Expected code targets plus tests/docs around:
+- session-sensitive recovery, timestamp-adjacent heuristics, bounded compatibility behavior, malformed persistence handling, and user-facing guidance all span these modules
+
+## `p3-t01` Add interruption and resume regression coverage for transaction checkpoints
+
+Expected code and test targets around:
 
 - `state_store.py`
 - `state_rebuilder.py`
@@ -1424,11 +1470,44 @@ Expected code targets plus tests/docs around:
 - `commit_manager.py`
 - `repo_tools.py`
 
+Why:
+
+- interruption coverage must exercise checkpoint persistence, replay, resume dispatch, helper-driven verify/commit flows, and post-terminal handling
+
+## `p3-t02` Add idempotent continuation coverage for verify, commit, and terminal flows
+
+Expected code and test targets around:
+
+- `state_store.py`
+- `state_rebuilder.py`
+- `ops_tools.py`
+- `workflow_response.py`
+- `commit_manager.py`
+- `repo_tools.py`
+
+Why:
+
+- idempotent continuation depends on replay correctness, duplicate-safe lifecycle progression, helper checkpoint handling, and terminal-state reuse behavior
+
+## `p3-t03` Update documentation and operator guidance for the redesigned protocol
+
+Expected documentation and operator guidance targets around:
+
+- `docs/v0.6.0/traceability-framework.md`
+- `docs/v0.6.0/phase0-implementation-map.md`
+- `workflow_response.py`
+- `ops_tools.py`
+- runtime-facing operator/developer documentation updated in later phase-3 work
+
+Why:
+
+- guidance must explain canonical runtime truth, derived planning artifacts, interruption behavior, and operator-facing lifecycle expectations using the verified protocol behavior
+
 ---
 
 ## Recommended downstream editing order
 
-A practical order, based on the current map:
+**Derived recommendation:** A practical order, based on the current map and intended only as execution guidance for later plan-derived tickets:
 
 1. normalize identity model and type consistency
 2. narrow the canonical continuation contract

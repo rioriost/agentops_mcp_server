@@ -2,94 +2,53 @@
   "ticket_id": "p2-t01",
   "phase_id": "p2",
   "title": "Replace ticket-derived tx_id generation with issued transaction IDs",
-  "source_plan": "docs/v0.6.0/plan.md",
-  "plan_sections": [
-    "Objectives",
-    "Canonical Runtime Model",
-    "Server-owned transaction variables vs client-managed inputs",
+  "canonical_source": "docs/v0.6.0/plan.md",
+  "source_plan_phase": "Implementation Strategy / Phase 2",
+  "source_plan_sections": [
     "Canonical Invariants",
+    "Persistence Model",
     "Identity Model",
     "Compatibility Policy",
     "Implementation Strategy"
   ],
-  "goal": "Replace any ticket-derived or helper-derived transaction identity generation in runtime code with server-issued monotonic transaction IDs allocated only through the canonical begin path.",
-  "why_this_ticket": "The 0.6.0 protocol requires tx_id to be exact, server-issued, opaque once created, and never derived from ticket_id or other client-managed labels. This ticket implements that requirement in runtime code and removes identity ambiguity from new writes.",
+  "covered_requirements": [
+    "REQ-P2-ISSUED-TXID"
+  ],
+  "goal": "Implement the plan-defined rule that new transaction identity is issued canonically during begin and is never derived from ticket identity in new writes.",
   "scope": [
-    "Identify all runtime code paths that create a new transaction identity.",
-    "Replace any ticket-derived, task-derived, session-derived, string-derived, or heuristic tx_id generation logic with issued monotonic IDs.",
-    "Ensure tx_id issuance occurs only through the canonical begin path for new transactions.",
-    "Ensure issued tx_id values are represented as integers in JSON-facing artifacts.",
-    "Align issuance behavior with tx_id counter metadata handling.",
-    "Preserve bounded compatibility for historical data without weakening strict new-write semantics."
+    "Replace any new-write path that derives tx_id from ticket_id with canonical issued tx_id allocation.",
+    "Ensure issued tx_id allocation occurs only during canonical begin.",
+    "Preserve integer JSON-facing tx_id representation.",
+    "Ensure compatibility behavior does not weaken strict new-write semantics."
   ],
   "out_of_scope": [
-    "Redesigning the full materialized continuation contract.",
-    "Rewriting the full resume dispatcher around next_action.",
-    "Removing sentinel no-active handling except where directly required to stop tx_id misuse.",
-    "Broad regression-suite expansion beyond what is necessary to validate issued tx_id behavior.",
-    "Changing client planning document formats."
+    "Broad resume simplification outside exact identity allocation.",
+    "Sentinel elimination outside direct identity-write consequences.",
+    "Historical event-log rewrite."
   ],
   "inputs": [
     "docs/v0.6.0/plan.md",
-    "docs/v0.6.0/tickets_list.json",
-    "docs/v0.6.0/p0-t01.json outputs",
-    "docs/v0.6.0/p0-t02.json outputs",
-    "docs/v0.6.0/p0-t03.json outputs",
-    "docs/v0.6.0/p1-t01.json outputs",
-    "src/**/*.py",
-    ".agent/tx_id_counter.json handling",
-    ".agent/tx_state.json handling",
-    ".agent/tx_event_log.jsonl handling"
-  ],
-  "dependencies": [
-    "p0-t01",
-    "p0-t02",
-    "p0-t03",
-    "p1-t01"
-  ],
-  "enables": [
-    "p2-t02",
-    "p2-t03",
-    "p2-t04",
-    "p2-t05",
-    "p2-t08",
-    "p3-t04"
+    "docs/v0.6.0/phase0-implementation-map.md",
+    "docs/v0.6.0/p1-t01.json",
+    "docs/v0.6.0/p1-t03.json"
   ],
   "expected_outputs": [
-    "A runtime implementation where all new tx_id allocation uses a single canonical issuance path.",
-    "Removal or neutralization of any code path that derives tx_id from ticket_id or other client-managed labels.",
-    "Alignment between runtime issuance behavior and tx_id counter persistence.",
-    "A concise compatibility note describing how historical non-0.6.0 tx_id formats remain readable without affecting new writes."
-  ],
-  "implementation_requirements": [
-    "tx_id must be server-issued.",
-    "tx_id must be integer-valued for new writes.",
-    "tx_id must not be derived from ticket_id, task_id, session_id, title, path, or any other client-managed label.",
-    "A new tx_id may be created only when starting a new transaction.",
-    "Resume must reuse the exact existing tx_id.",
-    "The issuance counter must remain monotonic.",
-    "Missing tx_id counter metadata may be treated as a zero baseline only where allowed by the plan.",
-    "Malformed tx_id counter metadata must fail clearly and must not be silently treated as zero."
+    "Runtime changes that allocate tx_id only through canonical begin.",
+    "Verification evidence showing new writes do not derive tx_id from ticket_id.",
+    "A code-to-plan traceability summary for identity allocation changes."
   ],
   "acceptance_criteria": [
-    "No new runtime code path derives tx_id from ticket_id.",
-    "No new runtime code path derives tx_id from task_id, session_id, title, or string heuristics.",
-    "Newly created transactions receive tx_id values only through canonical begin.",
-    "Resumed transactions reuse the exact existing tx_id and never mint a replacement.",
-    "Issued tx_id values are persisted in JSON-facing artifacts as integers.",
-    "Issuance behavior is backed by monotonic counter state and does not rely on ad hoc identity creation.",
-    "Any retained historical compatibility behavior remains read-path-only and does not redefine strict new-write semantics."
+    "No new-write path derives tx_id from ticket_id.",
+    "Issued tx_id allocation occurs only during canonical begin.",
+    "tx_id remains integer-valued in JSON-facing artifacts.",
+    "Any compatibility handling remains read-path-only or otherwise bounded so new semantics stay strict."
   ],
-  "review_checkpoints": [
-    "Confirm every transaction-creation path routes through a single issuance mechanism.",
-    "Confirm every resume path reuses an existing tx_id rather than allocating a new one.",
-    "Confirm no helper API label can influence canonical tx_id creation.",
-    "Confirm counter persistence and runtime issuance stay in sync under repeated begin operations.",
-    "Confirm historical compatibility logic does not leak into new-write behavior."
+  "dependencies": [
+    "p1-t01",
+    "p1-t03"
   ],
-  "notes": [
-    "This ticket is foundational for the rest of phase 2 because exact active-transaction continuation depends on exact issued identity.",
-    "If legacy tx_id formats remain readable historically, that compatibility must not allow new writes to emit legacy-shaped identities.",
-    "Prefer deleting identity-derivation heuristics over layering additional normalization rules on top of them."
+  "enables": [
+    "p2-t03",
+    "p3-t01"
   ]
 }

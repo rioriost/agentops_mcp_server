@@ -3,7 +3,7 @@
   "phase_id": "p0",
   "title": "Review all Python files under src and build an implementation map",
   "goal": "Review every Python file under `src/` and create a codebase map that explains each file's role, major symbols, protocol responsibilities, and likely impact on the 0.6.0 redesign.",
-  "why_this_ticket_exists": "The 0.6.0 redesign changes transaction identity, continuation semantics, persistence behavior, and resume logic across multiple parts of the runtime. A complete implementation map is needed before later tickets can safely identify exact modification targets without drifting from the plan.",
+  "why_this_ticket_exists": "The 0.6.0 redesign changes transaction identity, continuation semantics, persistence behavior, and resume logic across multiple parts of the runtime. This evidence artifact captures a reusable codebase map so later plan-derived tickets can identify exact modification targets without drifting from plan.md.",
   "scope": [
     "Review all Python files under `src/`.",
     "Identify each file's primary responsibility.",
@@ -20,31 +20,18 @@
     "Implementing any 0.6.0 protocol changes.",
     "Adding or removing tests except where needed to understand current file responsibility."
   ],
-  "plan_sections": [
-    "Objectives",
-    "Core Design Goal",
-    "Canonical Runtime Model",
-    "Server-owned transaction variables vs client-managed inputs",
-    "Transaction Semantics",
-    "Canonical Invariants",
-    "Persistence Model",
-    "Resume Model",
-    "Identity Model",
-    "Compatibility Policy",
-    "Implementation Strategy"
-  ],
   "inputs": [
     "docs/v0.6.0/plan.md",
     "src/**/*.py"
   ],
   "tasks": [
-    "Enumerate all Python files under `src/`.",
+    "Enumerate all Python files under `src`.",
     "Read each file and summarize its responsibility in 1-3 lines.",
     "Extract major public or structurally important functions, classes, and data structures.",
     "Tag each file with the protocol concerns it participates in.",
     "Identify high-impact files for identity, resume, materialized state, event log, issuance metadata, compatibility, and task lifecycle behavior.",
-    "Record likely future touch points for later tickets.",
-    "Produce a single implementation map document that later tickets can reference."
+    "Record likely future touch points for later plan-derived tickets.",
+    "Produce a single implementation map evidence document that later plan-derived tickets can reference."
   ],
   "expected_outputs": [
     {
@@ -91,12 +78,12 @@
     "diagnostics_or_guidance"
   ],
   "acceptance_criteria": [
-    "Every Python file under `src/` is reviewed and included in the implementation map.",
+    "Every Python file under `src` is reviewed and included in the implementation map.",
     "Each file entry explains what the file does and why it matters to the 0.6.0 redesign.",
     "Each file entry lists the major classes, functions, or structurally important symbols found there.",
     "The map explicitly distinguishes files involved in transaction identity, materialized state, event history, issuance metadata, resume logic, and compatibility behavior.",
-    "The map identifies high-impact files likely to be modified by later tickets.",
-    "The map is detailed enough that later tickets can use it to choose exact edit targets without redoing repository-wide discovery."
+    "The map identifies high-impact files likely to be modified by later plan-derived tickets.",
+    "The map is detailed enough that later plan-derived tickets can use it to choose exact edit targets without redoing repository-wide discovery."
   ],
   "handoff_to_future_tickets": {
     "used_by": [
@@ -105,15 +92,10 @@
       "p1-t01",
       "p1-t02",
       "p1-t03",
-      "p1-t04",
       "p2-t01",
       "p2-t02",
       "p2-t03",
-      "p2-t04",
-      "p2-t05",
-      "p2-t06",
-      "p2-t07",
-      "p2-t08"
+      "p2-t04"
     ],
     "required_handoff_fields": [
       "file_path",
@@ -122,12 +104,49 @@
       "protocol_concerns",
       "high_impact_reason",
       "related_future_tickets"
+    ],
+    "notes": [
+      "These handoff fields are evidence-oriented and must not be treated as canonical requirements.",
+      "Downstream use of this handoff must remain consistent with plan.md."
     ]
   },
   "notes": [
     "This ticket is analysis-only and should not change runtime semantics.",
     "If a file mixes multiple concerns, the map should say so explicitly rather than forcing a single category.",
     "If a file appears low-impact, that should be recorded explicitly rather than omitted.",
-    "The output of this ticket becomes the primary codebase orientation reference for the rest of the 0.6.0 ticket set."
+    "The output of this ticket becomes the primary codebase orientation evidence reference for the rest of the 0.6.0 ticket set."
+  ],
+  "canonical_source": "docs/v0.6.0/plan.md",
+  "artifact_role": "derived evidence and analysis",
+  "source_plan_phase": "Pre-implementation evidence for later plan-derived work",
+  "source_plan_sections": [
+    "Objectives",
+    "Core Design Goal",
+    "Canonical Runtime Model",
+    "Server-owned transaction variables vs client-managed inputs",
+    "Transaction Semantics",
+    "Canonical Invariants",
+    "Persistence Model",
+    "Resume Model",
+    "Identity Model",
+    "Compatibility Policy",
+    "Implementation Strategy"
+  ],
+  "covered_requirements": [
+    "PHASE0-ANALYSIS-IMPLEMENTATION-MAP"
+  ],
+  "traceability_notes": [
+    "This ticket is an evidence artifact, not a source of canonical requirements.",
+    "Its outputs may guide later work only when consistent with plan.md.",
+    "Any observation in downstream use must be distinguished from canonical plan requirements."
+  ],
+  "enables": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03",
+    "p2-t01",
+    "p2-t02",
+    "p2-t03",
+    "p2-t04"
   ]
 }

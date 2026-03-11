@@ -1,104 +1,76 @@
 {
   "ticket_id": "p1-t02",
   "phase_id": "p1",
-  "title": "Define the minimal canonical continuation contract in code",
-  "source_plan": "docs/v0.6.0/plan.md",
-  "plan_sections": [
-    "Server-owned transaction variables vs client-managed inputs",
+  "title": "Define the canonical state machine and continuation rules",
+  "canonical_source": "docs/v0.6.0/plan.md",
+  "source_plan_phase": "Implementation Strategy / Phase 1",
+  "source_plan_sections": [
     "Canonical State Machine",
-    "Persistence Model",
-    "Materialized state",
-    "Resume Model"
+    "Status set",
+    "Meaning of each status",
+    "State-machine constraints",
+    "Canonical Checkpoints and Events",
+    "Resume Model",
+    "Implementation Strategy"
   ],
-  "goal": "Define and enforce the minimal canonical continuation contract in code so deterministic resume depends only on the top-level canonical fields identified in the plan.",
-  "why_this_ticket": "The plan defines a deliberately small continuation surface. This ticket makes that contract explicit in the runtime code before broader recovery and identity changes are implemented.",
+  "covered_requirements": [
+    "REQ-P1-STATE-MACHINE",
+    "REQ-P1-CHECKPOINTS"
+  ],
+  "goal": "Translate the plan-defined canonical status model, continuation rules, next_action precedence, and minimal checkpoint event set into fully traceable implementation-facing documentation.",
   "scope": [
-    "Identify the code paths and data structures that represent the materialized continuation state.",
-    "Define the canonical top-level continuation fields required for deterministic resume.",
-    "Ensure the continuation contract distinguishes active-transaction state from the no-active baseline.",
-    "Ensure lifecycle classification remains top-level via status and is not duplicated as an authoritative field elsewhere.",
-    "Document any currently present fields that should be treated as non-canonical, derived, or optional."
+    "Define the allowed canonical statuses and their meanings exactly as written in plan.md.",
+    "Define the rule that next_action is the primary continuation dispatcher when valid.",
+    "Define the minimal canonical checkpoint event set and the limited role of optional progress events.",
+    "Define the high-level transition model and repair-loop allowances exactly as written in plan.md."
   ],
   "out_of_scope": [
-    "Changing tx_id issuance behavior.",
-    "Implementing compatibility normalization for historical logs.",
-    "Rewriting event-log formats.",
-    "Adding or removing regression tests beyond what is needed to validate the contract shape.",
-    "Making session context part of the continuation contract."
+    "Changing runtime code.",
+    "Changing identity-allocation behavior that belongs to p2-t01.",
+    "Changing persistence schema details that belong to p1-t03.",
+    "Inventing extra lifecycle states or extra canonical checkpoint events beyond plan.md."
   ],
   "inputs": [
     "docs/v0.6.0/plan.md",
-    "src/**/*.py"
-  ],
-  "dependencies": [
-    "p0-t01",
-    "p0-t02",
-    "p1-t01"
+    "docs/v0.6.0/phase0-implementation-map.md"
   ],
   "expected_outputs": [
-    "A clear code-level definition of the minimal continuation contract.",
-    "A list of runtime structures or modules that own the continuation contract.",
-    "A mapping from plan-defined canonical continuation fields to concrete code locations.",
-    "A short note identifying fields that are currently present but must not control deterministic continuation.",
-    "A gap note identifying remaining helper/runtime dependencies that still rely on non-canonical active_tx metadata and therefore block terminal completion of this ticket."
-  ],
-  "canonical_fields": [
-    "active_tx",
-    "status",
-    "next_action",
-    "verify_state",
-    "commit_state",
-    "semantic_summary",
-    "last_applied_seq"
-  ],
-  "no_active_baseline_requirements": {
-    "active_tx": null,
-    "status": null,
-    "next_action": "tx.begin",
-    "semantic_summary": null,
-    "verify_state": null,
-    "commit_state": null,
-    "last_applied_seq": "retains the last materialized event sequence when available"
-  },
-  "rules": [
-    "Treat the listed canonical_fields as the only top-level continuation fields required for deterministic resume.",
-    "Treat status as the canonical lifecycle classification field and keep it top-level.",
-    "Treat active_tx as an identity-bearing active-transaction snapshot, not as the lifecycle-classification field.",
-    "Do not promote phase-style, step-style, session-derived, or guidance-only fields into the continuation contract.",
-    "Do not redefine canonical continuation behavior through helper-style API labels."
+    "A state-machine specification derived strictly from plan.md.",
+    "A checkpoint-event specification derived strictly from plan.md.",
+    "A traceability matrix linking continuation rules to exact plan sections and runtime review targets."
   ],
   "acceptance_criteria": [
-    "The code-level continuation contract contains exactly the canonical fields identified in the plan for deterministic resume.",
-    "The no-active baseline is represented structurally and matches the plan.",
-    "The implementation clearly distinguishes active_tx from top-level status responsibilities.",
-    "Optional or derived metadata is not required for continuation correctness.",
-    "The resulting contract can be described in terms of the minimal canonical continuation contract plus top-level next_action.",
-    "Helper and runtime continuation paths no longer require active_tx phase/current_step/session metadata as correctness-critical inputs."
+    "The canonical status set matches plan.md exactly.",
+    "The continuation rules explicitly preserve next_action precedence over status-derived heuristics when next_action is valid.",
+    "The checkpoint-event contract does not require commit events when no repository commit is attempted.",
+    "The artifact remains strictly derived from plan.md and does not invent new canonical semantics."
   ],
-  "notes": [
-    "This ticket should be completed before tickets that depend on exact active-transaction continuation behavior.",
-    "Any ambiguity found while mapping fields should be resolved in favor of the minimal contract defined in plan.md.",
-    "Corrective plan: restrict next_action derivation to top-level canonical fields, remove canonical sentinel no-active semantics, and reduce active_tx consumers to identity-only continuation use.",
-    "Follow-up boundary: helper execution flows that still depend on active_tx phase/current_step/session metadata remain out of scope for p1-t02 and should be handled by later tickets.",
-    "Current audit result: the materialized contract and workflow guidance were narrowed toward the minimal canonical surface, but repo/commit helper paths still depend on active_tx phase/current_step/session metadata and therefore acceptance remains incomplete.",
-    "Current audit result: tickets_list.json bookkeeping must not mark p1-t02 as done until the remaining helper/runtime dependencies are removed or the ticket boundary is explicitly re-scoped.",
-    "Concrete remaining dependency: src/agentops_mcp_server/repo_tools.py::_load_tx_context still requires active_tx.session_id and still derives phase/step execution context from active_tx.phase and active_tx.current_step.",
-    "Concrete remaining dependency: src/agentops_mcp_server/repo_tools.py::_emit_tx_event still writes phase/current_step/session_id back into materialized active_tx before appending tx events, which keeps helper continuation coupled to non-canonical active_tx metadata.",
-    "Concrete remaining dependency: src/agentops_mcp_server/commit_manager.py::_load_tx_context still requires active_tx.session_id and still derives commit execution context from active_tx.phase and active_tx.current_step.",
-    "Concrete remaining dependency: src/agentops_mcp_server/commit_manager.py::_emit_tx_begin_with_context and _ensure_tx_begin still repopulate active_tx.phase/current_step/session_id into materialized state, so helper bootstrap still assumes old-shaped active_tx metadata.",
-    "Concrete remaining dependency: src/agentops_mcp_server/state_store.py::tx_event_append_and_state_save still materializes phase/current_step/session_id and other helper-oriented fields under active_tx, so canonical-state writes are not yet reduced to an identity-only active_tx snapshot.",
-    "Concrete remaining dependency: src/agentops_mcp_server/state_store.py::_current_active_tx_context still reports status/phase/current_step/next_action/session_id from active_tx, which shows diagnostics and helper context are still modeled around old-shaped active_tx content.",
-    "Concrete remaining dependency: tests/test_repo_tools.py and tests/test_commit_manager.py still build and assert old-shaped active_tx fixtures containing status/phase/current_step/session_id/next_action nested under active_tx, so regression coverage still encodes the pre-minimal continuation contract.",
-    "Follow-on ticket mapping: move active_tx write-shape reduction in src/agentops_mcp_server/state_store.py and related materialized-state cleanup into p2-t04.",
-    "Follow-on ticket mapping: move canonical next_action-driven continuation cleanup in src/agentops_mcp_server/repo_tools.py and src/agentops_mcp_server/commit_manager.py into p2-t05.",
-    "Follow-on ticket mapping: move session_id de-hardening so helper continuation no longer treats session context as correctness-critical into p2-t07.",
-    "Follow-on ticket mapping: move old-shaped helper regression fixture cleanup in tests/test_repo_tools.py and tests/test_commit_manager.py alongside the corresponding p2 runtime changes rather than forcing partial updates in p1-t02.",
-    "Concrete remaining dependency: src/agentops_mcp_server/repo_tools.py::_load_tx_context still requires active_tx.session_id and still derives phase/step execution context from active_tx.phase and active_tx.current_step.",
-    "Concrete remaining dependency: src/agentops_mcp_server/repo_tools.py::_emit_tx_event still writes phase/current_step/session_id back into materialized active_tx before appending tx events, which keeps helper continuation coupled to non-canonical active_tx metadata.",
-    "Concrete remaining dependency: src/agentops_mcp_server/commit_manager.py::_load_tx_context still requires active_tx.session_id and still derives commit execution context from active_tx.phase and active_tx.current_step.",
-    "Concrete remaining dependency: src/agentops_mcp_server/commit_manager.py::_emit_tx_begin_with_context and _ensure_tx_begin still repopulate active_tx.phase/current_step/session_id into materialized state, so helper bootstrap still assumes old-shaped active_tx metadata.",
-    "Concrete remaining dependency: src/agentops_mcp_server/state_store.py::tx_event_append_and_state_save still materializes phase/current_step/session_id and other helper-oriented fields under active_tx, so canonical-state writes are not yet reduced to an identity-only active_tx snapshot.",
-    "Concrete remaining dependency: src/agentops_mcp_server/state_store.py::_current_active_tx_context still reports status/phase/current_step/next_action/session_id from active_tx, which shows diagnostics and helper context are still modeled around old-shaped active_tx content.",
-    "Concrete remaining dependency: tests/test_repo_tools.py and tests/test_commit_manager.py still build and assert old-shaped active_tx fixtures containing status/phase/current_step/session_id/next_action nested under active_tx, so regression coverage still encodes the pre-minimal continuation contract."
-  ]
+  "dependencies": [
+    "p0-t03",
+    "p1-t01"
+  ],
+  "enables": [
+    "p2-t02",
+    "p2-t03",
+    "p3-t01",
+    "p3-t02"
+  ],
+  "traceability_contract": {
+    "requirement_sources": {
+      "REQ-P1-STATE-MACHINE": [
+        "Canonical State Machine",
+        "Status set",
+        "Meaning of each status",
+        "State-machine constraints"
+      ],
+      "REQ-P1-CHECKPOINTS": [
+        "Canonical Checkpoints and Events",
+        "Resume Model"
+      ]
+    },
+    "forbidden_moves": [
+      "Do not elevate optional progress events into required canonical continuation checkpoints.",
+      "Do not let status override a valid canonical next_action."
+    ]
+  }
 }

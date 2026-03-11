@@ -1,120 +1,43 @@
 {
   "ticket_id": "p3-t03",
   "phase_id": "p3",
-  "title": "Add regression coverage for terminal re-entry, no-change completion, and idempotent resume",
-  "source_plan": "docs/v0.6.0/plan.md",
-  "plan_sections": [
-    "Transaction Semantics",
-    "Transaction success",
-    "Commit is non-terminal",
-    "Terminal completion is explicit",
-    "Canonical State Machine",
-    "Meaning of each status",
-    "Canonical Checkpoints and Events",
-    "Materialized state",
-    "Resume Model",
-    "Post-terminal materialization",
-    "Idempotent continuation requirements",
-    "Implementation Strategy",
-    "Success Criteria"
+  "title": "Update documentation and operator guidance for the redesigned protocol",
+  "canonical_source": "docs/v0.6.0/plan.md",
+  "source_plan_phase": "Implementation Strategy / Phase 3",
+  "source_plan_sections": [
+    "Success Criteria",
+    "Implementation Strategy"
   ],
-  "goal": "Add regression coverage that proves terminal transactions are not resumed as active work, verified transactions with no repository changes can complete explicitly without commit checkpoints, and repeated resume of already-completed or already-advanced states does not corrupt lifecycle state.",
-  "why_this_ticket": "The 0.6.0 protocol depends on explicit terminal completion, a canonical no-change verified path, and idempotent continuation under interruption. This ticket turns those protocol requirements into regression coverage so later changes cannot silently reintroduce duplicate completion, bogus post-terminal resume, or unnecessary commit behavior.",
+  "covered_requirements": [
+    "REQ-P3-GUIDANCE"
+  ],
+  "goal": "Update documentation and operator guidance so the redesigned protocol is explained consistently with plan.md and with the verified runtime behavior.",
   "scope": [
-    "Add tests for terminal re-entry after `done`.",
-    "Add tests for terminal re-entry after `blocked`.",
-    "Add tests for the canonical `verified -> done` path when there are no repository changes.",
-    "Add tests proving that commit checkpoints are not required in the no-change verified path.",
-    "Add tests for repeated resume of already-verified states before commit.",
-    "Add tests for repeated resume of already-committed states before explicit terminal end.",
-    "Add tests for repeated encounters with already-terminal transactions after the canonical no-active baseline is reached.",
-    "Validate that `verify_state` and `commit_state` are `null` once materialized state reaches the canonical no-active baseline."
+    "Document the meaning of a transaction, single-active behavior, next_action-driven continuation, non-terminal commit, and explicit terminal end as implemented.",
+    "Document operator-facing expectations for interruption, resume, verification, commit, and terminal completion.",
+    "Document the bounded role of planning artifacts and the canonical role of runtime state."
   ],
   "out_of_scope": [
-    "Broad compatibility coverage for malformed persistence artifacts.",
-    "Broad compatibility coverage for historical legacy logs.",
-    "Rewriting the canonical status model.",
-    "Changing transaction identity issuance behavior.",
-    "Changing client planning artifacts."
+    "Redefining protocol semantics away from plan.md.",
+    "Changing runtime behavior except as necessary to align docs with verified behavior."
   ],
   "inputs": [
     "docs/v0.6.0/plan.md",
-    "docs/v0.6.0/tickets_list.json",
-    "Outputs from phase 2 runtime implementation tickets",
-    "Current test framework and existing transaction lifecycle tests"
-  ],
-  "dependencies": [
-    "p1-t02",
-    "p1-t03",
-    "p1-t04",
-    "p2-t04",
-    "p2-t05",
-    "p2-t06"
-  ],
-  "enables": [
-    "p3-t05"
+    "docs/v0.6.0/p3-t01.json",
+    "docs/v0.6.0/p3-t02.json"
   ],
   "expected_outputs": [
-    "Regression tests covering terminal re-entry behavior.",
-    "Regression tests covering the no-change verified completion path.",
-    "Regression tests covering idempotent continuation of already-advanced states.",
-    "A short note or code comment set describing what protocol guarantees these tests protect."
-  ],
-  "scenarios_to_cover": [
-    {
-      "name": "done_terminal_reentry",
-      "description": "A transaction that has already ended as `done` is encountered again and must not be resumed as active work."
-    },
-    {
-      "name": "blocked_terminal_reentry",
-      "description": "A transaction that has already ended as `blocked` is encountered again and must not be resumed as active work."
-    },
-    {
-      "name": "verified_no_change_direct_done",
-      "description": "A verified transaction with no repository changes proceeds directly to explicit terminal completion without commit checkpoints."
-    },
-    {
-      "name": "verified_no_change_no_commit_events",
-      "description": "The no-change verified path does not require `tx.commit.start` or `tx.commit.done`."
-    },
-    {
-      "name": "already_verified_repeated_resume",
-      "description": "Repeated resume of an already-verified state before commit does not corrupt lifecycle state or duplicate logical work."
-    },
-    {
-      "name": "already_committed_repeated_resume",
-      "description": "Repeated resume of an already-committed state before explicit end does not corrupt lifecycle state or duplicate logical work."
-    },
-    {
-      "name": "post_terminal_no_active_baseline",
-      "description": "Once the canonical no-active baseline is reached, terminal work is not exposed as active resumable work and checkpoint states are null."
-    }
-  ],
-  "protocol_assertions": [
-    "Explicit terminal completion as `done` is the only successful terminal outcome.",
-    "A successful repository commit is non-terminal by itself.",
-    "A verified transaction with no repository changes may proceed directly to explicit terminal completion.",
-    "Terminal transactions are not resumed as active work.",
-    "Repeated resume of the same interrupted or already-advanced state does not corrupt lifecycle state.",
-    "Once materialized state reaches the canonical no-active baseline, `verify_state` and `commit_state` are `null`."
+    "Updated operator and developer guidance aligned with plan.md and verified runtime behavior.",
+    "A documentation traceability summary linking guidance statements back to plan.md and verified behavior."
   ],
   "acceptance_criteria": [
-    "The test suite contains explicit regression coverage for both `done` and `blocked` terminal re-entry.",
-    "The test suite contains explicit regression coverage for the canonical no-change `verified -> done` path.",
-    "The no-change verified path is tested without requiring commit checkpoint events.",
-    "Repeated resume of already-verified and already-committed states is shown to be idempotent.",
-    "Post-terminal normalization to the canonical no-active baseline is covered by regression tests.",
-    "The tests fail if terminal work is incorrectly resumed, if duplicate completion is introduced, or if no-change verified flow is forced through commit checkpoints."
+    "Guidance does not redefine canonical behavior away from plan.md.",
+    "Guidance clearly distinguishes canonical runtime truth from derived planning artifacts.",
+    "Guidance reflects the verified interruption, resume, commit, and terminal behaviors covered by phase 3 tests."
   ],
-  "review_checkpoints": [
-    "Confirm that terminal re-entry tests distinguish historical visibility from active resumability.",
-    "Confirm that no-change verified tests assert explicit terminal completion rather than silent implicit success.",
-    "Confirm that idempotent resume tests cover both pre-commit and post-commit non-terminal repetition.",
-    "Confirm that canonical no-active baseline assertions include null checkpoint states where required by the plan."
+  "dependencies": [
+    "p3-t01",
+    "p3-t02"
   ],
-  "notes": [
-    "This ticket protects some of the easiest protocol guarantees to regress accidentally: explicit end semantics, no-change completion semantics, and idempotent continuation.",
-    "These tests should be treated as protocol-contract tests rather than incidental implementation-detail tests.",
-    "When in doubt, assert machine-visible lifecycle state and continuation behavior, not only side effects."
-  ]
+  "enables": []
 }

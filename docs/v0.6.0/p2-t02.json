@@ -1,96 +1,51 @@
 {
   "ticket_id": "p2-t02",
   "phase_id": "p2",
-  "title": "Unify active transaction selection around exact active_tx identity",
-  "source_plan": "docs/v0.6.0/plan.md",
-  "plan_sections": [
-    "Canonical Invariants",
-    "Resume Model",
-    "Materialized state",
-    "Identity Model",
+  "title": "Remove sentinel active-transaction semantics from normal flow",
+  "canonical_source": "docs/v0.6.0/plan.md",
+  "source_plan_phase": "Implementation Strategy / Phase 2",
+  "source_plan_sections": [
+    "Persistence Model",
+    "Post-terminal materialization",
     "Sentinel elimination",
-    "Timestamp Policy",
-    "Compatibility Policy",
     "Implementation Strategy"
   ],
-  "goal": "Ensure the runtime always selects the active transaction by exact canonical active_tx identity from materialized state, and never by heuristic reconstruction, timestamp-first choice, sentinel interpretation, or session-led selection.",
-  "why_this_ticket": "The 0.6.0 redesign depends on deterministic resume of the exact active transaction. This ticket converts active transaction selection from potentially ambiguous or artifact-driven behavior into exact canonical selection rooted in the materialized continuation contract.",
+  "covered_requirements": [
+    "REQ-P2-NO-SENTINEL"
+  ],
+  "goal": "Implement the plan-defined structural no-active representation and remove sentinel active-transaction behavior from normal flow.",
   "scope": [
-    "Review every runtime code path that selects, infers, or reconstructs the active transaction.",
-    "Identify any places where active transaction selection depends on string-shape checks, reverse mapping, timestamps, session context, sentinel IDs, or helper-style labels.",
-    "Update runtime selection logic so active transaction choice is based on exact active_tx identity from canonical materialized state.",
-    "Ensure no-active state is handled structurally through active_tx: null rather than fake identifiers or heuristic fallback.",
-    "Ensure rebuild paths preserve exact active transaction identity when materialized state is missing, incomplete, or inconsistent.",
-    "Document any bounded legacy compatibility behavior retained for historical data without weakening the new exact-selection rule."
+    "Adopt active_tx: null as the structural no-active representation in normal materialized state.",
+    "Remove normal-flow sentinel transaction identifiers and sentinel ticket placeholders.",
+    "Ensure post-terminal materialization returns to the canonical no-active baseline described in plan.md."
   ],
   "out_of_scope": [
-    "Introducing new transaction statuses.",
-    "Redesigning the event log format beyond what is needed to preserve exact active transaction recovery.",
-    "Changing client planning document formats.",
-    "Broad test-suite expansion beyond the minimum needed to validate exact active selection behavior.",
-    "General refactoring unrelated to active transaction selection."
+    "Historical in-place rewrite of legacy data.",
+    "Redefining compatibility behavior beyond bounded handling.",
+    "Changing canonical status meanings beyond the no-active baseline described in plan.md."
   ],
   "inputs": [
     "docs/v0.6.0/plan.md",
-    "docs/v0.6.0/p0-t01.json outputs",
-    "docs/v0.6.0/p0-t02.json outputs",
-    "docs/v0.6.0/p0-t03.json outputs",
-    "src/**/*.py",
-    ".agent/tx_state.json handling",
-    ".agent/tx_event_log.jsonl handling"
+    "docs/v0.6.0/phase0-implementation-map.md",
+    "docs/v0.6.0/p1-t02.json",
+    "docs/v0.6.0/p1-t03.json"
+  ],
+  "expected_outputs": [
+    "Runtime changes that remove normal-flow sentinel active-transaction behavior.",
+    "Verification evidence showing no-active state is represented structurally.",
+    "A code-to-plan traceability summary for no-active and post-terminal materialization behavior."
+  ],
+  "acceptance_criteria": [
+    "Normal canonical behavior does not represent active transaction identity with sentinel values.",
+    "No-active materialized state uses active_tx: null and null top-level status/verify_state/commit_state as described in plan.md.",
+    "Terminal completion does not leave completed work exposed as resumable active work."
   ],
   "dependencies": [
-    "p0-t01",
-    "p0-t02",
-    "p0-t03",
-    "p1-t01",
-    "p1-t02"
+    "p1-t02",
+    "p1-t03"
   ],
   "enables": [
     "p2-t03",
-    "p2-t04",
-    "p2-t05",
-    "p2-t06",
-    "p2-t08",
-    "p3-t01",
-    "p3-t02",
-    "p3-t03",
-    "p3-t04"
-  ],
-  "expected_outputs": [
-    "A code-level map of all active transaction selection paths.",
-    "A list of heuristic or ambiguous selection mechanisms removed or replaced.",
-    "An implementation update that selects the active transaction only from exact canonical active_tx identity.",
-    "A short implementation note describing any bounded historical compatibility behavior used during rebuild or read paths."
-  ],
-  "rules": [
-    "Active transaction selection must prefer healthy materialized state over heuristic reconstruction.",
-    "If active_tx is null, no active transaction exists.",
-    "If active_tx is non-null, selection must target that exact active transaction identity, including tx_id.",
-    "Selection must not depend on string-prefix or substring checks over transaction identifiers.",
-    "Selection must not depend on sentinel transaction identifiers.",
-    "Selection must not depend on timestamp-first ordering.",
-    "Selection must not depend on session-parent modeling or session-led identity recovery.",
-    "When rebuild is required, canonical event-log replay may recover the exact active transaction, but it must not mint a substitute transaction or choose among heuristic candidates.",
-    "Compatibility handling for historical data may normalize documented legacy formats, but it must not weaken exact active transaction selection for new runtime behavior."
-  ],
-  "acceptance_criteria": [
-    "Runtime code selects the active transaction by exact canonical active_tx identity when materialized state is healthy.",
-    "No code path selects an active transaction by timestamp-first choice, string heuristics, sentinel interpretation, or helper-label reverse mapping.",
-    "No-active state is represented structurally and handled as absence of active_tx rather than as a fake transaction identifier.",
-    "Rebuild paths preserve exact active transaction identity instead of minting or inferring replacement identities.",
-    "Session context is not used as the primary basis for active transaction selection.",
-    "The resulting behavior matches the plan: resume always continues the same active transaction."
-  ],
-  "review_checkpoints": [
-    "Confirm that every entrypoint deciding between begin and resume uses exact active_tx identity.",
-    "Confirm that any fallback or rebuild path preserves exact tx_id continuity.",
-    "Confirm that no helper-style label can redefine which transaction is active.",
-    "Confirm that historical compatibility logic remains read-path-bounded and does not alter the new canonical selection rule."
-  ],
-  "notes": [
-    "This ticket is central to deterministic resume and should be treated as a correctness boundary, not a cosmetic cleanup.",
-    "When in doubt, remove ambiguous selection logic rather than adding more tie-breaking heuristics.",
-    "All implementation decisions in this ticket must remain consistent with the minimal canonical continuation contract defined in plan.md."
+    "p3-t01"
   ]
 }

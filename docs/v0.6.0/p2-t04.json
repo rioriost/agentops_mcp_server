@@ -1,124 +1,53 @@
 {
   "ticket_id": "p2-t04",
   "phase_id": "p2",
-  "title": "Align materialized state with the minimal continuation contract",
-  "source_plan": "docs/v0.6.0/plan.md",
-  "plan_sections": [
-    "Server-owned transaction variables vs client-managed inputs",
-    "Canonical State Machine",
+  "title": "Bound session context and define historical compatibility behavior",
+  "canonical_source": "docs/v0.6.0/plan.md",
+  "source_plan_phase": "Implementation Strategy / Phase 2",
+  "source_plan_sections": [
+    "Canonical Runtime Model",
     "Persistence Model",
-    "Materialized state",
-    "Resume Model",
-    "Post-terminal materialization",
+    "Timestamp Policy",
+    "Compatibility Policy",
     "Implementation Strategy"
   ],
-  "goal": "Align the runtime materialized state implementation with the minimal canonical continuation contract defined in the 0.6.0 plan so resume correctness depends only on the intended top-level fields and the no-active baseline is represented structurally and unambiguously.",
-  "why_this_ticket": "The 0.6.0 design makes materialized state the canonical resume entrypoint. If tx_state carries extra authoritative fields, mixes active and no-active semantics, or leaves baseline behavior ambiguous, later identity, resume, and compatibility work will drift from the plan. This ticket makes the materialized state shape explicit and authoritative before downstream runtime behavior is finalized.",
+  "covered_requirements": [
+    "REQ-P2-SESSION-COMPAT"
+  ],
+  "goal": "Implement the plan-defined rule that session context remains secondary to deterministic correctness while historical compatibility remains bounded and does not weaken strict new semantics.",
   "scope": [
-    "Review the code that defines, writes, updates, reads, validates, and rebuilds materialized transaction state.",
-    "Align the top-level materialized state shape to the minimal canonical continuation contract.",
-    "Ensure `active_tx` is treated as an identity-bearing active-transaction snapshot rather than a lifecycle-classification field.",
-    "Ensure top-level `status` remains the canonical lifecycle classification field.",
-    "Ensure no-active baseline representation is structural and matches the plan.",
-    "Ensure `verify_state` and `commit_state` are `null` in the canonical no-active baseline.",
-    "Ensure `last_applied_seq` is retained in the no-active baseline when available.",
-    "Ensure completed work is not exposed as resumable active work once the materialized state reaches the canonical no-active baseline.",
-    "Identify and demote any currently present phase-style, step-style, session-derived, or guidance-only fields that are incorrectly treated as part of the canonical continuation contract."
+    "Bound session-sensitive logic so it is not the primary basis for active transaction identity or deterministic continuation.",
+    "Ensure timestamps are not used as the primary canonical ordering key, primary active selector, or primary deterministic recovery mechanism.",
+    "Implement bounded compatibility behavior for documented historical data without silently normalizing malformed or ambiguous canonical persistence into healthy state."
   ],
   "out_of_scope": [
-    "Changing transaction ID issuance behavior.",
-    "Defining or changing the canonical checkpoint event set except where materialized state semantics require consistency.",
-    "Implementing historical compatibility normalization for event-log formats beyond what is necessary to preserve materialized-state correctness.",
-    "Adding broad interruption-focused regression coverage.",
-    "Changing client planning document formats."
+    "In-place rewrite of historical logs.",
+    "Distributed identity allocation.",
+    "Making session-parent modeling the primary correctness mechanism."
   ],
   "inputs": [
     "docs/v0.6.0/plan.md",
-    "docs/v0.6.0/tickets_list.json",
-    "docs/v0.6.0/p0-t01.json",
-    "docs/v0.6.0/p0-t02.json",
-    "docs/v0.6.0/p0-t03.json",
-    "src/**/*.py",
-    ".agent/tx_state.json handling code",
-    "Any transaction-state serializers, validators, and rebuild logic under src"
+    "docs/v0.6.0/phase0-implementation-map.md",
+    "docs/v0.6.0/p1-t01.json",
+    "docs/v0.6.0/p1-t03.json"
+  ],
+  "expected_outputs": [
+    "Runtime changes that demote session context from correctness-sensitive logic.",
+    "Runtime changes that preserve bounded compatibility behavior for historical data.",
+    "Verification evidence showing malformed persistence fails clearly and timestamp/session heuristics do not displace canonical continuation."
+  ],
+  "acceptance_criteria": [
+    "session_id is not the primary basis for active transaction identity, active transaction selection, or deterministic continuation.",
+    "timestamps are not used as the primary canonical ordering key or primary active transaction selector.",
+    "Documented historical formats remain readable under bounded compatibility rules.",
+    "Malformed or ambiguous canonical persistence does not silently degrade into healthy canonical state."
   ],
   "dependencies": [
-    "p0-t01",
-    "p0-t02",
-    "p0-t03",
     "p1-t01",
-    "p1-t02",
     "p1-t03"
   ],
   "enables": [
-    "p2-t05",
-    "p2-t06",
-    "p2-t08",
     "p3-t01",
-    "p3-t02",
-    "p3-t03",
-    "p3-t04"
-  ],
-  "canonical_fields": [
-    "active_tx",
-    "status",
-    "next_action",
-    "verify_state",
-    "commit_state",
-    "semantic_summary",
-    "last_applied_seq"
-  ],
-  "no_active_baseline": {
-    "active_tx": null,
-    "status": null,
-    "next_action": "tx.begin",
-    "semantic_summary": null,
-    "verify_state": null,
-    "commit_state": null,
-    "last_applied_seq": "retains the last materialized event sequence when available"
-  },
-  "rules": [
-    "Treat the listed canonical_fields as the only top-level materialized-state fields required for deterministic resume.",
-    "Treat `status` as the canonical lifecycle classification field and keep it top-level.",
-    "Treat `active_tx` as an identity-bearing active-transaction snapshot and not as the lifecycle-classification field.",
-    "Do not require phase-style, step-style, session-derived, or guidance-only fields for deterministic continuation.",
-    "When the materialized state reaches the canonical no-active baseline, `verify_state` and `commit_state` must be `null`.",
-    "When the materialized state reaches the canonical no-active baseline, completed work must not remain exposed as resumable active work.",
-    "Any retained non-canonical fields must be clearly treated as derived, optional, or compatibility-only and must not control resume correctness."
-  ],
-  "tasks": [
-    "Identify the runtime structures and modules that own the materialized transaction state shape.",
-    "Map existing tx_state fields to the plan-defined canonical fields and identify extras.",
-    "Update materialized-state writing logic so the top-level state shape matches the plan.",
-    "Update materialized-state reading and validation logic so no-active baseline handling is explicit and consistent.",
-    "Ensure post-terminal transitions converge to the canonical no-active baseline without leaving resumable active state behind.",
-    "Confirm that `last_applied_seq` behavior is preserved correctly across active and no-active states.",
-    "Document or annotate any non-canonical fields that remain for compatibility or observability only."
-  ],
-  "expected_outputs": [
-    "A code-level materialized-state schema aligned with the minimal canonical continuation contract.",
-    "A clear no-active baseline representation implemented consistently in runtime code.",
-    "A list of non-canonical materialized-state fields that remain and why they do not control continuation correctness.",
-    "A short alignment note describing how active state, no-active baseline, and post-terminal normalization now behave."
-  ],
-  "acceptance_criteria": [
-    "The runtime materialized state can be described in terms of the canonical fields: `active_tx`, `status`, `next_action`, `verify_state`, `commit_state`, `semantic_summary`, and `last_applied_seq`.",
-    "The runtime no-active baseline matches the plan-defined structural representation.",
-    "The implementation clearly distinguishes `active_tx` from top-level `status` responsibilities.",
-    "Once materialized state reaches the canonical no-active baseline, `verify_state` and `commit_state` are `null`.",
-    "Once materialized state reaches the canonical no-active baseline, completed work is not exposed as resumable active work.",
-    "Optional or derived metadata is not required for continuation correctness.",
-    "Materialized state remains usable as the canonical resume entrypoint and stays consistent with the next_action-driven resume model."
-  ],
-  "review_checkpoints": [
-    "Confirm that top-level lifecycle classification is represented only by `status`.",
-    "Confirm that no-active baseline handling does not rely on sentinel identifiers or reconstructed fake transactions.",
-    "Confirm that any retained compatibility or observability fields are not consulted for deterministic resume dispatch.",
-    "Confirm that post-terminal normalization cannot leave behind an apparently resumable active transaction."
-  ],
-  "notes": [
-    "This ticket should be implemented after the minimal continuation contract and status-versus-next_action responsibilities are explicit in code.",
-    "Any ambiguity discovered while aligning tx_state should be resolved in favor of the plan's minimal materialized-state contract.",
-    "This ticket is the materialized-state counterpart to exact active-transaction selection and next_action-driven resume."
+    "p3-t03"
   ]
 }

@@ -1,6 +1,6 @@
 {
   "version": "0.6.0",
-  "description": "Regenerated ticket index for implementing the resumable transactional protocol redesign; this file is the single source of truth for ticket statuses.",
+  "description": "Plan-derived ticket index for implementing the resumable transactional protocol redesign; this file is the single source of truth for ticket statuses and plan-to-ticket traceability.",
   "source_plan": "docs/v0.6.0/plan.md",
   "status_model": [
     "planned",
@@ -21,142 +21,250 @@
           "ticket_id": "p0-t01",
           "title": "Review all Python files under src and build an implementation map",
           "status": "done",
-          "path": "docs/v0.6.0/p0-t01.json"
+          "path": "docs/v0.6.0/p0-t01.json",
+          "source_plan_sections": [
+            "Objectives",
+            "Core Design Goal",
+            "Canonical Runtime Model",
+            "Server-owned transaction variables vs client-managed inputs",
+            "Transaction Semantics",
+            "Canonical Invariants",
+            "Persistence Model",
+            "Resume Model",
+            "Identity Model",
+            "Compatibility Policy",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "PHASE0-ANALYSIS-IMPLEMENTATION-MAP"
+          ]
         },
         {
           "ticket_id": "p0-t02",
           "title": "Map persistence artifacts and their read/write code paths",
           "status": "done",
-          "path": "docs/v0.6.0/p0-t02.json"
+          "path": "docs/v0.6.0/p0-t02.json",
+          "source_plan_sections": [
+            "Persistence Model",
+            "Canonical Ordering and Durability",
+            "Identity Model",
+            "Compatibility Policy",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "PHASE0-ANALYSIS-PERSISTENCE-MAP"
+          ]
         },
         {
           "ticket_id": "p0-t03",
           "title": "Map begin, resume, and active-transaction selection code paths",
           "status": "done",
-          "path": "docs/v0.6.0/p0-t03.json"
+          "path": "docs/v0.6.0/p0-t03.json",
+          "source_plan_sections": [
+            "Canonical Invariants",
+            "Resume Model",
+            "Sentinel elimination",
+            "Timestamp Policy",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "PHASE0-ANALYSIS-RESUME-MAP"
+          ]
         }
       ]
     },
     {
       "phase_id": "p1",
-      "title": "Define and align protocol contracts in code",
-      "goal": "Align the codebase with the minimal canonical continuation contract, identity model, and checkpoint model defined in the plan.",
+      "title": "Define the resumable transaction protocol contracts from plan.md",
+      "goal": "Convert the phase 1 requirements in plan.md into canonical, fully traceable planning artifacts without adding extra semantics.",
+      "source_plan_phase": "Implementation Strategy / Phase 1",
       "tickets": [
         {
           "ticket_id": "p1-t01",
-          "title": "Define and enforce the identity boundary between ticket_id, tx_id, task_id, and session_id",
+          "phase_id": "p1",
+          "title": "Define the canonical resumable work transaction model",
           "status": "planned",
-          "path": "docs/v0.6.0/p1-t01.json"
+          "path": "docs/v0.6.0/p1-t01.json",
+          "source_plan_sections": [
+            "Transaction Semantics",
+            "Canonical Invariants",
+            "Canonical Runtime Model",
+            "Identity Model",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "REQ-P1-SEMANTICS",
+            "REQ-P1-IDENTITY"
+          ]
         },
         {
           "ticket_id": "p1-t02",
-          "title": "Define the minimal canonical continuation contract in code",
+          "phase_id": "p1",
+          "title": "Define the canonical state machine and continuation rules",
           "status": "planned",
-          "path": "docs/v0.6.0/p1-t02.json"
+          "path": "docs/v0.6.0/p1-t02.json",
+          "source_plan_sections": [
+            "Canonical State Machine",
+            "Status set",
+            "Meaning of each status",
+            "State-machine constraints",
+            "Canonical Checkpoints and Events",
+            "Resume Model",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "REQ-P1-STATE-MACHINE",
+            "REQ-P1-CHECKPOINTS"
+          ]
         },
         {
           "ticket_id": "p1-t03",
-          "title": "Separate status classification from next_action dispatch semantics",
+          "phase_id": "p1",
+          "title": "Define persistence, rebuild, and issuance responsibilities",
           "status": "planned",
-          "path": "docs/v0.6.0/p1-t03.json"
-        },
-        {
-          "ticket_id": "p1-t04",
-          "title": "Align checkpoint events with the minimal canonical core event set",
-          "status": "planned",
-          "path": "docs/v0.6.0/p1-t04.json"
+          "path": "docs/v0.6.0/p1-t03.json",
+          "source_plan_sections": [
+            "Persistence Model",
+            "Canonical Ordering and Durability",
+            "Resume Model",
+            "Identity Model",
+            "Compatibility Policy",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "REQ-P1-IDENTITY",
+            "REQ-P1-CHECKPOINTS",
+            "REQ-P1-PERSISTENCE"
+          ]
         }
       ]
     },
     {
       "phase_id": "p2",
-      "title": "Implement runtime identity and recovery simplifications",
-      "goal": "Implement exact active-transaction continuation, issued transaction identities, structural no-active handling, and bounded compatibility behavior.",
+      "title": "Implement runtime identity and recovery simplifications from plan.md",
+      "goal": "Map the phase 2 implementation work directly to plan.md requirements for issued identity, structural no-active state, exact resume, and bounded compatibility.",
+      "source_plan_phase": "Implementation Strategy / Phase 2",
       "tickets": [
         {
           "ticket_id": "p2-t01",
+          "phase_id": "p2",
           "title": "Replace ticket-derived tx_id generation with issued transaction IDs",
           "status": "planned",
-          "path": "docs/v0.6.0/p2-t01.json"
+          "path": "docs/v0.6.0/p2-t01.json",
+          "source_plan_sections": [
+            "Canonical Invariants",
+            "Persistence Model",
+            "Identity Model",
+            "Compatibility Policy",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "REQ-P2-ISSUED-TXID"
+          ]
         },
         {
           "ticket_id": "p2-t02",
-          "title": "Unify active transaction selection around exact active_tx identity",
+          "phase_id": "p2",
+          "title": "Remove sentinel active-transaction semantics from normal flow",
           "status": "planned",
-          "path": "docs/v0.6.0/p2-t02.json"
+          "path": "docs/v0.6.0/p2-t02.json",
+          "source_plan_sections": [
+            "Persistence Model",
+            "Post-terminal materialization",
+            "Sentinel elimination",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "REQ-P2-NO-SENTINEL"
+          ]
         },
         {
           "ticket_id": "p2-t03",
-          "title": "Remove sentinel active-transaction semantics and adopt structural no-active state",
+          "phase_id": "p2",
+          "title": "Simplify resume logic to continue the exact active transaction",
           "status": "planned",
-          "path": "docs/v0.6.0/p2-t03.json"
+          "path": "docs/v0.6.0/p2-t03.json",
+          "source_plan_sections": [
+            "Canonical Invariants",
+            "Canonical State Machine",
+            "Resume Model",
+            "Post-terminal materialization",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "REQ-P2-EXACT-RESUME"
+          ]
         },
         {
           "ticket_id": "p2-t04",
-          "title": "Align materialized state with the minimal continuation contract",
+          "phase_id": "p2",
+          "title": "Bound session context and define historical compatibility behavior",
           "status": "planned",
-          "path": "docs/v0.6.0/p2-t04.json"
-        },
-        {
-          "ticket_id": "p2-t05",
-          "title": "Make canonical next_action the sole continuation dispatcher",
-          "status": "planned",
-          "path": "docs/v0.6.0/p2-t05.json"
-        },
-        {
-          "ticket_id": "p2-t06",
-          "title": "Normalize post-terminal handling into the canonical no-active baseline",
-          "status": "planned",
-          "path": "docs/v0.6.0/p2-t06.json"
-        },
-        {
-          "ticket_id": "p2-t07",
-          "title": "Bound session context to a secondary runtime role",
-          "status": "planned",
-          "path": "docs/v0.6.0/p2-t07.json"
-        },
-        {
-          "ticket_id": "p2-t08",
-          "title": "Implement bounded historical compatibility and malformed persistence failure behavior",
-          "status": "planned",
-          "path": "docs/v0.6.0/p2-t08.json"
+          "path": "docs/v0.6.0/p2-t04.json",
+          "source_plan_sections": [
+            "Canonical Runtime Model",
+            "Persistence Model",
+            "Timestamp Policy",
+            "Compatibility Policy",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "REQ-P2-SESSION-COMPAT"
+          ]
         }
       ]
     },
     {
       "phase_id": "p3",
-      "title": "Harden with interruption-focused regression coverage and guidance",
-      "goal": "Prove that the redesigned protocol resumes correctly across interruption and that optional metadata is not required for correctness.",
+      "title": "Harden with interruption-focused regression coverage and guidance from plan.md",
+      "goal": "Map the phase 3 hardening work directly to plan.md requirements for interruption coverage, idempotent continuation, and operator guidance.",
+      "source_plan_phase": "Implementation Strategy / Phase 3",
       "tickets": [
         {
           "ticket_id": "p3-t01",
-          "title": "Add regression coverage for interrupted in-progress and checking flows",
+          "phase_id": "p3",
+          "title": "Add interruption and resume regression coverage for transaction checkpoints",
           "status": "planned",
-          "path": "docs/v0.6.0/p3-t01.json"
+          "path": "docs/v0.6.0/p3-t01.json",
+          "source_plan_sections": [
+            "Resume Model",
+            "Post-terminal materialization",
+            "Compatibility Policy",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "REQ-P3-INTERRUPTION"
+          ]
         },
         {
           "ticket_id": "p3-t02",
-          "title": "Add regression coverage for verify, commit, and post-commit interruption paths",
+          "phase_id": "p3",
+          "title": "Add idempotent continuation coverage for verify, commit, and terminal flows",
           "status": "planned",
-          "path": "docs/v0.6.0/p3-t02.json"
+          "path": "docs/v0.6.0/p3-t02.json",
+          "source_plan_sections": [
+            "Transaction Semantics",
+            "Canonical Invariants",
+            "Idempotent continuation requirements",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "REQ-P3-IDEMPOTENT"
+          ]
         },
         {
           "ticket_id": "p3-t03",
-          "title": "Add regression coverage for terminal re-entry, no-change completion, and idempotent resume",
+          "phase_id": "p3",
+          "title": "Update documentation and operator guidance for the redesigned protocol",
           "status": "planned",
-          "path": "docs/v0.6.0/p3-t03.json"
-        },
-        {
-          "ticket_id": "p3-t04",
-          "title": "Add regression coverage for historical compatibility and malformed persistence",
-          "status": "planned",
-          "path": "docs/v0.6.0/p3-t04.json"
-        },
-        {
-          "ticket_id": "p3-t05",
-          "title": "Update operator and developer guidance for the redesigned protocol",
-          "status": "planned",
-          "path": "docs/v0.6.0/p3-t05.json"
+          "path": "docs/v0.6.0/p3-t03.json",
+          "source_plan_sections": [
+            "Success Criteria",
+            "Implementation Strategy"
+          ],
+          "covered_requirements": [
+            "REQ-P3-GUIDANCE"
+          ]
         }
       ]
     }
@@ -168,12 +276,21 @@
       "title": "Review all Python files under src and build an implementation map",
       "status": "done",
       "path": "docs/v0.6.0/p0-t01.json",
-      "plan_sections": [
+      "source_plan_sections": [
         "Objectives",
         "Core Design Goal",
         "Canonical Runtime Model",
         "Server-owned transaction variables vs client-managed inputs",
+        "Transaction Semantics",
+        "Canonical Invariants",
+        "Persistence Model",
+        "Resume Model",
+        "Identity Model",
+        "Compatibility Policy",
         "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "PHASE0-ANALYSIS-IMPLEMENTATION-MAP"
       ]
     },
     {
@@ -182,11 +299,15 @@
       "title": "Map persistence artifacts and their read/write code paths",
       "status": "done",
       "path": "docs/v0.6.0/p0-t02.json",
-      "plan_sections": [
+      "source_plan_sections": [
         "Persistence Model",
         "Canonical Ordering and Durability",
         "Identity Model",
-        "Compatibility Policy"
+        "Compatibility Policy",
+        "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "PHASE0-ANALYSIS-PERSISTENCE-MAP"
       ]
     },
     {
@@ -195,60 +316,73 @@
       "title": "Map begin, resume, and active-transaction selection code paths",
       "status": "done",
       "path": "docs/v0.6.0/p0-t03.json",
-      "plan_sections": [
+      "source_plan_sections": [
         "Canonical Invariants",
         "Resume Model",
         "Sentinel elimination",
-        "Timestamp Policy"
+        "Timestamp Policy",
+        "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "PHASE0-ANALYSIS-RESUME-MAP"
       ]
     },
     {
       "ticket_id": "p1-t01",
       "phase_id": "p1",
-      "title": "Define and enforce the identity boundary between ticket_id, tx_id, task_id, and session_id",
+      "title": "Define the canonical resumable work transaction model",
       "status": "planned",
       "path": "docs/v0.6.0/p1-t01.json",
-      "plan_sections": [
+      "source_plan_sections": [
+        "Transaction Semantics",
+        "Canonical Invariants",
         "Canonical Runtime Model",
-        "Server-owned transaction variables vs client-managed inputs",
-        "Identity Model"
+        "Identity Model",
+        "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "REQ-P1-SEMANTICS",
+        "REQ-P1-IDENTITY"
       ]
     },
     {
       "ticket_id": "p1-t02",
       "phase_id": "p1",
-      "title": "Define the minimal canonical continuation contract in code",
+      "title": "Define the canonical state machine and continuation rules",
       "status": "planned",
       "path": "docs/v0.6.0/p1-t02.json",
-      "plan_sections": [
-        "Server-owned transaction variables vs client-managed inputs",
+      "source_plan_sections": [
         "Canonical State Machine",
-        "Persistence Model",
-        "Resume Model"
+        "Status set",
+        "Meaning of each status",
+        "State-machine constraints",
+        "Canonical Checkpoints and Events",
+        "Resume Model",
+        "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "REQ-P1-STATE-MACHINE",
+        "REQ-P1-CHECKPOINTS"
       ]
     },
     {
       "ticket_id": "p1-t03",
       "phase_id": "p1",
-      "title": "Separate status classification from next_action dispatch semantics",
+      "title": "Define persistence, rebuild, and issuance responsibilities",
       "status": "planned",
       "path": "docs/v0.6.0/p1-t03.json",
-      "plan_sections": [
-        "Canonical State Machine",
-        "Canonical Checkpoints and Events",
-        "Resume Model"
-      ]
-    },
-    {
-      "ticket_id": "p1-t04",
-      "phase_id": "p1",
-      "title": "Align checkpoint events with the minimal canonical core event set",
-      "status": "planned",
-      "path": "docs/v0.6.0/p1-t04.json",
-      "plan_sections": [
-        "Canonical Checkpoints and Events",
-        "Transaction Semantics",
-        "Canonical Invariants"
+      "source_plan_sections": [
+        "Persistence Model",
+        "Canonical Ordering and Durability",
+        "Resume Model",
+        "Identity Model",
+        "Compatibility Policy",
+        "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "REQ-P1-IDENTITY",
+        "REQ-P1-CHECKPOINTS",
+        "REQ-P1-PERSISTENCE"
       ]
     },
     {
@@ -257,162 +391,393 @@
       "title": "Replace ticket-derived tx_id generation with issued transaction IDs",
       "status": "planned",
       "path": "docs/v0.6.0/p2-t01.json",
-      "plan_sections": [
+      "source_plan_sections": [
+        "Canonical Invariants",
+        "Persistence Model",
         "Identity Model",
-        "Server-owned transaction variables vs client-managed inputs",
+        "Compatibility Policy",
         "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "REQ-P2-ISSUED-TXID"
       ]
     },
     {
       "ticket_id": "p2-t02",
       "phase_id": "p2",
-      "title": "Unify active transaction selection around exact active_tx identity",
+      "title": "Remove sentinel active-transaction semantics from normal flow",
       "status": "planned",
       "path": "docs/v0.6.0/p2-t02.json",
-      "plan_sections": [
-        "Resume Model",
-        "Canonical Invariants",
-        "Compatibility Policy"
+      "source_plan_sections": [
+        "Persistence Model",
+        "Post-terminal materialization",
+        "Sentinel elimination",
+        "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "REQ-P2-NO-SENTINEL"
       ]
     },
     {
       "ticket_id": "p2-t03",
       "phase_id": "p2",
-      "title": "Remove sentinel active-transaction semantics and adopt structural no-active state",
+      "title": "Simplify resume logic to continue the exact active transaction",
       "status": "planned",
       "path": "docs/v0.6.0/p2-t03.json",
-      "plan_sections": [
-        "Sentinel elimination",
-        "Materialized state",
+      "source_plan_sections": [
+        "Canonical Invariants",
+        "Canonical State Machine",
+        "Resume Model",
+        "Post-terminal materialization",
         "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "REQ-P2-EXACT-RESUME"
       ]
     },
     {
       "ticket_id": "p2-t04",
       "phase_id": "p2",
-      "title": "Align materialized state with the minimal continuation contract",
+      "title": "Bound session context and define historical compatibility behavior",
       "status": "planned",
       "path": "docs/v0.6.0/p2-t04.json",
-      "plan_sections": [
-        "Materialized state",
-        "Resume Model",
-        "Server-owned transaction variables vs client-managed inputs"
-      ]
-    },
-    {
-      "ticket_id": "p2-t05",
-      "phase_id": "p2",
-      "title": "Make canonical next_action the sole continuation dispatcher",
-      "status": "planned",
-      "path": "docs/v0.6.0/p2-t05.json",
-      "plan_sections": [
-        "Resume is deterministic",
-        "Canonical State Machine",
-        "Resume invariants",
-        "Resume entrypoint"
-      ]
-    },
-    {
-      "ticket_id": "p2-t06",
-      "phase_id": "p2",
-      "title": "Normalize post-terminal handling into the canonical no-active baseline",
-      "status": "planned",
-      "path": "docs/v0.6.0/p2-t06.json",
-      "plan_sections": [
-        "Terminal completion is explicit",
-        "Post-terminal materialization",
-        "Materialized state"
-      ]
-    },
-    {
-      "ticket_id": "p2-t07",
-      "phase_id": "p2",
-      "title": "Bound session context to a secondary runtime role",
-      "status": "planned",
-      "path": "docs/v0.6.0/p2-t07.json",
-      "plan_sections": [
-        "Session",
-        "Server-owned transaction variables vs client-managed inputs",
-        "Session metadata"
-      ]
-    },
-    {
-      "ticket_id": "p2-t08",
-      "phase_id": "p2",
-      "title": "Implement bounded historical compatibility and malformed persistence failure behavior",
-      "status": "planned",
-      "path": "docs/v0.6.0/p2-t08.json",
-      "plan_sections": [
+      "source_plan_sections": [
+        "Canonical Runtime Model",
+        "Persistence Model",
+        "Timestamp Policy",
         "Compatibility Policy",
-        "Historical logs",
-        "Compatibility rule",
-        "New-write policy"
+        "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "REQ-P2-SESSION-COMPAT"
       ]
     },
     {
       "ticket_id": "p3-t01",
       "phase_id": "p3",
-      "title": "Add regression coverage for interrupted in-progress and checking flows",
+      "title": "Add interruption and resume regression coverage for transaction checkpoints",
       "status": "planned",
       "path": "docs/v0.6.0/p3-t01.json",
-      "plan_sections": [
+      "source_plan_sections": [
         "Resume Model",
-        "Canonical State Machine",
+        "Post-terminal materialization",
+        "Compatibility Policy",
         "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "REQ-P3-INTERRUPTION"
       ]
     },
     {
       "ticket_id": "p3-t02",
       "phase_id": "p3",
-      "title": "Add regression coverage for verify, commit, and post-commit interruption paths",
+      "title": "Add idempotent continuation coverage for verify, commit, and terminal flows",
       "status": "planned",
       "path": "docs/v0.6.0/p3-t02.json",
-      "plan_sections": [
-        "Commit is non-terminal",
-        "Post-terminal materialization",
-        "Idempotent continuation requirements"
+      "source_plan_sections": [
+        "Transaction Semantics",
+        "Canonical Invariants",
+        "Idempotent continuation requirements",
+        "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "REQ-P3-IDEMPOTENT"
       ]
     },
     {
       "ticket_id": "p3-t03",
       "phase_id": "p3",
-      "title": "Add regression coverage for terminal re-entry, no-change completion, and idempotent resume",
+      "title": "Update documentation and operator guidance for the redesigned protocol",
       "status": "planned",
       "path": "docs/v0.6.0/p3-t03.json",
-      "plan_sections": [
-        "Transaction success",
-        "Meaning of each status",
-        "Canonical Checkpoints and Events",
-        "Idempotent continuation requirements"
-      ]
-    },
-    {
-      "ticket_id": "p3-t04",
-      "phase_id": "p3",
-      "title": "Add regression coverage for historical compatibility and malformed persistence",
-      "status": "planned",
-      "path": "docs/v0.6.0/p3-t04.json",
-      "plan_sections": [
-        "Compatibility Policy",
-        "Transaction ID issuance metadata",
-        "Resume source-of-truth order"
-      ]
-    },
-    {
-      "ticket_id": "p3-t05",
-      "phase_id": "p3",
-      "title": "Update operator and developer guidance for the redesigned protocol",
-      "status": "planned",
-      "path": "docs/v0.6.0/p3-t05.json",
-      "plan_sections": [
+      "source_plan_sections": [
         "Success Criteria",
-        "Implementation Strategy",
-        "Resume Model",
-        "Compatibility Policy"
+        "Implementation Strategy"
+      ],
+      "covered_requirements": [
+        "REQ-P3-GUIDANCE"
       ]
     }
   ],
   "notes": [
-    "Ticket status is tracked only in this index; per-ticket JSON files intentionally omit status to avoid drift."
-  ]
+    "Ticket status is tracked only in this index; per-ticket JSON files intentionally omit status to avoid drift.",
+    "Phase 0 artifacts are retained as reusable evidence and analysis inputs.",
+    "Phase 1 and later tickets were regenerated from plan.md to maximize end-to-end traceability.",
+    "Phase 0 ticket metadata is now also normalized into source_plan_sections and covered_requirements for end-to-end traceability.",
+    "Phase 0 done means evidence-complete analysis artifacts, not completion of plan-defined runtime implementation."
+  ],
+  "traceability": {
+    "canonical_source": "docs/v0.6.0/plan.md",
+    "rules": [
+      "plan.md is the only canonical source of requirements for v0.6.0.",
+      "tickets_list.json is the single source of truth for ticket status and requirement allocation.",
+      "per-ticket JSON files may elaborate execution detail but must not add requirements that are absent from plan.md.",
+      "derived evidence documents may record observations, gaps, and recommendations, but they must not redefine canonical requirements."
+    ],
+    "phase_requirement_matrix": {
+      "phase_1": {
+        "phase_id": "p1",
+        "title": "Define the resumable transaction protocol contracts from plan.md",
+        "source": {
+          "plan_phase": "Implementation Strategy / Phase 1",
+          "recommended_ticket_breakdown": [
+            "p1-t01",
+            "p1-t02",
+            "p1-t03"
+          ]
+        },
+        "requirements": [
+          {
+            "requirement_id": "REQ-P1-SEMANTICS",
+            "summary": "Define the canonical meaning of a transaction as a durable ticket-scoped resumable execution context with explicit terminal completion.",
+            "source_sections": [
+              "Transaction Semantics",
+              "Canonical Invariants",
+              "Implementation Strategy"
+            ],
+            "allocated_ticket_ids": [
+              "p1-t01"
+            ]
+          },
+          {
+            "requirement_id": "REQ-P1-IDENTITY",
+            "summary": "Define the canonical roles of ticket_id, tx_id, seq, and bounded session_id without promoting client-managed identity into canonical runtime identity.",
+            "source_sections": [
+              "Canonical Runtime Model",
+              "Server-owned transaction variables vs client-managed inputs",
+              "Identity Model",
+              "Implementation Strategy"
+            ],
+            "allocated_ticket_ids": [
+              "p1-t01",
+              "p1-t03"
+            ]
+          },
+          {
+            "requirement_id": "REQ-P1-STATE-MACHINE",
+            "summary": "Define the canonical status model, meanings, transitions, and next_action-first continuation rules.",
+            "source_sections": [
+              "Canonical State Machine",
+              "Status set",
+              "Meaning of each status",
+              "State-machine constraints"
+            ],
+            "allocated_ticket_ids": [
+              "p1-t02"
+            ]
+          },
+          {
+            "requirement_id": "REQ-P1-CHECKPOINTS",
+            "summary": "Define the minimal canonical checkpoint event set and the distinction between required core checkpoints and optional observability events.",
+            "source_sections": [
+              "Canonical Checkpoints and Events",
+              "Transaction Semantics",
+              "Implementation Strategy"
+            ],
+            "allocated_ticket_ids": [
+              "p1-t02",
+              "p1-t03"
+            ]
+          },
+          {
+            "requirement_id": "REQ-P1-PERSISTENCE",
+            "summary": "Define the minimal materialized-state contract, event-log role, issuance metadata role, write-order guarantees, rebuild responsibilities, and malformed-vs-missing behavior.",
+            "source_sections": [
+              "Persistence Model",
+              "Canonical Ordering and Durability",
+              "Resume Model",
+              "Compatibility Policy",
+              "Implementation Strategy"
+            ],
+            "allocated_ticket_ids": [
+              "p1-t03"
+            ]
+          }
+        ]
+      },
+      "phase_2": {
+        "phase_id": "p2",
+        "title": "Implement runtime identity and recovery simplifications from plan.md",
+        "source": {
+          "plan_phase": "Implementation Strategy / Phase 2",
+          "recommended_ticket_breakdown": [
+            "p2-t01",
+            "p2-t02",
+            "p2-t03",
+            "p2-t04"
+          ]
+        },
+        "requirements": [
+          {
+            "requirement_id": "REQ-P2-ISSUED-TXID",
+            "summary": "Replace ticket-derived transaction identity in new writes with issued monotonic tx_id allocation during canonical begin only.",
+            "source_sections": [
+              "Canonical Invariants",
+              "Persistence Model",
+              "Identity Model",
+              "Compatibility Policy",
+              "Implementation Strategy"
+            ],
+            "allocated_ticket_ids": [
+              "p2-t01"
+            ]
+          },
+          {
+            "requirement_id": "REQ-P2-NO-SENTINEL",
+            "summary": "Remove sentinel active-transaction semantics from normal flow and adopt structural no-active representation using active_tx: null.",
+            "source_sections": [
+              "Persistence Model",
+              "Post-terminal materialization",
+              "Sentinel elimination",
+              "Implementation Strategy"
+            ],
+            "allocated_ticket_ids": [
+              "p2-t02"
+            ]
+          },
+          {
+            "requirement_id": "REQ-P2-EXACT-RESUME",
+            "summary": "Simplify resume behavior so it continues the exact active transaction from healthy materialized state using top-level next_action.",
+            "source_sections": [
+              "Canonical Invariants",
+              "Resume Model",
+              "Resume invariants",
+              "Canonical State Machine",
+              "Implementation Strategy"
+            ],
+            "allocated_ticket_ids": [
+              "p2-t03"
+            ]
+          },
+          {
+            "requirement_id": "REQ-P2-SESSION-COMPAT",
+            "summary": "Bound the role of session context in correctness-sensitive logic and implement bounded compatibility behavior for historical data.",
+            "source_sections": [
+              "Canonical Runtime Model",
+              "Persistence Model",
+              "Compatibility Policy",
+              "Timestamp Policy",
+              "Implementation Strategy"
+            ],
+            "allocated_ticket_ids": [
+              "p2-t04"
+            ]
+          }
+        ]
+      },
+      "phase_3": {
+        "phase_id": "p3",
+        "title": "Harden with interruption-focused regression coverage and guidance from plan.md",
+        "source": {
+          "plan_phase": "Implementation Strategy / Phase 3",
+          "recommended_ticket_breakdown": [
+            "p3-t01",
+            "p3-t02",
+            "p3-t03"
+          ]
+        },
+        "requirements": [
+          {
+            "requirement_id": "REQ-P3-INTERRUPTION",
+            "summary": "Add interruption-focused regression coverage for in-progress, verify, commit, post-commit, no-active, and compatibility-sensitive paths.",
+            "source_sections": [
+              "Implementation Strategy",
+              "Resume Model",
+              "Post-terminal materialization",
+              "Compatibility Policy"
+            ],
+            "allocated_ticket_ids": [
+              "p3-t01"
+            ]
+          },
+          {
+            "requirement_id": "REQ-P3-IDEMPOTENT",
+            "summary": "Add coverage proving idempotent continuation and non-corrupt repeated resume for verify, commit, and terminal flows.",
+            "source_sections": [
+              "Idempotent continuation requirements",
+              "Transaction Semantics",
+              "Canonical Invariants",
+              "Implementation Strategy"
+            ],
+            "allocated_ticket_ids": [
+              "p3-t02"
+            ]
+          },
+          {
+            "requirement_id": "REQ-P3-GUIDANCE",
+            "summary": "Update operator and developer guidance for the redesigned protocol without redefining canonical runtime truth away from plan.md.",
+            "source_sections": [
+              "Implementation Strategy",
+              "Success Criteria"
+            ],
+            "allocated_ticket_ids": [
+              "p3-t03"
+            ]
+          }
+        ]
+      },
+      "phase_0": {
+        "phase_id": "p0",
+        "title": "Analysis and implementation mapping as reusable evidence",
+        "source": {
+          "plan_phase": "Pre-implementation evidence derived from plan.md",
+          "recommended_ticket_breakdown": [
+            "p0-t01",
+            "p0-t02",
+            "p0-t03"
+          ]
+        },
+        "requirements": [
+          {
+            "requirement_id": "PHASE0-ANALYSIS-IMPLEMENTATION-MAP",
+            "summary": "Produce a reusable codebase implementation map to support later plan-derived work without redefining canonical requirements.",
+            "source_sections": [
+              "Objectives",
+              "Core Design Goal",
+              "Canonical Runtime Model",
+              "Server-owned transaction variables vs client-managed inputs",
+              "Transaction Semantics",
+              "Canonical Invariants",
+              "Persistence Model",
+              "Resume Model",
+              "Identity Model",
+              "Compatibility Policy",
+              "Implementation Strategy"
+            ],
+            "allocated_ticket_ids": [
+              "p0-t01"
+            ]
+          },
+          {
+            "requirement_id": "PHASE0-ANALYSIS-PERSISTENCE-MAP",
+            "summary": "Produce a reusable persistence artifact and read/write code-path map to support later plan-derived work without redefining canonical requirements.",
+            "source_sections": [
+              "Persistence Model",
+              "Canonical Ordering and Durability",
+              "Identity Model",
+              "Compatibility Policy",
+              "Implementation Strategy"
+            ],
+            "allocated_ticket_ids": [
+              "p0-t02"
+            ]
+          },
+          {
+            "requirement_id": "PHASE0-ANALYSIS-RESUME-MAP",
+            "summary": "Produce a reusable begin/resume/active-transaction selection map to support later plan-derived work without redefining canonical requirements.",
+            "source_sections": [
+              "Canonical Invariants",
+              "Resume Model",
+              "Sentinel elimination",
+              "Timestamp Policy",
+              "Implementation Strategy"
+            ],
+            "allocated_ticket_ids": [
+              "p0-t03"
+            ]
+          }
+        ]
+      }
+    }
+  }
 }

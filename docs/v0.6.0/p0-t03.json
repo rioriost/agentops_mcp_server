@@ -3,14 +3,7 @@
   "phase_id": "p0",
   "title": "Map begin, resume, and active-transaction selection code paths",
   "goal": "Review the current runtime implementation and identify every code path involved in starting a transaction, resuming a transaction, selecting the active transaction, and deciding whether new work may begin.",
-  "why_this_ticket_exists": "The 0.6.0 redesign depends on exact active-transaction continuation, structural no-active handling, and elimination of heuristic recovery behavior. Before changing runtime behavior, the code paths responsible for begin and resume decisions must be mapped precisely so later tickets can target the correct files and functions without drifting from the plan.",
-  "plan_sections": [
-    "Canonical Invariants",
-    "Resume Model",
-    "Sentinel elimination",
-    "Timestamp Policy",
-    "Implementation Strategy"
-  ],
+  "why_this_ticket_exists": "The 0.6.0 redesign depends on exact active-transaction continuation, structural no-active handling, and elimination of heuristic recovery behavior. This evidence artifact captures the current begin and resume code paths so later plan-derived tickets can target the correct files and functions without drifting from plan.md.",
   "inputs": [
     "docs/v0.6.0/plan.md",
     "src/**/*.py"
@@ -31,10 +24,10 @@
     "Implementing new ticket or transaction semantics."
   ],
   "work_products": [
-    "A file-by-file map of all Python modules relevant to begin and resume behavior.",
+    "A file-by-file evidence map of all Python modules relevant to begin and resume behavior.",
     "A function-level map of transaction creation, transaction resume, and active-transaction selection logic.",
     "A list of places where heuristics are currently used or may be used, including string-shape assumptions, sentinel IDs, timestamp-first selection, or session-driven selection.",
-    "A list of the files most likely to be modified by later identity, resume, and no-active-state tickets.",
+    "A list of the files most likely to be modified by later plan-derived identity, resume, and no-active-state tickets.",
     "A short summary of risks or ambiguities in the current code paths."
   ],
   "expected_outputs": [
@@ -55,7 +48,7 @@
     "All Python files under src that are relevant to begin, resume, or active-transaction selection have been reviewed.",
     "The output identifies the exact functions or classes that create a transaction, resume a transaction, or select the active transaction.",
     "The output identifies whether active transaction selection depends on exact identity, sentinel handling, timestamps, session context, or string heuristics.",
-    "The output makes it easy for later tickets to determine which files should be modified for identity changes, no-active representation changes, and next_action-driven resume changes.",
+    "The output makes it easy for later plan-derived tickets to determine which files should be modified for identity changes, no-active representation changes, and next_action-driven resume changes.",
     "The mapping remains descriptive only and does not change runtime behavior."
   ],
   "dependencies": [
@@ -67,12 +60,30 @@
     "p2-t01",
     "p2-t02",
     "p2-t03",
-    "p2-t05"
+    "p2-t04"
   ],
   "notes": [
     "Use the plan definitions, not current implementation habits, as the evaluation baseline.",
     "Pay special attention to any place where resume behavior depends on data outside the minimal canonical continuation contract.",
     "Pay special attention to any place where no-active state is represented by sentinel values or reconstructed heuristically.",
-    "The output of this ticket should be referenced by later implementation tickets when selecting target files."
+    "The output of this ticket should be referenced by later plan-derived implementation tickets when selecting target files."
+  ],
+  "canonical_source": "docs/v0.6.0/plan.md",
+  "artifact_role": "derived evidence and analysis",
+  "source_plan_phase": "Pre-implementation evidence for later plan-derived work",
+  "source_plan_sections": [
+    "Canonical Invariants",
+    "Resume Model",
+    "Sentinel elimination",
+    "Timestamp Policy",
+    "Implementation Strategy"
+  ],
+  "covered_requirements": [
+    "PHASE0-ANALYSIS-RESUME-MAP"
+  ],
+  "traceability_notes": [
+    "This ticket is an evidence artifact, not a source of canonical requirements.",
+    "Its observations about begin, resume, and active selection are current-state analysis rather than canonical protocol definition.",
+    "Any downstream implementation decision must prefer plan.md when current behavior diverges from plan intent."
   ]
 }

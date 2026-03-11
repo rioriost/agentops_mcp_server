@@ -1,106 +1,58 @@
 {
   "ticket_id": "p2-t03",
   "phase_id": "p2",
-  "title": "Remove sentinel active-transaction semantics and adopt structural no-active state",
-  "source_plan": "docs/v0.6.0/plan.md",
-  "plan_sections": [
+  "title": "Simplify resume logic to continue the exact active transaction",
+  "canonical_source": "docs/v0.6.0/plan.md",
+  "source_plan_phase": "Implementation Strategy / Phase 2",
+  "source_plan_sections": [
     "Canonical Invariants",
-    "Sentinel elimination",
-    "Persistence Model",
-    "Materialized state",
+    "Canonical State Machine",
     "Resume Model",
     "Post-terminal materialization",
     "Implementation Strategy"
   ],
-  "goal": "Replace all normal-flow sentinel-style active-transaction representations with the structural no-active baseline defined by the 0.6.0 plan, so the runtime no longer relies on fake transaction identifiers or heuristic absence markers.",
-  "why_this_ticket": "The 0.6.0 protocol requires absence of an active transaction to be represented structurally rather than by sentinel IDs or substitute identity values. This ticket implements that rule in runtime code and aligns materialized state, active-slot handling, and downstream resume behavior with the plan.",
+  "covered_requirements": [
+    "REQ-P2-EXACT-RESUME"
+  ],
+  "goal": "Implement the plan-defined rule that resume continues the exact active transaction from healthy materialized state using top-level next_action, with rebuild only when materialized state is missing, incomplete, or inconsistent.",
   "scope": [
-    "Identify all runtime code paths that represent no-active state using sentinel transaction identifiers, fake IDs, placeholder strings, synthetic active slots, or equivalent normal-flow substitutes.",
-    "Replace sentinel-style no-active handling with the structural no-active baseline centered on `active_tx: null`.",
-    "Align materialized-state construction, parsing, and update paths with the plan's no-active baseline expectations.",
-    "Ensure active-slot handling distinguishes real active transaction snapshots from structural absence of an active transaction.",
-    "Update any code paths that currently branch on sentinel transaction identifiers so they instead branch on structural no-active state.",
-    "Preserve bounded historical compatibility where legacy sentinel-bearing historical data must remain readable, without allowing sentinel semantics to survive in new normal-flow behavior."
+    "Make healthy materialized state the primary resume anchor.",
+    "Use rebuild only under the fallback conditions described in plan.md.",
+    "Ensure resume reuses the exact active tx_id and does not replace it with heuristic candidates.",
+    "Ensure valid top-level next_action is the primary continuation guide."
   ],
   "out_of_scope": [
-    "Replacing ticket-derived tx_id issuance by itself.",
-    "Redesigning the full checkpoint event model.",
-    "Redesigning client planning artifacts.",
-    "Broad compatibility rewrites beyond the bounded behavior needed to keep historical data readable.",
-    "Adding the full interruption-focused regression suite covered by Phase 3 tickets."
+    "Changing tx_id issuance semantics outside p2-t01.",
+    "Broad compatibility redesign outside bounded behavior.",
+    "Introducing extra continuation metadata not present in plan.md."
   ],
   "inputs": [
     "docs/v0.6.0/plan.md",
-    "docs/v0.6.0/tickets_list.json",
-    "docs/v0.6.0/p0-t01.json outputs",
-    "docs/v0.6.0/p0-t02.json outputs",
-    "docs/v0.6.0/p0-t03.json outputs",
-    "Any runtime modules that read, write, normalize, or branch on active transaction state"
+    "docs/v0.6.0/phase0-implementation-map.md",
+    "docs/v0.6.0/p1-t01.json",
+    "docs/v0.6.0/p1-t02.json",
+    "docs/v0.6.0/p1-t03.json"
   ],
-  "dependencies": [
-    "p0-t01",
-    "p0-t02",
-    "p0-t03",
-    "p1-t01",
-    "p1-t02"
-  ],
-  "enables": [
-    "p2-t04",
-    "p2-t05",
-    "p2-t06",
-    "p2-t08",
-    "p3-t01",
-    "p3-t02",
-    "p3-t03",
-    "p3-t04"
-  ],
-  "target_state": {
-    "no_active_baseline": {
-      "active_tx": null,
-      "status": null,
-      "next_action": "tx.begin",
-      "semantic_summary": null,
-      "verify_state": null,
-      "commit_state": null,
-      "last_applied_seq": "retains the last materialized event sequence when available"
-    },
-    "rules": [
-      "Normal canonical behavior must not represent absence of an active transaction with sentinel identifiers such as `none`.",
-      "No-active state must be represented structurally, not by fake transaction identities.",
-      "When `active_tx` is null, no active transaction exists.",
-      "When `active_tx` is non-null, it must represent a real active non-terminal transaction snapshot and include exact active transaction identity including `tx_id`.",
-      "New normal-flow logic must not depend on sentinel transaction IDs."
-    ]
-  },
   "expected_outputs": [
-    "A list of all runtime code paths that currently use sentinel or substitute active-transaction semantics.",
-    "Code changes that replace sentinel no-active handling with structural no-active handling.",
-    "Updated materialized-state handling aligned with the no-active baseline in the plan.",
-    "A short implementation note describing any bounded read-path compatibility retained for historical sentinel-bearing data."
-  ],
-  "implementation_notes": [
-    "This ticket must treat structural no-active state as a runtime behavior change, not just a documentation change.",
-    "Historical sentinel-bearing artifacts may remain readable only through bounded compatibility handling and must not define new-write behavior.",
-    "This ticket should preserve exact active transaction identity when an active transaction exists and should not weaken resume determinism.",
-    "Any branch that currently interprets a fake or sentinel transaction value as 'no active work' must be converted to branch on structural absence instead."
+    "Runtime changes that continue the exact active transaction deterministically.",
+    "Verification evidence showing resume prefers healthy materialized state and valid next_action.",
+    "A code-to-plan traceability summary for exact resume behavior."
   ],
   "acceptance_criteria": [
-    "No new normal-flow runtime path uses sentinel transaction identifiers to represent absence of an active transaction.",
-    "Materialized state uses the structural no-active baseline when no active transaction exists.",
-    "Runtime begin/resume logic branches on `active_tx: null` rather than sentinel identity values.",
-    "A non-null `active_tx` always represents a real active transaction snapshot rather than a placeholder or substitute identifier.",
-    "Bounded compatibility for historical sentinel-bearing data, if retained, is limited to historical read/replay behavior and does not survive into new normal-flow writes.",
-    "The resulting behavior is consistent with the plan's Sentinel elimination, Materialized state, and Resume Model sections."
+    "Resume never mints a new tx_id for an existing active transaction.",
+    "Resume never replaces the active transaction with a heuristic candidate when exact active state is available.",
+    "Valid canonical next_action is preferred over status-derived heuristics and reconstructed guesses.",
+    "Post-terminal work is not resumed as active work."
   ],
-  "review_checkpoints": [
-    "Confirm that no sentinel values remain in normal-flow active transaction selection logic.",
-    "Confirm that no-active materialized state is structural and matches the plan.",
-    "Confirm that exact active transaction identity is preserved when active_tx is non-null.",
-    "Confirm that any retained compatibility path does not leak sentinel semantics back into canonical runtime behavior."
+  "dependencies": [
+    "p1-t01",
+    "p1-t02",
+    "p1-t03",
+    "p2-t01",
+    "p2-t02"
   ],
-  "notes": [
-    "This ticket is one of the core runtime simplification steps for 0.6.0.",
-    "If the implementation map reveals multiple sentinel patterns, all of them should be cataloged before edits begin.",
-    "This ticket should be coordinated closely with materialized-state alignment and next_action-driven resume work so the resulting runtime contract remains coherent."
+  "enables": [
+    "p3-t01",
+    "p3-t02"
   ]
 }

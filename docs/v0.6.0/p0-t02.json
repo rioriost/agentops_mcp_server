@@ -2,16 +2,8 @@
   "ticket_id": "p0-t02",
   "phase_id": "p0",
   "title": "Map persistence artifacts and their read/write code paths",
-  "source_plan": "docs/v0.6.0/plan.md",
-  "plan_sections": [
-    "Persistence Model",
-    "Canonical Ordering and Durability",
-    "Identity Model",
-    "Compatibility Policy",
-    "Implementation Strategy"
-  ],
   "goal": "Document the current persistence model in the codebase by identifying every canonical artifact involved in transaction state, event history, and transaction ID issuance, along with the Python code paths that read, write, validate, rebuild, or normalize those artifacts.",
-  "why_now": "The 0.6.0 redesign depends on a precise understanding of how materialized state, event history, and issuance metadata are currently persisted. This ticket creates that map before any behavior changes so later tickets can modify the correct code paths without introducing schema drift or replay regressions.",
+  "why_now": "The 0.6.0 redesign depends on a precise understanding of how materialized state, event history, and issuance metadata are currently persisted. This evidence artifact captures that map before any behavior changes so later plan-derived tickets can modify the correct code paths without introducing schema drift or replay regressions.",
   "scope": [
     "Review all Python code paths under src that read or write .agent persistence artifacts relevant to the transaction protocol.",
     "Identify current handling of .agent/tx_state.json, .agent/tx_event_log.jsonl, and .agent/tx_id_counter.json.",
@@ -33,11 +25,11 @@
     ".agent artifact usage in runtime code"
   ],
   "expected_outputs": [
-    "A persistence artifact map covering canonical files and any related supporting artifacts.",
+    "A persistence artifact evidence map covering canonical files and any related supporting artifacts.",
     "A per-artifact list of reader, writer, validator, and rebuild code paths.",
     "A summary of current schema fields and defaulting behavior.",
-    "A list of persistence-related mismatches or risks relative to the 0.6.0 plan.",
-    "A shortlist of high-impact files for follow-on implementation tickets."
+    "A list of persistence-related mismatches or risks relative to plan.md.",
+    "A shortlist of high-impact files for follow-on plan-derived implementation tickets."
   ],
   "deliverables": [
     {
@@ -54,28 +46,45 @@
     }
   ],
   "acceptance_criteria": [
-    "Every canonical persistence artifact referenced by the 0.6.0 plan is accounted for.",
+    "Every canonical persistence artifact referenced by plan.md in scope is accounted for.",
     "For each artifact, the relevant Python reader, writer, validator, and rebuild paths are identified.",
     "Current write ordering and rebuild behavior are described where implemented.",
     "Current schema assumptions and default values are documented.",
-    "Known mismatches between current persistence behavior and the 0.6.0 plan are called out explicitly.",
-    "The output is detailed enough that later tickets can identify which files to change without redoing the persistence survey."
+    "Known mismatches between current persistence behavior and plan.md are called out explicitly.",
+    "The output is detailed enough that later plan-derived tickets can identify which files to change without redoing the persistence survey."
   ],
   "dependencies": [
     "p0-t01"
   ],
   "enables": [
-    "p1-t02",
+    "p1-t03",
     "p2-t01",
     "p2-t03",
     "p2-t04",
-    "p2-t08",
-    "p3-t04"
+    "p3-t01"
   ],
   "notes": [
     "Treat materialized state, event history, and issuance metadata as distinct concerns even when handled in the same module.",
     "Pay special attention to defaulting behavior for missing versus malformed artifacts.",
     "Record whether historical compatibility logic is implemented at read time, rebuild time, or response-construction time.",
-    "Do not propose code changes in this ticket; this is analysis and mapping only."
+    "Do not propose code changes in this ticket; this is evidence and mapping only."
+  ],
+  "canonical_source": "docs/v0.6.0/plan.md",
+  "artifact_role": "derived evidence and analysis",
+  "source_plan_phase": "Pre-implementation evidence for later plan-derived work",
+  "source_plan_sections": [
+    "Persistence Model",
+    "Canonical Ordering and Durability",
+    "Identity Model",
+    "Compatibility Policy",
+    "Implementation Strategy"
+  ],
+  "covered_requirements": [
+    "PHASE0-ANALYSIS-PERSISTENCE-MAP"
+  ],
+  "traceability_notes": [
+    "This ticket is an evidence artifact, not a source of canonical requirements.",
+    "Its persistence observations must not weaken plan-defined malformed-versus-missing behavior.",
+    "Any downstream implementation decision must be validated against plan.md rather than this ticket alone."
   ]
 }

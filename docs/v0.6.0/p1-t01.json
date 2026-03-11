@@ -1,66 +1,75 @@
 {
   "ticket_id": "p1-t01",
   "phase_id": "p1",
-  "title": "Define and enforce the identity boundary between ticket_id, tx_id, task_id, and session_id",
-  "source_plan": "docs/v0.6.0/plan.md",
-  "plan_sections": [
-    "Canonical Runtime Model",
-    "Server-owned transaction variables vs client-managed inputs",
+  "title": "Define the canonical resumable work transaction model",
+  "canonical_source": "docs/v0.6.0/plan.md",
+  "source_plan_phase": "Implementation Strategy / Phase 1",
+  "source_plan_sections": [
     "Transaction Semantics",
     "Canonical Invariants",
+    "Canonical Runtime Model",
     "Identity Model",
     "Implementation Strategy"
   ],
-  "goal": "Align the runtime code with the 0.6.0 identity model so that ticket_id remains planning identity, tx_id remains exact server-issued runtime identity, task_id remains a helper compatibility label, and session_id remains secondary runtime context rather than a correctness anchor.",
+  "covered_requirements": [
+    "REQ-P1-SEMANTICS",
+    "REQ-P1-IDENTITY"
+  ],
+  "goal": "Translate the plan-defined transaction meaning, lifecycle semantics, active-transaction invariants, and identity roles into implementation-facing documentation and executable review criteria without adding requirements beyond plan.md.",
   "scope": [
-    "Review how ticket_id, tx_id, task_id, and session_id are represented and propagated through the runtime implementation",
-    "Identify code paths that derive, reconstruct, reverse-map, or otherwise blur canonical transaction identity",
-    "Define the concrete enforcement rules needed for 0.6.0 implementation work",
-    "Update code paths that currently allow helper-style or planning identifiers to influence canonical runtime identity",
-    "Document any compatibility boundaries required for legacy data while preserving strict new-write semantics"
+    "Capture the canonical meaning of a transaction exactly as specified in plan.md.",
+    "Capture the distinction between ticket_id, tx_id, seq, and session_id exactly as specified in plan.md.",
+    "Capture the single-active-transaction rule, begin-versus-resume rule, commit-non-terminal rule, and explicit terminal completion rule exactly as specified in plan.md.",
+    "Produce implementation-facing acceptance checks that can later be used against runtime code and tests."
   ],
   "out_of_scope": [
-    "Implementing the full materialized-state schema redesign",
-    "Implementing the full checkpoint event redesign",
-    "Adding broad interruption-focused regression coverage",
-    "Changing client planning document formats"
+    "Changing runtime code.",
+    "Adding requirements not present in plan.md.",
+    "Redefining persistence schema details that belong to p1-t03.",
+    "Redefining state-machine continuation rules that belong to p1-t02."
   ],
   "inputs": [
     "docs/v0.6.0/plan.md",
-    "src/**/*.py",
-    ".agent/tx_state.json handling",
-    ".agent/tx_event_log.jsonl handling",
-    ".agent/tx_id_counter.json handling"
+    "docs/v0.6.0/phase0-implementation-map.md"
   ],
   "expected_outputs": [
-    "A precise mapping of where each identifier is introduced, stored, read, and used",
-    "A list of code paths that violate or risk violating the 0.6.0 identity boundary",
-    "Code changes that enforce exact tx_id continuity and remove identity ambiguity from new runtime behavior",
-    "A short implementation note describing any bounded historical compatibility behavior retained for legacy data"
+    "A transaction-model specification derived strictly from the cited plan sections.",
+    "A traceability table linking each requirement in scope to exact plan sections and exact implementation review targets.",
+    "A gap checklist for current code that distinguishes plan requirements from current observations."
   ],
   "acceptance_criteria": [
-    "New runtime behavior does not derive tx_id from ticket_id, task_id, session_id, or any other client-managed label",
-    "Continuation logic uses exact canonical tx_id rather than helper-style reverse mapping or heuristic reconstruction",
-    "task_id is treated only as a client-managed helper compatibility label and not as canonical transaction identity",
-    "session_id is not used as the primary basis for active transaction identity, active transaction selection, or deterministic resume correctness",
-    "ticket_id remains a planning/work-item identifier and is not promoted into canonical runtime identity",
-    "Any retained compatibility handling is explicitly bounded to historical data and does not weaken strict new-write semantics"
+    "Every requirement in scope is traceable to explicit plan.md sections listed in source_plan_sections.",
+    "The ticket artifact does not add canonical requirements that are absent from plan.md.",
+    "The ticket artifact clearly separates plan requirements from current-code observations and future implementation work.",
+    "The output is detailed enough that later implementation tickets can validate runtime behavior without inventing new semantics."
   ],
   "dependencies": [
     "p0-t01",
-    "p0-t02",
     "p0-t03"
   ],
-  "blocks": [
+  "enables": [
     "p1-t02",
+    "p1-t03",
     "p2-t01",
-    "p2-t02",
-    "p2-t07",
-    "p2-t08"
+    "p2-t03",
+    "p2-t04"
   ],
-  "notes": [
-    "This ticket establishes the identity boundary that later runtime, resume, and compatibility tickets must preserve.",
-    "All implementation choices in this ticket must follow the plan's distinction between server-owned canonical protocol state and client-managed inputs.",
-    "If legacy compatibility requires normalization of historical identity formats, that normalization must be read-path-only and must not redefine the 0.6.0 canonical identity model."
-  ]
+  "traceability_contract": {
+    "requirement_sources": {
+      "REQ-P1-SEMANTICS": [
+        "Transaction Semantics",
+        "Canonical Invariants"
+      ],
+      "REQ-P1-IDENTITY": [
+        "Canonical Runtime Model",
+        "Server-owned transaction variables vs client-managed inputs",
+        "Identity Model"
+      ]
+    },
+    "forbidden_moves": [
+      "Do not infer additional transaction statuses beyond plan.md.",
+      "Do not promote task_id or session_id into canonical runtime identity.",
+      "Do not redefine transaction success to include verify or commit success alone."
+    ]
+  }
 }
