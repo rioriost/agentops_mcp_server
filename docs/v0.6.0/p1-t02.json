@@ -30,20 +30,23 @@
   "inputs": [
     "docs/v0.6.0/plan.md",
     "docs/v0.6.0/phase0-implementation-map.md",
-    "docs/v0.6.0/ops-tool-contract-alignment-plan.md"
+    "docs/v0.6.0/ops-tool-contract-alignment-plan.md",
+    "docs/v0.6.0/p1-t02-spec.md"
   ],
   "expected_outputs": [
     "A state-machine specification derived strictly from plan.md.",
     "A checkpoint-event specification derived strictly from plan.md.",
     "A traceability matrix linking continuation rules to exact plan sections and runtime review targets.",
-    "Implementation-facing guidance for how ops_* helper contracts should preserve explicit checkpoint ordering and valid next_action-first continuation behavior."
+    "Implementation-facing guidance for how ops_* helper contracts should preserve explicit checkpoint ordering and valid next_action-first continuation behavior.",
+    "A completed ticket artifact at docs/v0.6.0/p1-t02-spec.md whose source usage is consistent with the ticket inputs."
   ],
   "acceptance_criteria": [
     "The canonical status set matches plan.md exactly.",
     "The continuation rules explicitly preserve next_action precedence over status-derived heuristics when next_action is valid.",
     "The checkpoint-event contract does not require commit events when no repository commit is attempted.",
     "The artifact remains strictly derived from plan.md and does not invent new canonical semantics.",
-    "When ops_* helper contracts are updated in downstream implementation work, they reference docs/v0.6.0/ops-tool-contract-alignment-plan.md for checkpoint-ordering and next_action-precedence alignment without introducing extra canonical states or events."
+    "When ops_* helper contracts are updated in downstream implementation work, they reference docs/v0.6.0/ops-tool-contract-alignment-plan.md for checkpoint-ordering and next_action-precedence alignment without introducing extra canonical states or events.",
+    "The completed p1-t02 artifact explicitly checks that the ticket inputs are complete, non-contradictory, and sufficient for the ticket scope."
   ],
   "dependencies": ["p0-t03", "p1-t01"],
   "enables": ["p2-t02", "p2-t03", "p3-t01", "p3-t02"],

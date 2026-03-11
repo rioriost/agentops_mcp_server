@@ -299,7 +299,7 @@
       "ticket_id": "p1-t01",
       "phase_id": "p1",
       "title": "Define the canonical resumable work transaction model",
-      "status": "verified",
+      "status": "done",
       "path": "docs/v0.6.0/p1-t01.json",
       "source_plan_sections": [
         "Transaction Semantics",
@@ -314,7 +314,7 @@
       "ticket_id": "p1-t02",
       "phase_id": "p1",
       "title": "Define the canonical state machine and continuation rules",
-      "status": "planned",
+      "status": "verified",
       "path": "docs/v0.6.0/p1-t02.json",
       "source_plan_sections": [
         "Canonical State Machine",
