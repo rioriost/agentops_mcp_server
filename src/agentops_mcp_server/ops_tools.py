@@ -227,20 +227,10 @@ class OpsTools:
             materialized_active_tx.get("ticket_id")
         )
         match_tx_id = materialized_tx_id or active_tx_id
-        match_ticket_id = materialized_ticket_id or active_ticket_id
 
         def _record_matches_active_tx(record: Dict[str, Any]) -> bool:
             record_tx_id = self._normalize_tx_identifier(record.get("tx_id"))
-            record_ticket_id = self._normalize_tx_identifier(record.get("ticket_id"))
-            if match_tx_id and record_tx_id == match_tx_id:
-                return True
-            if (
-                match_ticket_id
-                and not match_tx_id
-                and record_ticket_id == match_ticket_id
-            ):
-                return True
-            return False
+            return bool(match_tx_id) and record_tx_id == match_tx_id
 
         try:
             for raw_line in self.repo_context.tx_event_log.read_text(
@@ -439,15 +429,12 @@ class OpsTools:
             )
 
         rebuilt_tx_id = self._normalize_tx_identifier(rebuilt_active_tx.get("tx_id"))
-        rebuilt_ticket_id = self._normalize_tx_identifier(
-            rebuilt_active_tx.get("ticket_id")
-        )
         if (
             rebuilt_tx_id
             and rebuilt_active_tx
             and not self._is_terminal_active_tx(rebuilt_active_tx)
         ):
-            if requested_id == rebuilt_ticket_id:
+            if requested_id == rebuilt_tx_id:
                 return ValueError(
                     "cannot emit tx.begin for an already-active non-terminal transaction; "
                     "resume it with task update semantics instead"
@@ -460,11 +447,8 @@ class OpsTools:
             rebuilt_tx_id = self._normalize_tx_identifier(
                 rebuilt_active_tx.get("tx_id")
             )
-            rebuilt_ticket_id = self._normalize_tx_identifier(
-                rebuilt_active_tx.get("ticket_id")
-            )
             if rebuilt_tx_id:
-                if requested_id == rebuilt_ticket_id:
+                if requested_id == rebuilt_tx_id:
                     return self._active_tx_mismatch_error(
                         requested_task_id, rebuilt_active_tx
                     )
@@ -473,13 +457,10 @@ class OpsTools:
         materialized_tx_id = self._normalize_tx_identifier(
             materialized_active_tx.get("tx_id")
         )
-        materialized_ticket_id = self._normalize_tx_identifier(
-            materialized_active_tx.get("ticket_id")
-        )
 
         if not materialized_tx_id:
             return None
-        if requested_id == materialized_ticket_id:
+        if requested_id == materialized_tx_id:
             return ValueError(
                 "cannot emit tx.begin for an already-active non-terminal transaction; "
                 "resume it with task update semantics instead"
@@ -537,13 +518,8 @@ class OpsTools:
         if requested_id and requested_id == canonical_id:
             return active_tx, canonical_id
 
-        if requested_task_id and requested_task_id == ticket_id:
-            if allow_resume:
-                return active_tx, canonical_id
-            raise ValueError(
-                "cannot emit tx.begin for an already-active non-terminal transaction; "
-                "resume it with task update semantics instead"
-            )
+        if allow_resume and requested_task_id and requested_task_id == ticket_id:
+            return active_tx, canonical_id
 
         if requested_task_id:
             raise self._active_tx_mismatch_error(requested_task_id, active_tx)

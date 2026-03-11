@@ -386,6 +386,79 @@ def test_ops_start_task_requires_task_id_when_bootstrapping(
         ops.ops_start_task(title="Missing task id")
 
 
+def test_ops_start_task_issues_integer_tx_id_during_canonical_begin(
+    repo_context, state_store, state_rebuilder
+):
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    event = ops._emit_tx_event(
+        event_type="tx.begin",
+        payload={"ticket_id": "p2-t01", "ticket_title": "Implement issued identity"},
+        title="p2-t01",
+        task_id="p2-t01",
+        phase="in-progress",
+        step_id="none",
+        session_id="s1",
+        agent_id="agent-test",
+    )
+
+    assert event is not None
+    assert event["seq"] == 1
+    assert isinstance(event["seq"], int)
+
+    events = _read_tx_events(repo_context)
+    assert events[0]["event_type"] == "tx.begin"
+    assert events[0]["ticket_id"] == "p2-t01"
+    assert events[0]["tx_id"] == 1
+    assert isinstance(events[0]["tx_id"], int)
+
+    counter = json.loads(repo_context.tx_id_counter.read_text(encoding="utf-8"))
+    assert counter["last_issued_id"] == 1
+    assert isinstance(counter["last_issued_id"], int)
+
+    tx_state = json.loads(repo_context.tx_state.read_text(encoding="utf-8"))
+    assert tx_state["active_tx"]["ticket_id"] == "p2-t01"
+    assert tx_state["active_tx"]["tx_id"] == 1
+    assert isinstance(tx_state["active_tx"]["tx_id"], int)
+
+
+def test_ops_start_task_reuses_exact_active_tx_identity_on_resume(
+    repo_context, state_store, state_rebuilder
+):
+    _seed_active_tx(
+        repo_context,
+        tx_id=17,
+        ticket_id="p2-t01",
+        status="in-progress",
+        phase="in-progress",
+        current_step="p2-t01",
+        next_action="tx.verify.start",
+        semantic_summary="Started transaction p2-t01",
+    )
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    active_tx, canonical_id = ops._require_active_tx("17", allow_resume=True)
+
+    assert canonical_id == "17"
+    assert active_tx["tx_id"] == 17
+    assert active_tx["ticket_id"] == "p2-t01"
+
+
+def test_ops_start_task_accepts_ticket_id_when_resuming_current_active_transaction(
+    repo_context, state_store, state_rebuilder
+):
+    _begin_tx(
+        state_store, state_rebuilder, tx_id=23, ticket_id="p2-t01", session_id="s1"
+    )
+    ops = _build_ops_tools(repo_context, state_store, state_rebuilder)
+
+    active_tx, canonical_id = ops._require_active_tx("p2-t01", allow_resume=True)
+
+    assert canonical_id == "23"
+    assert active_tx["tx_id"] == 23
+    assert active_tx["ticket_id"] == "p2-t01"
+
+
 def test_ops_update_task_rejects_terminal_statuses(
     repo_context, state_store, state_rebuilder
 ):
