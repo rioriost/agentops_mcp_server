@@ -723,8 +723,13 @@ class StateStore:
             active_tx["session_id"] = session_id
 
             if event_type == "tx.begin":
+                active_tx["status"] = phase
                 active_tx["last_completed_step"] = ""
                 active_tx["user_intent"] = None
+                active_tx["next_action"] = "tx.verify.start"
+                active_tx["semantic_summary"] = f"Started transaction {ticket_id}"
+                active_tx["verify_state"] = None
+                active_tx["commit_state"] = None
                 if not isinstance(active_tx.get("file_intents"), list):
                     active_tx["file_intents"] = []
             elif event_type == "tx.user_intent.set":
