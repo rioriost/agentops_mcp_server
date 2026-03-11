@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, Optional
 
 from .git_repo import GitRepo
 from .test_suggestions import CODE_SUFFIXES, is_test_path, parse_changed_files
 from .verify_runner import VerifyRunner
-from .workflow_response import build_success_response
+from .workflow_response import build_failure_response, build_success_response
 
 
 class RepoTools:
@@ -67,16 +68,174 @@ class RepoTools:
             active_tx["semantic_summary"] = "Verification failed"
             active_tx["next_action"] = "fix and re-verify"
 
-    def _load_tx_context(self) -> Optional[Dict[str, Any]]:
+    def _is_valid_materialized_tx_state(self, tx_state: Any) -> bool:
+        if not isinstance(tx_state, dict):
+            return False
+
+        active_tx = tx_state.get("active_tx")
+        status = tx_state.get("status")
+        next_action = tx_state.get("next_action")
+        verify_state = tx_state.get("verify_state")
+        commit_state = tx_state.get("commit_state")
+        semantic_summary = tx_state.get("semantic_summary")
+
+        if active_tx is None:
+            return (
+                status is None
+                and isinstance(next_action, str)
+                and bool(next_action.strip())
+                and verify_state is None
+                and commit_state is None
+                and semantic_summary is None
+            )
+
+        if not isinstance(active_tx, dict):
+            return False
+        if not isinstance(status, str) or not status.strip():
+            return False
+        if not isinstance(next_action, str) or not next_action.strip():
+            return False
+        if not isinstance(verify_state, dict):
+            return False
+        if not isinstance(commit_state, dict):
+            return False
+        if not isinstance(semantic_summary, str) or not semantic_summary.strip():
+            return False
+
+        tx_id = active_tx.get("tx_id")
+        ticket_id = active_tx.get("ticket_id")
+        if isinstance(tx_id, bool) or not isinstance(tx_id, int):
+            return False
+        if not isinstance(ticket_id, str) or not ticket_id.strip():
+            return False
+
+        session_id = active_tx.get("session_id")
+        if session_id is not None and not isinstance(session_id, str):
+            return False
+
+        return True
+
+    def _load_resume_state(self) -> Dict[str, Any]:
+        baseline = {
+            "active_tx": None,
+            "status": None,
+            "next_action": "tx.begin",
+            "verify_state": None,
+            "commit_state": None,
+            "semantic_summary": None,
+            "integrity": {},
+        }
         if self.state_store is None:
-            return None
+            return baseline
+
         tx_state = self.state_store.read_json_file(
             self.state_store.repo_context.tx_state
         )
-        if not isinstance(tx_state, dict):
-            return None
+        if self._is_valid_materialized_tx_state(tx_state):
+            return tx_state
+
+        materialized_state = tx_state if isinstance(tx_state, dict) else {}
+        materialized_active_tx = (
+            materialized_state.get("active_tx")
+            if isinstance(materialized_state.get("active_tx"), dict)
+            else None
+        )
+        materialized_status = materialized_state.get("status")
+        materialized_next_action = materialized_state.get("next_action")
+        materialized_requests_rebuild = (
+            tx_state is None
+            or materialized_active_tx is None
+            or not isinstance(materialized_status, str)
+            or not materialized_status.strip()
+            or not isinstance(materialized_next_action, str)
+            or not materialized_next_action.strip()
+        )
+
+        if materialized_requests_rebuild and self.state_rebuilder is not None:
+            rebuild = self.state_rebuilder.rebuild_tx_state()
+            if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
+                rebuilt_state = rebuild["state"]
+                integrity = (
+                    rebuilt_state.get("integrity")
+                    if isinstance(rebuilt_state.get("integrity"), dict)
+                    else {}
+                )
+                if integrity.get("drift_detected") is True:
+                    raise ValueError(
+                        json.dumps(
+                            build_failure_response(
+                                error_code="integrity_blocked",
+                                reason="resume blocked by ambiguous canonical persistence",
+                                tx_state=rebuilt_state,
+                                recommended_next_tool="tx_state_rebuild",
+                                recommended_action="Repair the invalid canonical history before resuming the exact active transaction.",
+                                recoverable=False,
+                                blocked=True,
+                                rebuild_warning=rebuilt_state.get("rebuild_warning"),
+                                rebuild_invalid_seq=rebuilt_state.get(
+                                    "rebuild_invalid_seq"
+                                ),
+                                rebuild_observed_mismatch=rebuilt_state.get(
+                                    "rebuild_observed_mismatch"
+                                ),
+                            ),
+                            ensure_ascii=False,
+                        )
+                    )
+                if self._is_valid_materialized_tx_state(rebuilt_state):
+                    return rebuilt_state
+                raise ValueError(
+                    json.dumps(
+                        build_failure_response(
+                            error_code="invalid_ordering",
+                            reason="resume blocked because rebuilt canonical state is incomplete",
+                            tx_state=rebuilt_state,
+                            recommended_next_tool="tx_state_rebuild",
+                            recommended_action="Repair canonical persistence so rebuild yields a complete exact active transaction state with top-level next_action.",
+                        ),
+                        ensure_ascii=False,
+                    )
+                )
+
+            if tx_state is None:
+                return baseline
+
+            raise ValueError(
+                json.dumps(
+                    build_failure_response(
+                        error_code="invalid_ordering",
+                        reason="resume blocked by malformed canonical persistence",
+                        tx_state=materialized_state or None,
+                        recommended_next_tool="tx_state_rebuild",
+                        recommended_action="Repair malformed canonical persistence before resuming the exact active transaction.",
+                    ),
+                    ensure_ascii=False,
+                )
+            )
+
+        raise ValueError(
+            json.dumps(
+                build_failure_response(
+                    error_code="invalid_ordering",
+                    reason="resume blocked because materialized canonical state is malformed",
+                    tx_state=materialized_state or None,
+                    recommended_next_tool="ops_capture_state",
+                    recommended_action="Restore canonical top-level status and next_action before resuming the exact active transaction.",
+                ),
+                ensure_ascii=False,
+            )
+        )
+
+    def _load_tx_context(self) -> Optional[Dict[str, Any]]:
+        tx_state = self._load_resume_state()
         active_tx = tx_state.get("active_tx")
         if not isinstance(active_tx, dict):
+            return None
+
+        status = tx_state.get("status")
+        if not isinstance(status, str) or not status.strip():
+            return None
+        if status.strip() in {"done", "blocked"}:
             return None
 
         tx_id = active_tx.get("tx_id")
@@ -88,15 +247,19 @@ class RepoTools:
             return None
         if not isinstance(ticket_id, str) or not ticket_id.strip():
             return None
-        if not isinstance(session_id, str) or not session_id.strip():
-            return None
         if not isinstance(next_action, str) or not next_action.strip():
-            next_action = "tx.begin"
+            return None
+
+        resolved_session_id = (
+            session_id.strip()
+            if isinstance(session_id, str) and session_id.strip()
+            else "resume"
+        )
 
         return {
             "tx_id": tx_id,
             "ticket_id": ticket_id.strip(),
-            "session_id": session_id.strip(),
+            "session_id": resolved_session_id,
             "next_action": next_action.strip(),
         }
 
@@ -116,22 +279,19 @@ class RepoTools:
         step_id = step_id_override or "verify"
         actor = {"tool": "repo_tools"}
 
-        tx_state = self.state_store.read_json_file(
-            self.state_store.repo_context.tx_state
-        )
-        if isinstance(tx_state, dict):
-            active_tx = tx_state.get("active_tx")
-            if isinstance(active_tx, dict):
-                self._apply_verify_event_state(
-                    active_tx=active_tx,
-                    event_type=event_type,
-                    payload=payload,
-                    phase=phase,
-                    step_id=step_id,
-                    session_id=context["session_id"],
-                    tx_id=context["tx_id"],
-                    ticket_id=context["ticket_id"],
-                )
+        tx_state = self._load_resume_state()
+        active_tx = tx_state.get("active_tx")
+        if isinstance(active_tx, dict):
+            self._apply_verify_event_state(
+                active_tx=active_tx,
+                event_type=event_type,
+                payload=payload,
+                phase=phase,
+                step_id=step_id,
+                session_id=context["session_id"],
+                tx_id=context["tx_id"],
+                ticket_id=context["ticket_id"],
+            )
             return self.state_store.tx_event_append_and_state_save(
                 tx_id=context["tx_id"],
                 ticket_id=context["ticket_id"],
@@ -143,40 +303,6 @@ class RepoTools:
                 payload=payload,
                 state=tx_state,
             )
-
-        if self.state_rebuilder is not None:
-            rebuild = self.state_rebuilder.rebuild_tx_state()
-            if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
-                state = rebuild["state"]
-                integrity = (
-                    state.get("integrity")
-                    if isinstance(state.get("integrity"), dict)
-                    else {}
-                )
-                if integrity.get("drift_detected") is not True:
-                    active_tx = state.get("active_tx")
-                    if isinstance(active_tx, dict):
-                        self._apply_verify_event_state(
-                            active_tx=active_tx,
-                            event_type=event_type,
-                            payload=payload,
-                            phase=phase,
-                            step_id=step_id,
-                            session_id=context["session_id"],
-                            tx_id=context["tx_id"],
-                            ticket_id=context["ticket_id"],
-                        )
-                    return self.state_store.tx_event_append_and_state_save(
-                        tx_id=context["tx_id"],
-                        ticket_id=context["ticket_id"],
-                        event_type=event_type,
-                        phase=phase,
-                        step_id=step_id,
-                        actor=actor,
-                        session_id=context["session_id"],
-                        payload=payload,
-                        state=state,
-                    )
 
         return self.state_store.tx_event_append(
             tx_id=context["tx_id"],
@@ -190,32 +316,8 @@ class RepoTools:
         )
 
     def _workflow_guidance(self) -> Dict[str, Any]:
-        if self.state_store is None:
-            tx_state = {
-                "active_tx": None,
-                "status": None,
-                "next_action": "tx.begin",
-                "verify_state": None,
-                "commit_state": None,
-                "semantic_summary": None,
-                "integrity": {},
-            }
-            response = build_success_response(tx_state=tx_state)
-        else:
-            tx_state = self.state_store.read_json_file(
-                self.state_store.repo_context.tx_state
-            )
-            if not isinstance(tx_state, dict):
-                tx_state = {
-                    "active_tx": None,
-                    "status": None,
-                    "next_action": "tx.begin",
-                    "verify_state": None,
-                    "commit_state": None,
-                    "semantic_summary": None,
-                    "integrity": {},
-                }
-            response = build_success_response(tx_state=tx_state)
+        tx_state = self._load_resume_state()
+        response = build_success_response(tx_state=tx_state)
 
         active_tx = tx_state.get("active_tx") if isinstance(tx_state, dict) else None
         if not isinstance(active_tx, dict):
@@ -247,17 +349,45 @@ class RepoTools:
             result.update(self._workflow_guidance())
             return result
 
-        tx_state = self.state_store.read_json_file(
-            self.state_store.repo_context.tx_state
-        )
+        tx_state = self._load_resume_state()
         canonical_status = (
             tx_state.get("status") if isinstance(tx_state, dict) else None
+        )
+        canonical_next_action = (
+            tx_state.get("next_action") if isinstance(tx_state, dict) else None
         )
         if isinstance(canonical_status, str) and canonical_status.strip() in {
             "done",
             "blocked",
         }:
-            raise ValueError("cannot verify a terminal transaction")
+            raise ValueError(
+                json.dumps(
+                    build_failure_response(
+                        error_code="terminal_transaction",
+                        reason="cannot verify a terminal transaction",
+                        tx_state=tx_state,
+                        recommended_next_tool="ops_start_task",
+                        recommended_action="Do not resume post-terminal work; begin a new transaction only when canonical state allows it.",
+                    ),
+                    ensure_ascii=False,
+                )
+            )
+        if (
+            not isinstance(canonical_next_action, str)
+            or not canonical_next_action.strip()
+        ):
+            raise ValueError(
+                json.dumps(
+                    build_failure_response(
+                        error_code="invalid_ordering",
+                        reason="cannot verify without a canonical next_action",
+                        tx_state=tx_state,
+                        recommended_next_tool="ops_capture_state",
+                        recommended_action="Restore the exact active transaction with a valid top-level next_action before running verification.",
+                    ),
+                    ensure_ascii=False,
+                )
+            )
 
         self._emit_tx_event(
             event_type="tx.verify.start",

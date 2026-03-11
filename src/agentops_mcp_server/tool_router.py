@@ -6,6 +6,7 @@ from typing import Any, Dict
 from .ops_tools import summarize_result
 from .repo_context import RepoContext
 from .state_store import StateStore
+from .workflow_response import build_failure_response
 
 
 class ToolRouter:
@@ -64,25 +65,6 @@ class ToolRouter:
         if resolved_name not in self.tool_registry:
             resolved_name = self.alias_map.get(resolved_name, resolved_name)
 
-        if resolved_name not in self.tool_registry:
-            raise ValueError(f"Unknown tool: {name}")
-
-        tool_spec = self.tool_registry[resolved_name]
-        input_schema = tool_spec.get("input_schema") or {}
-        required_fields = list(input_schema.get("required") or [])
-        if required_fields:
-            if not arguments:
-                missing_list = ", ".join(required_fields)
-                raise ValueError(f"Missing required argument(s): {missing_list}")
-            missing = [
-                field
-                for field in required_fields
-                if field not in arguments or arguments.get(field) is None
-            ]
-            if missing:
-                missing_list = ", ".join(missing)
-                raise ValueError(f"Missing required argument(s): {missing_list}")
-
         truncate_limit = None
         if arguments and "truncate_limit" in arguments:
             raw_limit = arguments.get("truncate_limit")
@@ -90,21 +72,55 @@ class ToolRouter:
                 truncate_limit = raw_limit
             arguments = {k: v for k, v in arguments.items() if k != "truncate_limit"}
 
-        if (
-            resolved_name != "workspace_initialize"
-            and resolved_name in self.tool_registry
-            and resolved_name != "tests_suggest"
-            and resolved_name != "tests_suggest_from_failures"
-        ):
-            if not self.repo_context.has_repo_root():
-                raise ValueError(
-                    "project root is not initialized; call workspace_initialize(cwd) before using file-backed tools"
+        summary_limit = truncate_limit if truncate_limit is not None else 2000
+
+        try:
+            if resolved_name not in self.tool_registry:
+                raise ValueError(f"Unknown tool: {name}")
+
+            tool_spec = self.tool_registry[resolved_name]
+            input_schema = tool_spec.get("input_schema") or {}
+            required_fields = list(input_schema.get("required") or [])
+            if required_fields:
+                if not arguments:
+                    missing_list = ", ".join(required_fields)
+                    raise ValueError(f"Missing required argument(s): {missing_list}")
+                missing = [
+                    field
+                    for field in required_fields
+                    if field not in arguments or arguments.get(field) is None
+                ]
+                if missing:
+                    missing_list = ", ".join(missing)
+                    raise ValueError(f"Missing required argument(s): {missing_list}")
+
+            if (
+                resolved_name != "workspace_initialize"
+                and resolved_name in self.tool_registry
+                and resolved_name != "tests_suggest"
+                and resolved_name != "tests_suggest_from_failures"
+            ):
+                if not self.repo_context.has_repo_root():
+                    raise ValueError(
+                        "project root is not initialized; call workspace_initialize(cwd) before using file-backed tools"
+                    )
+
+            handler = tool_spec["handler"]
+            result = handler(**arguments) if arguments else handler()  # type: ignore[misc]
+        except Exception as exc:
+            structured_payload = exc.args[0] if getattr(exc, "args", ()) else None
+            if (
+                isinstance(structured_payload, dict)
+                and structured_payload.get("ok") is False
+            ):
+                result = structured_payload
+            else:
+                result = build_failure_response(
+                    error_code="invalid_ordering",
+                    reason=str(exc),
+                    tx_state=None,
                 )
 
-        handler = tool_spec["handler"]
-        result = handler(**arguments) if arguments else handler()  # type: ignore[misc]
-
-        summary_limit = truncate_limit if truncate_limit is not None else 2000
         result_payload = summarize_result(result, limit=summary_limit)
         if not isinstance(result_payload, dict):
             result_payload = {"result": result_payload}

@@ -441,29 +441,57 @@ class StateRebuilder:
         commit_state: Optional[Dict[str, Any]],
         active_tx: Optional[Dict[str, Any]],
         semantic_summary: Optional[str],
+        last_event_type: Optional[str],
     ) -> str:
         if status is None:
             return "tx.begin"
 
+        resolved_last_event_type = (
+            last_event_type.strip()
+            if isinstance(last_event_type, str) and last_event_type.strip()
+            else ""
+        )
         resolved_verify_state = verify_state if isinstance(verify_state, dict) else {}
         resolved_commit_state = commit_state if isinstance(commit_state, dict) else {}
 
-        if status == "in-progress":
-            return "tx.verify.start"
+        event_next_action_map = {
+            "tx.begin": "tx.verify.start",
+            "tx.step.enter": "tx.verify.start",
+            "tx.file_intent.add": "tx.verify.start",
+            "tx.file_intent.update": "tx.verify.start",
+            "tx.file_intent.complete": "tx.verify.start",
+            "tx.verify.start": "tx.verify.pass",
+            "tx.verify.pass": "tx.commit.start",
+            "tx.verify.fail": "fix and re-verify",
+            "tx.commit.start": "tx.commit.done",
+            "tx.commit.done": "tx.end.done",
+            "tx.commit.fail": "tx.commit.start",
+            "tx.end.blocked": "tx.end.blocked",
+            "tx.end.done": "tx.end.done",
+        }
+        if resolved_last_event_type in event_next_action_map:
+            return event_next_action_map[resolved_last_event_type]
+
         if status == "checking":
             if resolved_verify_state.get("status") == "failed":
                 return "fix and re-verify"
+            if resolved_verify_state.get("status") == "running":
+                return "tx.verify.pass"
             return "tx.verify.start"
         if status == "verified":
-            if resolved_commit_state.get("status") == "not_started":
+            if resolved_commit_state.get("status") == "running":
+                return "tx.commit.done"
+            if resolved_commit_state.get("status") == "failed":
                 return "tx.commit.start"
-            return "tx.end.done"
+            return "tx.commit.start"
         if status == "committed":
             return "tx.end.done"
         if status == "blocked":
             return "tx.end.blocked"
         if status == "done":
             return "tx.end.done"
+        if status == "in-progress":
+            return "tx.verify.start"
         return "tx.begin"
 
     def _tx_state_integrity_ok(self, state: Dict[str, Any], last_seq: int) -> bool:
@@ -914,6 +942,9 @@ class StateRebuilder:
                 commit_state=commit_state,
                 active_tx=active_tx,
                 semantic_summary=semantic_summary,
+                last_event_type=tx_event_type
+                if isinstance(tx_event_type, str)
+                else None,
             )
 
             minimal_active_tx = {

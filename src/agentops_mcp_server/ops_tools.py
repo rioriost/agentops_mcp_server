@@ -81,10 +81,76 @@ class OpsTools:
         self.state_rebuilder = state_rebuilder
         self.git_repo = git_repo
 
+    def _is_valid_materialized_tx_state(self, tx_state: Any) -> bool:
+        if not isinstance(tx_state, dict):
+            return False
+
+        active_tx = tx_state.get("active_tx")
+        status = tx_state.get("status")
+        next_action = tx_state.get("next_action")
+        verify_state = tx_state.get("verify_state")
+        commit_state = tx_state.get("commit_state")
+        semantic_summary = tx_state.get("semantic_summary")
+
+        if active_tx is None:
+            return (
+                status is None
+                and next_action == "tx.begin"
+                and verify_state is None
+                and commit_state is None
+                and semantic_summary is None
+            )
+
+        if not isinstance(active_tx, dict):
+            return False
+        if not isinstance(status, str) or not status.strip():
+            return False
+        if status.strip() in {"done", "blocked"}:
+            return False
+        if not isinstance(next_action, str) or not next_action.strip():
+            return False
+        if not isinstance(verify_state, dict):
+            return False
+        if not isinstance(commit_state, dict):
+            return False
+        if not isinstance(semantic_summary, str) or not semantic_summary.strip():
+            return False
+
+        tx_id = active_tx.get("tx_id")
+        ticket_id = active_tx.get("ticket_id")
+        if isinstance(tx_id, bool) or not isinstance(tx_id, int):
+            return False
+        if not isinstance(ticket_id, str) or not ticket_id.strip():
+            return False
+
+        session_id = active_tx.get("session_id")
+        if session_id is not None and not isinstance(session_id, str):
+            return False
+
+        return True
+
     def _load_tx_state(self) -> Dict[str, Any]:
         tx_state = self.state_store.read_json_file(self.repo_context.tx_state)
-        if isinstance(tx_state, dict):
+        materialized_state = tx_state if isinstance(tx_state, dict) else {}
+        materialized_active_tx = (
+            materialized_state.get("active_tx")
+            if isinstance(materialized_state.get("active_tx"), dict)
+            else None
+        )
+        materialized_status = materialized_state.get("status")
+        materialized_next_action = materialized_state.get("next_action")
+        materialized_requests_rebuild = (
+            tx_state is None
+            or materialized_active_tx is None
+            or not isinstance(materialized_status, str)
+            or not materialized_status.strip()
+            or not isinstance(materialized_next_action, str)
+            or not materialized_next_action.strip()
+        )
+
+        if self._is_valid_materialized_tx_state(tx_state):
             return tx_state
+
         rebuild = self.state_rebuilder.rebuild_tx_state()
         if rebuild.get("ok") and isinstance(rebuild.get("state"), dict):
             state = rebuild["state"]
@@ -94,9 +160,69 @@ class OpsTools:
                 else {}
             )
             if integrity.get("drift_detected") is True:
-                return {}
-            return state
-        return {}
+                raise ValueError(
+                    json.dumps(
+                        build_failure_response(
+                            error_code="integrity_blocked",
+                            reason="resume blocked by ambiguous canonical persistence",
+                            tx_state=state,
+                            recommended_next_tool="tx_state_rebuild",
+                            recommended_action="Repair the invalid canonical history before relying on resumed active state.",
+                            recoverable=False,
+                            blocked=True,
+                            rebuild_warning=state.get("rebuild_warning"),
+                            rebuild_invalid_seq=state.get("rebuild_invalid_seq"),
+                            rebuild_observed_mismatch=state.get(
+                                "rebuild_observed_mismatch"
+                            ),
+                        ),
+                        ensure_ascii=False,
+                    )
+                )
+            if self._is_valid_materialized_tx_state(state):
+                return state
+            raise ValueError(
+                json.dumps(
+                    build_failure_response(
+                        error_code="invalid_ordering",
+                        reason="resume blocked because rebuilt canonical state is incomplete",
+                        tx_state=state,
+                        recommended_next_tool="tx_state_rebuild",
+                        recommended_action="Repair canonical persistence so rebuild yields a complete exact active transaction state with top-level next_action.",
+                    ),
+                    ensure_ascii=False,
+                )
+            )
+
+        if tx_state is None:
+            return {}
+
+        if materialized_requests_rebuild:
+            raise ValueError(
+                json.dumps(
+                    build_failure_response(
+                        error_code="invalid_ordering",
+                        reason="resume blocked by malformed canonical persistence",
+                        tx_state=materialized_state or None,
+                        recommended_next_tool="tx_state_rebuild",
+                        recommended_action="Repair malformed canonical persistence before resuming the exact active transaction.",
+                    ),
+                    ensure_ascii=False,
+                )
+            )
+
+        raise ValueError(
+            json.dumps(
+                build_failure_response(
+                    error_code="invalid_ordering",
+                    reason="resume blocked because materialized canonical state is malformed",
+                    tx_state=tx_state if isinstance(tx_state, dict) else None,
+                    recommended_next_tool="ops_capture_state",
+                    recommended_action="Restore canonical top-level status and next_action before resuming the exact active transaction.",
+                ),
+                ensure_ascii=False,
+            )
+        )
 
     def _active_tx(self) -> Dict[str, Any]:
         state = self._load_tx_state()
@@ -478,12 +604,23 @@ class OpsTools:
         normalized = value.strip()
         if not normalized:
             return ""
+        if normalized.lower() == "none":
+            return ""
         return normalized
 
     def _is_terminal_active_tx(self, active_tx: Dict[str, Any]) -> bool:
+        status = active_tx.get("status")
+        if isinstance(status, str) and status.strip():
+            return status.strip() in {"done", "blocked"}
+
         tx_state = self._load_tx_state()
-        status = tx_state.get("status") if isinstance(tx_state, dict) else None
-        return isinstance(status, str) and status.strip() in {"done", "blocked"}
+        top_level_status = (
+            tx_state.get("status") if isinstance(tx_state, dict) else None
+        )
+        return isinstance(top_level_status, str) and top_level_status.strip() in {
+            "done",
+            "blocked",
+        }
 
     def _active_tx_identity(self, active_tx: Dict[str, Any]) -> Dict[str, str]:
         tx_id = self._normalize_tx_identifier(active_tx.get("tx_id"))
@@ -503,26 +640,93 @@ class OpsTools:
     def _require_active_tx(
         self, requested_task_id: Optional[str] = None, *, allow_resume: bool = False
     ) -> Tuple[Dict[str, Any], str]:
-        active_tx = self._active_tx()
+        tx_state = self._load_tx_state()
+        active_tx = tx_state.get("active_tx") if isinstance(tx_state, dict) else None
+        active_tx = active_tx if isinstance(active_tx, dict) else {}
         identity = self._active_tx_identity(active_tx)
         canonical_id = identity["canonical_id"]
         ticket_id = identity["ticket_id"]
         requested_id = self._normalize_tx_identifier(requested_task_id)
         has_canonical_tx = identity["has_canonical_tx"]
+        next_action = (
+            tx_state.get("next_action") if isinstance(tx_state, dict) else None
+        )
+        status = tx_state.get("status") if isinstance(tx_state, dict) else None
 
         if not has_canonical_tx or not canonical_id:
-            raise ValueError("tx.begin required before other events")
-        if self._is_terminal_active_tx(active_tx):
-            raise ValueError("tx.begin required before other events")
+            raise ValueError(
+                json.dumps(
+                    build_failure_response(
+                        error_code="begin_required",
+                        reason="tx.begin required before other events",
+                        tx_state=tx_state,
+                        recommended_next_tool="ops_start_task",
+                        recommended_action="Resume the exact active transaction or begin a new one before emitting lifecycle or file-intent events.",
+                    ),
+                    ensure_ascii=False,
+                )
+            )
+        if not isinstance(status, str) or not status.strip():
+            raise ValueError(
+                json.dumps(
+                    build_failure_response(
+                        error_code="invalid_ordering",
+                        reason="exact active transaction state is incomplete",
+                        tx_state=tx_state,
+                        recommended_next_tool="ops_capture_state",
+                        recommended_action="Restore canonical top-level status and next_action before resuming the active transaction.",
+                    ),
+                    ensure_ascii=False,
+                )
+            )
+        if status.strip() in {"done", "blocked"}:
+            raise ValueError(
+                json.dumps(
+                    build_failure_response(
+                        error_code="terminal_transaction",
+                        reason="tx.begin required before other events",
+                        tx_state=tx_state,
+                        recommended_next_tool="ops_start_task",
+                        recommended_action="Do not resume post-terminal work; begin a new transaction only when canonical state allows it.",
+                    ),
+                    ensure_ascii=False,
+                )
+            )
+        if not isinstance(next_action, str) or not next_action.strip():
+            raise ValueError(
+                json.dumps(
+                    build_failure_response(
+                        error_code="invalid_ordering",
+                        reason="exact active transaction resume requires canonical next_action",
+                        tx_state=tx_state,
+                        recommended_next_tool="ops_capture_state",
+                        recommended_action="Restore the exact active transaction with a valid top-level next_action before resuming lifecycle or file-intent work.",
+                    ),
+                    ensure_ascii=False,
+                )
+            )
 
         if requested_id and requested_id == canonical_id:
             return active_tx, canonical_id
 
-        if allow_resume and requested_task_id and requested_task_id == ticket_id:
+        if allow_resume and requested_task_id and requested_task_id == canonical_id:
             return active_tx, canonical_id
 
         if requested_task_id:
-            raise self._active_tx_mismatch_error(requested_task_id, active_tx)
+            raise ValueError(
+                json.dumps(
+                    build_failure_response(
+                        error_code="resume_required",
+                        reason=str(
+                            self._active_tx_mismatch_error(requested_task_id, active_tx)
+                        ),
+                        tx_state=tx_state,
+                        recommended_next_tool="ops_update_task",
+                        recommended_action="Resume or complete the exact active transaction identified by canonical tx_id before switching tickets.",
+                    ),
+                    ensure_ascii=False,
+                )
+            )
 
         return active_tx, canonical_id
 
@@ -689,56 +893,36 @@ class OpsTools:
             if isinstance(value, str) and value.strip():
                 lines.append(f"- {label}: {value.strip()}")
 
-        active_status = active_tx.get("status")
+        tx_state = self._load_tx_state()
+        active_status = tx_state.get("status") if isinstance(tx_state, dict) else None
+        active_next_action = (
+            tx_state.get("next_action") if isinstance(tx_state, dict) else None
+        )
         active_tx_id = active_tx.get("tx_id")
         normalized_active_tx_id = self._normalize_tx_identifier(active_tx_id)
-        has_active_tx = bool(normalized_active_tx_id) and (
-            isinstance(active_status, str)
+        has_active_tx = (
+            bool(normalized_active_tx_id)
+            and isinstance(active_status, str)
+            and active_status.strip()
             and active_status.strip() not in {"done", "blocked"}
+            and isinstance(active_next_action, str)
+            and active_next_action.strip()
         )
 
         _line("ticket_id", active_tx.get("ticket_id"))
         _line("status", active_status)
         _line("current_step", active_tx.get("current_step"))
-        _line("next_action", active_tx.get("next_action"))
+        _line("next_action", active_next_action)
         _line("verify_status", verify_state.get("status"))
         _line("commit_status", commit_state.get("status"))
 
-        rebuild = self.state_rebuilder.rebuild_tx_state()
-        rebuild_state = (
-            rebuild.get("state") if isinstance(rebuild.get("state"), dict) else {}
-        )
-        rebuild_integrity = (
-            rebuild_state.get("integrity")
-            if isinstance(rebuild_state.get("integrity"), dict)
-            else {}
-        )
-        observed_mismatch = (
-            rebuild_state.get("rebuild_observed_mismatch")
-            if isinstance(rebuild_state.get("rebuild_observed_mismatch"), dict)
-            else {}
-        )
-
-        if rebuild_integrity.get("drift_detected") is True:
-            lines.append("- can_start_new_ticket: no")
-            lines.append("- status: blocked")
-            _line("blocked_reason", rebuild_state.get("rebuild_warning"))
-            invalid_reason = observed_mismatch.get("invalid_reason")
-            if isinstance(invalid_reason, str) and invalid_reason.strip():
-                lines.append(f"- invalid_reason: {invalid_reason.strip()}")
-            lines.append(
-                "- reason: canonical transaction history has integrity drift; capture and resume decisions are blocked until the invalid history is repaired"
-            )
-            lines.append(
-                "- recommended_action: inspect rebuild_invalid_event and rebuild_observed_mismatch, then repair or replace the damaged transaction log before continuing"
-            )
-        elif has_active_tx:
+        if has_active_tx:
             _line("active_ticket", active_tx.get("ticket_id") or active_tx_id)
             _line("active_status", active_status)
-            _line("required_next_action", active_tx.get("next_action"))
+            _line("required_next_action", active_next_action)
             lines.append("- can_start_new_ticket: no")
             lines.append(
-                "- reason: active transaction exists and must be resumed before starting another ticket"
+                "- reason: exact active transaction exists and must be resumed before starting another ticket"
             )
         else:
             lines.append("- can_start_new_ticket: yes")
@@ -1103,43 +1287,18 @@ class OpsTools:
         tx_phase = "in-progress"
         tx_step_id = resolved_task_id or "task"
 
-        active_tx = self._active_tx()
-        identity = self._active_tx_identity(active_tx)
-        terminal_active_tx = self._is_terminal_active_tx(active_tx)
-        has_active_tx = bool(identity["tx_id"]) and not terminal_active_tx
-
-        if not has_active_tx:
-            if not resolved_task_id:
-                raise ValueError("task_id is required to bootstrap tx.begin")
-            begin_conflict = self._canonical_begin_conflict(resolved_task_id)
-            if begin_conflict is not None:
-                raise begin_conflict
-            self._emit_tx_event(
-                event_type="tx.begin",
-                payload={"ticket_id": resolved_task_id, "ticket_title": title.strip()},
-                title=resolved_task_id,
-                task_id=resolved_task_id,
-                phase=tx_phase,
-                step_id="none",
-                session_id=session_id,
-                agent_id=agent_id,
+        active_tx, resolved_tx_id = self._require_active_tx(
+            resolved_task_id or None, allow_resume=True
+        )
+        if not resolved_task_id:
+            resolved_task_id = (
+                active_tx.get("ticket_id").strip()
+                if isinstance(active_tx.get("ticket_id"), str)
+                and active_tx.get("ticket_id").strip()
+                else resolved_tx_id
             )
-            active_tx, resolved_tx_id = self._require_active_tx(
-                resolved_task_id, allow_resume=True
-            )
-        else:
-            active_tx, resolved_tx_id = self._require_active_tx(
-                resolved_task_id or None, allow_resume=True
-            )
-            if not resolved_task_id:
-                resolved_task_id = (
-                    active_tx.get("ticket_id").strip()
-                    if isinstance(active_tx.get("ticket_id"), str)
-                    and active_tx.get("ticket_id").strip()
-                    else resolved_tx_id
-                )
-                payload["task_id"] = resolved_task_id
-            tx_step_id = resolved_task_id or tx_step_id
+            payload["task_id"] = resolved_task_id
+        tx_step_id = resolved_task_id or tx_step_id
 
         if requested_status and requested_status != "in-progress":
             payload["requested_status"] = requested_status

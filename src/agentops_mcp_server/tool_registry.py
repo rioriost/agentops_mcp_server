@@ -191,7 +191,7 @@ def build_tool_registry(
             "handler": ops_handoff_export,
         },
         "ops_resume_brief": {
-            "description": "Generate resume brief",
+            "description": "Generate a brief for resuming the exact active transaction using canonical next_action guidance",
             "input_schema": {
                 "type": "object",
                 "properties": {"max_chars": {"type": ["integer", "null"]}},
@@ -200,7 +200,7 @@ def build_tool_registry(
             "handler": ops_resume_brief,
         },
         "ops_start_task": {
-            "description": "Record lifecycle start as a wrapper over canonical transaction state",
+            "description": "Record lifecycle start for the exact active transaction; does not bootstrap tx.begin",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -215,7 +215,7 @@ def build_tool_registry(
             "handler": ops_start_task,
         },
         "ops_update_task": {
-            "description": "Record lifecycle progress as a wrapper over canonical transaction state",
+            "description": "Record lifecycle progress for the exact active transaction using canonical next_action ordering",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -231,7 +231,7 @@ def build_tool_registry(
             "handler": ops_update_task,
         },
         "ops_end_task": {
-            "description": "Record terminal lifecycle outcome as a wrapper over canonical transaction state",
+            "description": "Record terminal lifecycle outcome for the exact active transaction without resuming post-terminal work",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -247,7 +247,7 @@ def build_tool_registry(
             "handler": ops_end_task,
         },
         "ops_add_file_intent": {
-            "description": "Register a file intent as a wrapper over canonical transaction state",
+            "description": "Register a file intent for the exact active transaction under canonical ordering",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -263,7 +263,7 @@ def build_tool_registry(
             "handler": ops_add_file_intent,
         },
         "ops_update_file_intent": {
-            "description": "Advance a file intent state as a wrapper over canonical transaction state",
+            "description": "Advance a file intent state for the exact active transaction under canonical ordering",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -278,7 +278,7 @@ def build_tool_registry(
             "handler": ops_update_file_intent,
         },
         "ops_complete_file_intent": {
-            "description": "Complete a verified file intent as a wrapper over canonical transaction state",
+            "description": "Complete a verified file intent for the exact active transaction after canonical verification",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -292,7 +292,7 @@ def build_tool_registry(
             "handler": ops_complete_file_intent,
         },
         "ops_capture_state": {
-            "description": "Capture transaction state",
+            "description": "Capture canonical transaction state for exact-active-transaction resume",
             "input_schema": {
                 "type": "object",
                 "properties": {"session_id": {"type": ["string", "null"]}},

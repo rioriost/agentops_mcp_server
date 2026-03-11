@@ -137,6 +137,15 @@ def _resolved_status_phase_next_action(
         state.get("next_action")
     )
     tx_phase = _clean_str(canonical_phase) or tx_status
+
+    has_exact_active_tx = (
+        _clean_optional_tx_id(active_tx.get("tx_id")) is not None
+        and _clean_optional_str(active_tx.get("ticket_id")) is not None
+    )
+    if has_exact_active_tx and not resolved_next_action:
+        tx_status = ""
+        tx_phase = ""
+
     return tx_status, tx_phase, resolved_next_action
 
 
@@ -211,19 +220,25 @@ def derive_workflow_guidance(
         elif integrity:
             resolved_integrity_status = "ok"
 
-    has_active_tx = (
+    has_exact_active_tx = (
         bool(active_tx)
         and resolved_active_tx_id is not None
         and resolved_active_ticket_id is not None
     )
+    has_resumable_active_tx = (
+        has_exact_active_tx
+        and bool(tx_status)
+        and not resolved_terminal
+        and bool(resolved_next_action)
+    )
 
     resolved_resume_required = _clean_bool(resume_required)
     if resolved_resume_required is None:
-        resolved_resume_required = has_active_tx and not resolved_terminal
+        resolved_resume_required = has_resumable_active_tx
 
     resolved_can_start_new_ticket = _clean_bool(can_start_new_ticket)
     if resolved_can_start_new_ticket is None:
-        resolved_can_start_new_ticket = not has_active_tx or resolved_terminal
+        resolved_can_start_new_ticket = not has_resumable_active_tx
 
     return {
         "canonical_status": tx_status,

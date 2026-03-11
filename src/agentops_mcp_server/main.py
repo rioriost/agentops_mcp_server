@@ -25,7 +25,7 @@ Tools (snake_case):
 - ops_compact_context(max_chars?, include_diff?) -> generate compact context
 - ops_handoff_export() -> export handoff JSON
 - ops_resume_brief(max_chars?) -> generate resume brief
-- ops_start_task(title, task_id?, session_id?, agent_id?, status?) -> record lifecycle start as a wrapper over canonical transaction state
+- ops_start_task(title, task_id?, session_id?, agent_id?, status?) -> record lifecycle start for the exact active transaction; does not bootstrap tx.begin
 - ops_update_task(status?, note?, task_id?, session_id?, agent_id?, user_intent?) -> record lifecycle progress as a wrapper over canonical transaction state
 - ops_end_task(summary, next_action?, status?, task_id?, session_id?, agent_id?) -> record terminal lifecycle outcome as a wrapper over canonical transaction state
 - ops_add_file_intent(path, operation, purpose, task_id?, session_id?, agent_id?) -> register a file intent as a wrapper over canonical transaction state

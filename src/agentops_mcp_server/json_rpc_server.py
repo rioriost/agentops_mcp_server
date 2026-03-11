@@ -71,15 +71,25 @@ class JsonRpcServer:
                 raise ValueError("tools/call requires 'name' (string)")
             if not isinstance(arguments, dict):
                 raise ValueError("tools/call requires 'arguments' (object)")
+            result = self.tool_router.tools_call(name, arguments)
             try:
-                result = self.tool_router.tools_call(name, arguments)
-            except Exception as exc:
-                self._log_tool_failure(
-                    tool_name=name,
-                    tool_input=arguments,
-                    tool_output={"error": str(exc)},
-                )
-                raise
+                parsed_result = result
+                if isinstance(result, dict):
+                    content = result.get("content")
+                    if isinstance(content, list) and content:
+                        first_item = content[0]
+                        if isinstance(first_item, dict):
+                            text = first_item.get("text")
+                            if isinstance(text, str) and text.strip():
+                                parsed_result = json.loads(text)
+                if isinstance(parsed_result, dict) and parsed_result.get("ok") is False:
+                    self._log_tool_failure(
+                        tool_name=name,
+                        tool_input=arguments,
+                        tool_output=parsed_result,
+                    )
+            except Exception:
+                pass
         else:
             raise ValueError(f"Unknown method: {method}")
 
@@ -108,10 +118,24 @@ class JsonRpcServer:
                     req_id = None
 
                 if req_id is not None:
+                    error_payload: Dict[str, Any] = {
+                        "code": -32000,
+                        "message": str(exc),
+                    }
+                    structured_payload = (
+                        exc.args[0] if getattr(exc, "args", ()) else None
+                    )
+                    if isinstance(structured_payload, dict):
+                        reason = structured_payload.get("reason")
+                        if isinstance(reason, str) and reason.strip():
+                            error_payload["message"] = reason.strip()
+                        error_payload["data"] = structured_payload
+                    if isinstance(exc, ValueError):
+                        error_payload["code"] = -32602
                     _write_json(
                         {
                             "jsonrpc": "2.0",
                             "id": req_id,
-                            "error": {"code": -32000, "message": str(exc)},
+                            "error": error_payload,
                         }
                     )
