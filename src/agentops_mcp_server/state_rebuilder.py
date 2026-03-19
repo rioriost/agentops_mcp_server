@@ -852,15 +852,30 @@ class StateRebuilder:
         drift_reason = ""
 
         if candidates:
-            selected_active_tx = max(
+            ordered_candidates = sorted(
                 candidates,
                 key=lambda item: (
                     item.get("_last_event_seq", -1),
                     begin_seq_by_tx.get(str(item.get("tx_id")), -1),
                     item.get("tx_id", 0),
                 ),
+                reverse=True,
             )
+            selected_active_tx = ordered_candidates[0]
             active_tx_source = "active_candidate"
+
+            if len(ordered_candidates) > 1:
+                runner_up = ordered_candidates[1]
+                if runner_up.get("_last_event_seq", -1) == selected_active_tx.get(
+                    "_last_event_seq", -1
+                ) and begin_seq_by_tx.get(
+                    str(runner_up.get("tx_id")), -1
+                ) == begin_seq_by_tx.get(str(selected_active_tx.get("tx_id")), -1):
+                    drift_detected = True
+                    drift_reason = (
+                        "multiple non-terminal active transaction candidates share the "
+                        "same latest canonical ordering"
+                    )
 
         if selected_active_tx is not None:
             active_tx = json.loads(json.dumps(selected_active_tx, ensure_ascii=False))

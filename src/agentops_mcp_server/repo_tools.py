@@ -7,6 +7,7 @@ from .git_repo import GitRepo
 from .test_suggestions import CODE_SUFFIXES, is_test_path, parse_changed_files
 from .verify_runner import VerifyRunner
 from .workflow_response import (
+    build_failure_response,
     build_resume_load_value_error_adapter,
     build_success_response,
     canonical_idle_baseline,

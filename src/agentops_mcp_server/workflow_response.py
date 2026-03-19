@@ -76,6 +76,210 @@ class FailurePayload(TypedDict, total=False):
     rebuild_observed_mismatch: Any
 
 
+def build_failure_response(
+    *,
+    error_code: Any,
+    reason: Any,
+    tx_state: Any = None,
+    recommended_next_tool: Any = None,
+    recommended_action: Any = None,
+    recoverable: Any = None,
+    blocked: Any = None,
+    integrity_status: Any = None,
+    rebuild_warning: Any = None,
+    rebuild_invalid_seq: Any = None,
+    rebuild_observed_mismatch: Any = None,
+    **extra_fields: Any,
+) -> FailurePayload:
+    resolved_error_code = _clean_str(error_code) or "invalid_ordering"
+    defaults = _failure_defaults(resolved_error_code)
+
+    response: FailurePayload = {
+        "error_code": resolved_error_code,
+        "reason": _clean_str(reason) or "workflow operation failed",
+        "tx_state": tx_state,
+        "recoverable": (
+            _clean_bool(recoverable)
+            if _clean_bool(recoverable) is not None
+            else bool(defaults.get("recoverable", True))
+        ),
+        "blocked": (
+            _clean_bool(blocked) if _clean_bool(blocked) is not None else False
+        ),
+        "recommended_next_tool": (
+            _clean_str(recommended_next_tool)
+            or _clean_str(defaults.get("recommended_next_tool"))
+        ),
+        "recommended_action": (
+            _clean_str(recommended_action)
+            or _clean_str(defaults.get("recommended_action"))
+        ),
+    }
+
+    cleaned_integrity_status = _clean_optional_str(integrity_status)
+    if cleaned_integrity_status:
+        response["integrity_status"] = cleaned_integrity_status
+
+    if rebuild_warning is not None:
+        response["rebuild_warning"] = rebuild_warning
+    if rebuild_invalid_seq is not None:
+        response["rebuild_invalid_seq"] = rebuild_invalid_seq
+    if rebuild_observed_mismatch is not None:
+        response["rebuild_observed_mismatch"] = rebuild_observed_mismatch
+
+    for key, value in extra_fields.items():
+        response[key] = value
+
+    return response
+
+
+def derive_workflow_guidance(
+    tx_state: Any,
+    *,
+    next_action_override: Any = None,
+    phase_override: Any = None,
+    requires_followup: Any = None,
+    followup_tool: Any = None,
+    terminal: Any = None,
+    can_start_new_ticket: Any = None,
+    resume_required: Any = None,
+) -> Dict[str, Any]:
+    state = _as_dict(tx_state)
+    active_tx = _active_tx_from_state(state)
+    verify_state = _verify_state_from_state(state, active_tx)
+    commit_state = _commit_state_from_state(state, active_tx)
+    integrity = _resume_load_integrity(state)
+
+    canonical_status = _clean_optional_str(state.get("status"))
+    stored_next_action = _clean_optional_str(state.get("next_action"))
+
+    if integrity.get("drift_detected") is True:
+        canonical_phase = "blocked"
+        next_action = "tx_state_rebuild"
+        terminal_value = False
+        requires_followup_value = True
+        followup_tool_value = "tx_state_rebuild"
+        can_start_new_ticket_value = False
+        resume_required_value = False
+    elif canonical_status in TERMINAL_STATUSES:
+        canonical_phase = canonical_status
+        next_action = stored_next_action or (
+            "tx.begin" if canonical_status == "done" else "tx.end.blocked"
+        )
+        terminal_value = True
+        requires_followup_value = False
+        followup_tool_value = None
+        can_start_new_ticket_value = canonical_status == "done"
+        resume_required_value = False
+    elif not active_tx:
+        canonical_status = canonical_status
+        canonical_phase = _clean_optional_str(phase_override)
+        if not canonical_phase:
+            canonical_phase = canonical_status or "idle"
+        next_action = stored_next_action or "tx.begin"
+        terminal_value = False
+        requires_followup_value = next_action != "tx.begin"
+        followup_tool_value = next_action if requires_followup_value else None
+        can_start_new_ticket_value = next_action == "tx.begin"
+        resume_required_value = False
+    else:
+        verify_status = _clean_optional_str(verify_state.get("status"))
+        commit_status = _clean_optional_str(commit_state.get("status"))
+
+        canonical_phase = (
+            _clean_optional_str(phase_override)
+            or commit_status
+            or verify_status
+            or canonical_status
+            or "in-progress"
+        )
+        next_action = stored_next_action or "ops_update_task"
+        terminal_value = False
+        requires_followup_value = next_action not in {"", "tx.begin"}
+        followup_tool_value = next_action if requires_followup_value else None
+        can_start_new_ticket_value = False
+        resume_required_value = True
+
+    override_next_action = _clean_optional_str(next_action_override)
+    if override_next_action:
+        next_action = override_next_action
+
+    override_phase = _clean_optional_str(phase_override)
+    if override_phase:
+        canonical_phase = override_phase
+
+    if isinstance(terminal, bool):
+        terminal_value = terminal
+    if isinstance(requires_followup, bool):
+        requires_followup_value = requires_followup
+    if isinstance(can_start_new_ticket, bool):
+        can_start_new_ticket_value = can_start_new_ticket
+    if isinstance(resume_required, bool):
+        resume_required_value = resume_required
+
+    override_followup_tool = _clean_optional_str(followup_tool)
+    if override_followup_tool:
+        followup_tool_value = override_followup_tool
+    elif requires_followup_value and not followup_tool_value:
+        followup_tool_value = next_action
+    elif not requires_followup_value:
+        followup_tool_value = None
+
+    return {
+        "canonical_status": canonical_status,
+        "canonical_phase": canonical_phase,
+        "next_action": next_action,
+        "terminal": terminal_value,
+        "requires_followup": requires_followup_value,
+        "followup_tool": followup_tool_value,
+        "can_start_new_ticket": can_start_new_ticket_value,
+        "resume_required": resume_required_value,
+    }
+
+
+def build_success_response(
+    *,
+    tx_state: Any,
+    payload: Any = None,
+    event: Any = None,
+    **guidance_overrides: Any,
+) -> Dict[str, Any]:
+    state = _as_dict(tx_state)
+    guidance = derive_workflow_guidance(state, **guidance_overrides)
+    active_tx = _active_tx_from_state(state)
+    verify_state = _verify_state_from_state(state, active_tx)
+    commit_state = _commit_state_from_state(state, active_tx)
+    integrity = _resume_load_integrity(state)
+
+    response: Dict[str, Any] = {
+        "ok": True,
+        "tx_state": state,
+        "payload": payload,
+        "event": event,
+        "tx_status": guidance["canonical_status"],
+        "tx_phase": guidance["canonical_phase"],
+        "canonical_status": guidance["canonical_status"],
+        "canonical_phase": guidance["canonical_phase"],
+        "next_action": guidance["next_action"],
+        "terminal": guidance["terminal"],
+        "requires_followup": guidance["requires_followup"],
+        "followup_tool": guidance["followup_tool"],
+        "can_start_new_ticket": guidance["can_start_new_ticket"],
+        "resume_required": guidance["resume_required"],
+        "active_tx": active_tx or None,
+        "active_tx_id": active_tx.get("tx_id") if active_tx else None,
+        "active_ticket_id": active_tx.get("ticket_id") if active_tx else None,
+        "current_step": None,
+        "verify_status": verify_state.get("status"),
+        "commit_status": commit_state.get("status"),
+        "integrity_status": (
+            "blocked" if integrity.get("drift_detected") is True else "healthy"
+        ),
+    }
+
+    return response
+
+
 class ResumeLoadFailureResult(TypedDict):
     ok: bool
     tx_state: Any
@@ -341,19 +545,59 @@ def _materialized_active_tx_dict(tx_state: Any) -> Optional[Dict[str, Any]]:
     return None
 
 
-def requests_resume_state_rebuild(tx_state: Any) -> bool:
+def _is_strict_idle_baseline_state(tx_state: Any) -> bool:
     state = _materialized_state_dict(tx_state)
+    if not state:
+        return False
+    return (
+        state.get("active_tx") is None
+        and state.get("status") is None
+        and state.get("next_action") == "tx.begin"
+        and state.get("verify_state") is None
+        and state.get("commit_state") is None
+        and state.get("semantic_summary") is None
+    )
+
+
+def _is_valid_exact_active_resume_state(tx_state: Any) -> bool:
+    state = _materialized_state_dict(tx_state)
+    if not state:
+        return False
+
     active_tx = _materialized_active_tx_dict(state)
+    if not isinstance(active_tx, dict):
+        return False
+
+    tx_id = active_tx.get("tx_id")
+    ticket_id = active_tx.get("ticket_id")
     status = state.get("status")
     next_action = state.get("next_action")
+
     return (
-        tx_state is None
-        or active_tx is None
-        or not isinstance(status, str)
-        or not status.strip()
-        or not isinstance(next_action, str)
-        or not next_action.strip()
+        isinstance(tx_id, int)
+        and not isinstance(tx_id, bool)
+        and isinstance(ticket_id, str)
+        and bool(ticket_id.strip())
+        and isinstance(status, str)
+        and bool(status.strip())
+        and status.strip() not in TERMINAL_STATUSES
+        and isinstance(next_action, str)
+        and bool(next_action.strip())
     )
+
+
+def is_valid_exact_resume_tx_state(tx_state: Any) -> bool:
+    return _is_strict_idle_baseline_state(
+        tx_state
+    ) or _is_valid_exact_active_resume_state(tx_state)
+
+
+def requests_resume_state_rebuild(tx_state: Any) -> bool:
+    if tx_state is None:
+        return True
+    if _is_strict_idle_baseline_state(tx_state):
+        return False
+    return not is_valid_exact_resume_tx_state(tx_state)
 
 
 # Resume-load internals
@@ -783,6 +1027,11 @@ def load_resume_state_shared(
     rebuild_when_invalid: bool,
 ) -> ResumeLoadSharedReturn:
     tx_state = read_tx_state()
+    if tx_state is None:
+        return (
+            dict(baseline) if isinstance(baseline, dict) else canonical_idle_baseline()
+        )
+
     result = build_resume_load_failure(
         tx_state=tx_state,
         is_valid_tx_state=is_valid_tx_state,
@@ -1212,6 +1461,26 @@ def _build_commit_no_changes_failure_payload(
     )
 
 
+def _build_commit_no_files_failure_payload(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "repo_commit",
+    recommended_action: Any = (
+        "Provide one or more files or use auto staging before retrying commit."
+    ),
+    reason: Any = "no files specified",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return build_failure_response(
+        error_code="invalid_ordering",
+        reason=reason,
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        **guidance_overrides,
+    )
+
+
 # Commit-helper public failure builders
 
 
@@ -1247,6 +1516,25 @@ def build_commit_no_changes_failure(
     **guidance_overrides: Any,
 ) -> FailurePayload:
     return _build_commit_no_changes_failure_payload(
+        tx_state=tx_state,
+        recommended_next_tool=recommended_next_tool,
+        recommended_action=recommended_action,
+        reason=reason,
+        **guidance_overrides,
+    )
+
+
+def build_commit_no_files_failure(
+    *,
+    tx_state: Any,
+    recommended_next_tool: Any = "repo_commit",
+    recommended_action: Any = (
+        "Provide one or more files or use auto staging before retrying commit."
+    ),
+    reason: Any = "no files specified",
+    **guidance_overrides: Any,
+) -> FailurePayload:
+    return _build_commit_no_files_failure_payload(
         tx_state=tx_state,
         recommended_next_tool=recommended_next_tool,
         recommended_action=recommended_action,

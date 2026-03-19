@@ -232,7 +232,19 @@ class CommitManager:
                 )
             )
 
-        self._emit_tx_begin_with_context(context)
+        raise RuntimeError(
+            build_bootstrap_invalid_resume_failure(
+                tx_state=rebuilt_state if isinstance(rebuilt_state, dict) else None,
+                reason=(
+                    "helper bootstrap blocked because exact active transaction "
+                    "continuation could not be confirmed from canonical persistence"
+                ),
+                recommended_action=(
+                    "Repair canonical persistence so helper bootstrap resumes only "
+                    "from a valid exact active transaction state."
+                ),
+            )
+        )
 
     def _ensure_verify_started(self) -> None:
         tx_state = self._load_resume_state()

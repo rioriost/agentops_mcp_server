@@ -243,8 +243,32 @@ This is the core exact-resume behavior required by `docs/v0.6.0/plan.md`.
 The following remediation items capture the remaining gaps identified during strict review of `p2-t03`.
 They are derived implementation follow-ups and do not add new canonical requirements beyond `plan.md`.
 
-### High priority
+## Implementation-plan objective
+Translate the strict-review findings into a bounded implementation sequence that closes the remaining `REQ-P2-EXACT-RESUME` gaps without expanding the canonical protocol surface.
 
+## Implementation-plan constraints
+The remediation work should preserve the existing `p2-t03` scope boundaries:
+
+- do not introduce new canonical fields beyond `plan.md`
+- do not redefine bounded historical compatibility behavior owned by `p2-t04`
+- do not promote helper metadata into canonical transaction identity
+- keep healthy materialized state as the primary resume anchor
+- keep rebuild as fallback-only behavior
+- preserve explicit failure when deterministic continuation is unsafe
+
+## Implementation workstreams
+
+### Workstream 1: Canonical no-active baseline hardening
+**Goal**
+Make all resume-related runtime surfaces enforce the same strict no-active baseline contract so malformed materialized state is not accepted as resumable or canonical no-active state.
+
+**Files in scope**
+- `src/agentops_mcp_server/commit_manager.py`
+- `src/agentops_mcp_server/repo_tools.py`
+- `src/agentops_mcp_server/ops_tools.py`
+- `src/agentops_mcp_server/workflow_response.py`
+
+**Required changes**
 1. **Tighten no-active baseline validation in `commit_manager.py`.**
    - Update `_is_valid_materialized_tx_state()` so the no-active baseline only validates when:
      - `active_tx` is `null`
@@ -260,7 +284,7 @@ They are derived implementation follow-ups and do not add new canonical requirem
    - Keep no-active materialized validation consistent across resume-related runtime surfaces.
 
 3. **Return canonical no-active baseline from `ops_tools.py` when materialized state is missing.**
-   - In `_load_tx_state()`, replace the empty-dictionary fallback for missing materialized state with the canonical no-active baseline structure:
+   - In `_load_tx_state()`, replace any empty-dictionary style fallback for missing materialized state with the canonical no-active baseline structure:
      - `active_tx: null`
      - `status: null`
      - `next_action: tx.begin`
@@ -268,22 +292,129 @@ They are derived implementation follow-ups and do not add new canonical requirem
      - `commit_state: null`
      - `semantic_summary: null`
      - `integrity: {}`
-   - Avoid using `{}` as a substitute for canonical no-active state.
+   - Avoid using `{}` as a substitute for canonical no-active state in resume-related helper paths or response assembly.
 
-### Medium priority
+**Acceptance target**
+- No-active materialized state is accepted only when it matches the strict canonical baseline.
+- Missing or malformed no-active state does not silently pass as resumable active state.
+- Resume-related surfaces report the same canonical no-active shape.
 
+### Workstream 2: Helper bootstrap exact-resume hardening
+**Goal**
+Ensure helper bootstrap behavior cannot normalize malformed or incomplete canonical persistence into apparent healthy active continuation.
+
+**Files in scope**
+- `src/agentops_mcp_server/commit_manager.py`
+- `src/agentops_mcp_server/workflow_response.py`
+
+**Required changes**
 4. **Re-evaluate `commit_manager._ensure_tx_begin()` rebuild-based repair behavior.**
-   - Review the branch that writes rebuilt active transaction fields back into materialized state during helper bootstrap.
+   - Review the branch that emits or repairs `tx.begin` during helper bootstrap when event-log state and materialized state do not align.
    - Either:
      - remove the repair path if it is not required for exact-resume correctness, or
      - constrain and document it so it cannot act like heuristic active-transaction replacement or silent normalization of malformed canonical persistence.
-   - Exact-resume continuation should remain anchored in healthy materialized state first, with bounded rebuild fallback and explicit failure when deterministic continuation is not safely possible.
+   - Require explicit failure when canonical persistence is malformed, incomplete, or ambiguous and exact deterministic continuation is not safely possible.
+   - Preserve the rule that helper bootstrap must not replace the exact active transaction with a heuristic candidate.
 
-### Low priority
+**Acceptance target**
+- Helper bootstrap does not silently convert malformed canonical state into healthy active continuation.
+- Bootstrap follows the same explicit-failure rules as other exact-resume paths.
+- Existing active transaction identity remains exact and stable.
 
-5. **Deduplicate baseline-validation logic across resume-related runtime surfaces.**
+### Workstream 3: `next_action`-first guidance consistency
+**Goal**
+Eliminate remaining response or helper-path drift where continuation guidance can come from non-canonical mirrors instead of top-level canonical `next_action`.
+
+**Files in scope**
+- `src/agentops_mcp_server/ops_tools.py`
+- `src/agentops_mcp_server/workflow_response.py`
+- any other resume-adjacent helper surface still reading `active_tx.next_action` as a primary source
+
+**Required changes**
+5. **Standardize continuation guidance on top-level canonical `next_action`.**
+   - Audit helper, summary, and response-adjacent paths for places that derive continuation from:
+     - `active_tx.next_action`
+     - `active_tx.current_step`
+     - status-only heuristics
+   - Update those surfaces so top-level `tx_state.next_action` is the primary continuation source whenever canonical state is available.
+   - Treat nested `active_tx.next_action` as mirrored metadata only, not the canonical continuation contract.
+
+**Acceptance target**
+- Continuation guidance is consistent across helper, summary, verify, and response surfaces.
+- Canonical top-level `next_action` remains the primary machine-readable continuation guide.
+- Summary surfaces no longer drift into status-over-`next_action` behavior.
+
+### Workstream 4: Shared exact-resume validation contract
+**Goal**
+Reduce drift by centralizing exact-resume validation rules used by multiple runtime surfaces.
+
+**Files in scope**
+- `src/agentops_mcp_server/workflow_response.py`
+- `src/agentops_mcp_server/commit_manager.py`
+- `src/agentops_mcp_server/repo_tools.py`
+- `src/agentops_mcp_server/ops_tools.py`
+
+**Required changes**
+6. **Deduplicate baseline-validation logic across resume-related runtime surfaces.**
    - Extract the canonical no-active and active-state validation contract into shared logic used by:
      - `commit_manager.py`
      - `repo_tools.py`
      - `ops_tools.py`
-   - This reduces drift risk and helps keep exact-resume semantics aligned across helper, verify, and response-adjacent flows.
+   - Keep the shared contract aligned with:
+     - exact active transaction requirements
+     - strict no-active baseline requirements
+     - top-level `status` and `next_action` requirements
+     - explicit failure behavior for malformed or incomplete canonical persistence
+
+**Acceptance target**
+- Resume validation behavior is materially identical across helper, verify, and commit-adjacent surfaces.
+- Future drift risk is reduced because exact-resume rules live in one shared contract.
+
+## Suggested implementation order
+
+1. Complete **Workstream 1** first so baseline validation becomes strict and consistent.
+2. Then complete **Workstream 2** so helper bootstrap cannot bypass the stricter contract.
+3. Then complete **Workstream 3** to remove remaining continuation-guidance drift.
+4. Finish with **Workstream 4** to consolidate the resulting validation rules.
+
+This order minimizes the risk of preserving legacy permissive behavior while refactoring.
+
+## Verification plan
+After implementation, verification should explicitly confirm:
+
+1. **Strict no-active baseline acceptance**
+   - canonical no-active state is accepted
+   - malformed no-active variants are rejected
+
+2. **Exact active resume preference**
+   - healthy materialized active state is preferred over rebuild
+   - existing active `tx_id` is reused exactly
+
+3. **Fallback-only rebuild behavior**
+   - rebuild is used only when materialized state is missing, incomplete, or inconsistent
+   - ambiguous or drift-blocked rebuild state causes explicit failure
+
+4. **Helper bootstrap safety**
+   - bootstrap does not normalize malformed persistence into apparent healthy continuation
+   - helper bootstrap does not replace the active transaction with a heuristic candidate
+
+5. **`next_action`-first guidance consistency**
+   - helper and summary surfaces use top-level canonical `next_action`
+   - response guidance does not fall back to status-only continuation when canonical `next_action` is available
+
+## Traceability back to strict-review findings
+This remediation plan directly addresses the strict-review findings that:
+
+- no-active baseline validation was too permissive
+- helper bootstrap risked repair-style normalization
+- some surfaces still relied on non-canonical continuation mirrors
+- exact-resume validation logic risked drifting across runtime surfaces
+
+## Exit criteria for closing remediation
+The strict-review remediation can be considered complete when all of the following are true:
+
+- resume-related runtime surfaces share the same strict no-active baseline contract
+- helper bootstrap no longer masks malformed or ambiguous canonical persistence
+- canonical top-level `next_action` is the primary continuation guide across relevant surfaces
+- malformed or ambiguous exact-resume state fails explicitly rather than being normalized
+- the remaining `p2-t03` acceptance-criteria gaps are closed without expanding scope into `p2-t04`

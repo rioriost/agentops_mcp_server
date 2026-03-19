@@ -821,7 +821,10 @@ class OpsTools:
         active_tx_id = active_tx.get("tx_id")
         active_ticket_id = active_tx.get("ticket_id")
         active_status = active_tx.get("status")
-        next_action = active_tx.get("next_action")
+        tx_state = self._load_tx_state()
+        next_action = (
+            tx_state.get("next_action") if isinstance(tx_state, dict) else None
+        )
 
         active_value = self._normalize_tx_identifier(active_tx_id) or "unknown"
         requested_value = (
@@ -1449,13 +1452,14 @@ class OpsTools:
             response["active_tx"] = active_tx
             return response
 
-        active_tx = (
-            state.get("active_tx") if isinstance(state.get("active_tx"), dict) else {}
+        next_action = state.get("next_action")
+        current_step = (
+            state.get("active_tx", {}).get("current_step")
+            if isinstance(state.get("active_tx"), dict)
+            else None
         )
-        next_action = active_tx.get("next_action")
-        current_step = active_tx.get("current_step")
         if not isinstance(next_action, str) or not next_action.strip():
-            active_tx["next_action"] = (
+            state["next_action"] = (
                 current_step.strip()
                 if isinstance(current_step, str) and current_step.strip()
                 else "tx.begin"
@@ -1503,9 +1507,13 @@ class OpsTools:
             "task_status": active_tx.get("status") or "",
             "current_task": active_tx.get("ticket_id") or "",
             "last_action": active_tx.get("semantic_summary") or "",
-            "next_step": active_tx.get("next_action")
-            or active_tx.get("current_step")
-            or "",
+            "next_step": (
+                tx_state.get("next_action")
+                if isinstance(tx_state.get("next_action"), str)
+                and tx_state.get("next_action").strip()
+                else ""
+            ),
+            "current_step": active_tx.get("current_step") or "",
             "plan_steps": [],
             "artifact_summary": "",
             "failure_reason": last_error,
