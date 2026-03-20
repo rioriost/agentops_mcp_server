@@ -18,9 +18,9 @@ source-include = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rioriost/homebrew-agentops_mcp_server"
-Issues = "https://github.com/rioriost/homebrew-agentops_mcp_server/issues"
-Repository = "https://github.com/rioriost/homebrew-agentops_mcp_server"
+Homepage = "https://github.com/rioriost/agentops_mcp_server"
+Issues = "https://github.com/rioriost/agentops_mcp_server/issues"
+Repository = "https://github.com/rioriost/agentops_mcp_server"
 
 [project.scripts]
 agentops_mcp_server = "agentops_mcp_server.main:main"
