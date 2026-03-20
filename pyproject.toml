@@ -1,59 +1,58 @@
 [project]
 name = "agentops-mcp-server"
-authors = [
-    {name = "Rio Fujita", email = "rifujita@microsoft.com"},
-]
 version = "0.5.3"
-license = {file = "LICENSE"}
 description = "Simple MCP server for AgentOps with Zed"
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.14"
-dependencies = [
+license = { file = "LICENSE" }
+authors = [
+  { name = "Rio Fujita", email = "rifujita@microsoft.com" },
 ]
+dependencies = []
 
-[project.optional-dependencies]
-test = [
-  "pytest>=7",
-  "pytest-cov>=4",
+[tool.uv.build-backend]
+module-root = "src"
+source-include = [
+  "src/agentops_mcp_server/zed-agentops-init.sh",
+  "src/agentops_mcp_server/rules_template.txt",
 ]
 
 [project.urls]
 Homepage = "https://github.com/rioriost/homebrew-agentops_mcp_server"
 Issues = "https://github.com/rioriost/homebrew-agentops_mcp_server/issues"
+Repository = "https://github.com/rioriost/homebrew-agentops_mcp_server"
 
 [project.scripts]
 agentops_mcp_server = "agentops_mcp_server.main:main"
 zed-agentops-init = "agentops_mcp_server.init:main"
 
+[project.optional-dependencies]
+test = [
+  "pytest>=9",
+  "pytest-cov>=7",
+]
+
+[dependency-groups]
+dev = [
+  "build>=1.2.2",
+  "twine>=6.1.0",
+  "ruff>=0.12.0",
+]
+
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.9.27,<0.10.0"]
+build-backend = "uv_build"
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
 markers = [
   "release: coverage-only tests (excluded from verify)",
 ]
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/agentops_mcp_server"]
-include = [
-  "src/agentops_mcp_server/zed-agentops-init.sh",
-  "src/agentops_mcp_server/rules_template.txt",
-]
+[tool.ruff]
+line-length = 100
+target-version = "py314"
 
-[tool.hatch.build.targets.sdist]
-include = [
-  "src/agentops_mcp_server/*.py",
-  "README.md",
-  "README-jp.md",
-  "LICENSE",
-  "src/agentops_mcp_server/zed-agentops-init.sh",
-  "src/agentops_mcp_server/rules_template.txt",
-  "docs/**"
-]
-exclude = [
-  "agentops_mcp_server.rb",
-  "uv.lock",
-  "dist/.DS_Store",
-  ".envrc",
-]
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
