@@ -19,8 +19,7 @@ This README is written for users of the tool. It focuses on how to set up and us
 Install with Homebrew:
 
 ```bash
-brew tap rioriost/agentops_mcp_server
-brew install agentops_mcp_server
+brew intall rioriost/tap/agentops_mcp_server
 ```
 
 This installs:
