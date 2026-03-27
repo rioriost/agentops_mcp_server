@@ -1,3 +1,5 @@
+# Obsoleted
+
 # Zed AgentOps
 
 Zed AgentOps helps you run an edit → verify → commit workflow inside Zed with a local MCP server and a project template designed for resumable agent work.
