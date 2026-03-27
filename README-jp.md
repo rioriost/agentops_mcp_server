@@ -1,3 +1,5 @@
+# 廃止
+
 # Zed AgentOps
 
 Zed AgentOps は、Zed 上で edit → verify → commit のワークフローを回すためのローカル MCP サーバーと、作業再開しやすいプロジェクト用スキャフォールドを提供します。
